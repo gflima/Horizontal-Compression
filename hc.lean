@@ -68,6 +68,16 @@ def Node.decEq (x₁ x₂ : Node) : Decidable (x₁ = x₂) :=
 
 instance : DecidableEq Node := Node.decEq
 
+theorem Node.mk.injEq' {x y : Node} :
+  x = y ↔ x.id = y.id
+          ∧ x.level = y.level
+          ∧ x.formula = y.formula
+          ∧ x.isHypothesis = y.isHypothesis
+          ∧ x.isCollapsed = y.isCollapsed
+          ∧ x.past = y.past := by
+  match x, y with
+  | .mk _ _ _ _ _ _, .mk _ _ _ _ _ _ => simp only [Node.mk.injEq];
+
 structure DEdge where
   (orig : Node)
   (dest : Node)
@@ -75,8 +85,8 @@ structure DEdge where
   (deps : List Formula)
   deriving Repr
 
-def DEdge.decEq (e₁ e₂ : DEdge) : Decidable (e₁ = e₂) :=
-  match e₁, e₂ with
+def DEdge.decEq (d₁ d₂ : DEdge) : Decidable (d₁ = d₂) :=
+  match d₁, d₂ with
   | .mk i₁ j₁ c₁ ds₁, .mk i₂ j₂ c₂ ds₂ => by
     rewrite [DEdge.mk.injEq];
     have _ : Decidable (i₁ = i₂) := Node.decEq i₁ i₂;
@@ -88,6 +98,14 @@ def DEdge.decEq (e₁ e₂ : DEdge) : Decidable (e₁ = e₂) :=
     exact @instDecidableAnd (i₁ = i₂) (j₁ = j₂ ∧ c₁ = c₂ ∧ ds₁ = ds₂) _ _;
 
 instance : DecidableEq DEdge := DEdge.decEq
+
+theorem DEdge.mk.injEq' {d₁ d₂ : DEdge} :
+  d₁ = d₂ ↔ d₁.orig = d₂.orig
+            ∧ d₁.dest = d₂.dest
+            ∧ d₁.color = d₂.color
+            ∧ d₁.deps = d₂.deps := by
+  match d₁, d₂ with
+  | .mk _ _ _ _, .mk _ _ _ _ => simp only [DEdge.mk.injEq];
 
 structure AEdge where
   (orig : Node)
@@ -106,6 +124,13 @@ def AEdge.decEq (a₁ a₂ : @& AEdge) : Decidable (a₁ = a₂) :=
     exact @instDecidableAnd (i₁ = i₂) (j₁ = j₂ ∧ cs₁ = cs₂) _ _;
 
 instance : DecidableEq AEdge := AEdge.decEq
+
+theorem AEdge.mk.injEq' {a₁ a₂ : AEdge} :
+  a₁ = a₂ ↔ a₁.orig = a₂.orig
+            ∧ a₁.dest = a₂.dest
+            ∧ a₁.colors = a₂.colors := by
+  match a₁, a₂ with
+  | .mk _ _ _, .mk _ _ _ => simp only [AEdge.mk.injEq];
 
 structure DLDS where
   (nodes : List Node)
@@ -149,69 +174,20 @@ def Neighborhood.decEq (N₁ N₂ : Neighborhood) : Decidable (N₁ = N₂) :=
 
 instance : DecidableEq Neighborhood := Neighborhood.decEq
 
-namespace List
-  /- Set-Like Conversion -/
-  prefix:max "#" => List.eraseDups
-  /- Set-Like Union: l₁ ∪ l₂ = {a | a ∈ l₁ ∨ a ∈ l₂} -/
-  notation:66 l₁:40 " ∪ " l₂:40 => List.eraseDups (List.append l₁ l₂)
-  /- Set-Like Subtraction: l₁ − l₂ = {a | a ∈ l₁ ∧ a ∉ l₂} -/
-  notation:66 l₁:40 " − " l₂:40 => List.eraseDups (List.removeAll l₁ l₂)
-end List
+def DLDS.get_inc_dedges (G : DLDS) (x : Node) : List DEdge :=
+  loop G.dedges
+  where loop (dedges : List DEdge) : List DEdge :=
+    match dedges with
+    | [] => []
+    | d :: ds => if d.dest = x then d :: loop ds else loop ds
 
+def DLDS.get_out_dedges (G : DLDS) (x : Node)  : List DEdge :=
+  loop G.dedges
+  where loop (dedges : List DEdge) : List DEdge :=
+    match dedges with
+    | [] => []
+    | d :: ds => if d.orig = x then d :: loop ds else loop ds
 
-
-/- Unfold Equality: Node -/
-theorem Node.mk.injEq' {NODE₁ NODE₂ : Node} :
-  -----------------------------------------------------------------------------------
-  ( (NODE₁ = NODE₂) ↔ ( NODE₁.id = NODE₂.id
-                      ∧ NODE₁.level = NODE₂.level
-                      ∧ NODE₁.formula = NODE₂.formula
-                      ∧ NODE₁.isHypothesis = NODE₂.isHypothesis
-                      ∧ NODE₁.isCollapsed = NODE₂.isCollapsed
-                      ∧ NODE₁.past = NODE₂.past ) ) := by
-match NODE₁, NODE₂ with
-| (Node.mk NBR₁ LVL₁ FML₁ HPT₁ COL₁ PST₁),
-  (Node.mk NBR₂ LVL₂ FML₂ HPT₂ COL₂ PST₂) => simp only [Node.mk.injEq];
-/- Unfold Equality: DEdge -/
-theorem DEdge.mk.injEq' {EDGE₁ EDGE₂ : DEdge} :
-  -----------------------------------------------------------------------------------
-  ( (EDGE₁ = EDGE₂) ↔ ( EDGE₁.orig = EDGE₂.orig
-                      ∧ EDGE₁.dest = EDGE₂.dest
-                      ∧ EDGE₁.color = EDGE₂.color
-                      ∧ EDGE₁.deps = EDGE₂.deps ) ) := by
-match EDGE₁, EDGE₂ with
-| (.mk STT₁ dest₁ CLR₁ DEP₁), (.mk STT₂ dest₂ CLR₂ DEP₂) => simp only [DEdge.mk.injEq];
-/- Unfold Equality: AEdge -/
-theorem AEdge.mk.injEq' {PATH₁ PATH₂ : AEdge} :
-  -----------------------------------------------------------------------------------
-  ( (PATH₁ = PATH₂) ↔ ( PATH₁.orig = PATH₂.orig
-                      ∧ PATH₁.dest = PATH₂.dest
-                      ∧ PATH₁.colors = PATH₂.colors ) ) := by
-match PATH₁, PATH₂ with
-| (AEdge.mk STT₁ dest₁ CLRS₁), (AEdge.mk STT₂ dest₂ CLRS₂) => simp only [AEdge.mk.injEq];
-
-
-/- Methods & Definitions -/
-/- Get: Incoming DEdges -/--------------------------------------------------------------------------------------------------
-def get_rule.incoming (NODE : Node) (G : DLDS) : List DEdge :=
-    loop NODE G.dedges
-    where loop (NODE : Node) (EDGES : List DEdge) : List DEdge :=
-          match EDGES with
-          | [] => []
-          | (EDGE::EDGES) => if   ( EDGE.dest = NODE )
-                             then ( EDGE :: loop NODE EDGES )
-                             else ( loop NODE EDGES )
-    ----------------------------------------------------------------------------------------------------------------------------
-/- Get: Outgoing DEdges -/--------------------------------------------------------------------------------------------------
-def get_rule.outgoing (NODE : Node) (G : DLDS) : List DEdge :=
-    loop NODE G.dedges
-    where loop (NODE : Node) (EDGES : List DEdge) : List DEdge :=
-          match EDGES with
-          | [] => []
-          | (EDGE::EDGES) => if   ( EDGE.orig = NODE )
-                             then ( EDGE :: loop NODE EDGES )
-                             else ( loop NODE EDGES )
-    ----------------------------------------------------------------------------------------------------------------------------
 /- Get: Direct AEdges -/----------------------------------------------------------------------------------------------------
 def get_rule.direct (NODE : Node) (G : DLDS) : List AEdge :=
     loop NODE G.aedges
@@ -224,7 +200,7 @@ def get_rule.direct (NODE : Node) (G : DLDS) : List AEdge :=
     ----------------------------------------------------------------------------------------------------------------------------
 /- Get: Indirect AEdges -/--------------------------------------------------------------------------------------------------
 def get_rule.indirect (NODE : Node) (G : DLDS) : List AEdge :=
-    loop (get_rule.incoming NODE G) G.aedges
+    loop (DLDS.get_inc_dedges G NODE) G.aedges
     where loop (EDGES : List DEdge) (PATHS : List AEdge) : List AEdge :=
           match EDGES with
           | [] => []
@@ -233,11 +209,21 @@ def get_rule.indirect (NODE : Node) (G : DLDS) : List AEdge :=
 /- Collapse: NODE × G → Neighborhood -/--------------------------------------------------------------------------------------
 def get_rule (NODE : Node) (G : DLDS) : Neighborhood :=
     Neighborhood.mk ( NODE )
-         ( get_rule.incoming NODE G )
-         ( get_rule.outgoing NODE G )
+         ( DLDS.get_inc_dedges G NODE )
+         ( DLDS.get_out_dedges G NODE )
          ( get_rule.direct NODE G )
          ( get_rule.indirect NODE G )
     ----------------------------------------------------------------------------------------------------------------------------
+
+namespace List
+  /- Set-Like Conversion -/
+  prefix:max "#" => List.eraseDups
+  /- Set-Like Union: l₁ ∪ l₂ = {a | a ∈ l₁ ∨ a ∈ l₂} -/
+  notation:66 l₁:40 " ∪ " l₂:40 => List.eraseDups (List.append l₁ l₂)
+  /- Set-Like Subtraction: l₁ − l₂ = {a | a ∈ l₁ ∧ a ∉ l₂} -/
+  notation:66 l₁:40 " − " l₂:40 => List.eraseDups (List.removeAll l₁ l₂)
+end List
+
 
 /- Collapse & Type Conditionals -/
 /- Check: Past Collapses (Node) & Path Colors (AEdge) -/-------------------------------------------------------------
@@ -827,40 +813,40 @@ def DLDS.is_collapse (U V : Node) : DLDS → DLDS → Prop
                 /- Incoming Nodes -/-------------------------------------------------------------------------------------------------------------
                 /- Above & Right Side (Collapsed Child) -/---------------------------------------------------------------------------------------
 | CLPS, G => ( ∀{inc : DEdge}, ( U.isCollapsed = true ) →
-                                      ( inc ∈ get_rule.incoming U G ) →
+                                      ( inc ∈ DLDS.get_inc_dedges G U ) →
                   ---------------------------------------------------------------------
                   ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
-                                                   ( get_rule.incoming inc.orig G )
-                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (get_rule.outgoing inc.orig G) )
+                                                   ( DLDS.get_inc_dedges G inc.orig )
+                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (DLDS.get_out_dedges G inc.orig) )
                 /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct inc.orig G )
                                                    ( get_rule.indirect inc.orig G ) ) )
                 ---------------------------------------------------------------------------------------------------------------------------------
                 /- Aboce & Right Side (Non-Collapsed Child) -/-----------------------------------------------------------------------------------
               ∧ ( ∀{inc : DEdge}, ( U.isCollapsed = false ) →
-                                      ( inc ∈ get_rule.incoming U G ) →
+                                      ( inc ∈ DLDS.get_inc_dedges G U ) →
                   ---------------------------------------------------------------------
                   ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
-                                                   ( get_rule.incoming inc.orig G )
-                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (get_rule.outgoing inc.orig G) )
+                                                   ( DLDS.get_inc_dedges G inc.orig )
+                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (DLDS.get_out_dedges G inc.orig) )
                 /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.orig )
                                                                           ( pre_collapse.indirect ( U.id )
                                                                                                   ( U.isHypothesis )
-                                                                                                  ( get_rule.incoming U G )
-                                                                                                  ( get_rule.outgoing U G )
+                                                                                                  ( DLDS.get_inc_dedges G U )
+                                                                                                  ( DLDS.get_out_dedges G U )
                                                                                                   ( get_rule.direct U G ) ) )
                                                    ( get_rule.indirect inc.orig G ) ) )
                 ---------------------------------------------------------------------------------------------------------------------------------
                 /- Above & Left Side -/----------------------------------------------------------------------------------------------------------
-              ∧ ( ∀{inc : DEdge}, ( inc ∈ get_rule.incoming V G ) →
+              ∧ ( ∀{inc : DEdge}, ( inc ∈ DLDS.get_inc_dedges G V ) →
                   ---------------------------------------------------------------------
                   ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
-                                                   ( get_rule.incoming inc.orig G )
-                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (get_rule.outgoing inc.orig G) )
+                                                   ( DLDS.get_inc_dedges G inc.orig )
+                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (DLDS.get_out_dedges G inc.orig) )
                 /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.orig )
                                                                           ( pre_collapse.indirect ( V.id )
                                                                                                   ( V.isHypothesis )
-                                                                                                  ( get_rule.incoming V G )
-                                                                                                  ( get_rule.outgoing V G )
+                                                                                                  ( DLDS.get_inc_dedges G V )
+                                                                                                  ( DLDS.get_out_dedges G V )
                                                                                                   ( get_rule.direct V G ) ) )
                                                    ( get_rule.indirect inc.orig G ) ) )
     ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -1012,35 +998,35 @@ namespace COLLAPSE
                        | head _ => exact prop_head;
                        | tail _ mem_cases => exact prop_mem mem_cases; );
 
-  /- Lemma: Simplify "dest" at "get_rule.incoming" -/
+  /- Lemma: Simplify "dest" at "DLDS.get_inc_dedges" -/
   theorem Simp_Dest_Incoming {NODE : Node} {G : DLDS} {EDGE : DEdge} :
-    ( EDGE ∈ get_rule.incoming NODE G ) →
+    ( EDGE ∈ DLDS.get_inc_dedges G NODE ) →
     ------------------------------------
     ( EDGE.dest = NODE ) := by
-  simp only [get_rule.incoming];
+  simp only [DLDS.get_inc_dedges];
   induction G.dedges with
   | nil => intro mem_incoming;
-           simp only [get_rule.incoming.loop] at mem_incoming;
+           simp only [DLDS.get_inc_dedges.loop] at mem_incoming;
            trivial;
   | cons HEAD TAIL LOOP => intro mem_incoming;
-                           simp only [get_rule.incoming.loop] at mem_incoming;
+                           simp only [DLDS.get_inc_dedges.loop] at mem_incoming;
                            split at mem_incoming;
                            case _ eq_head => cases mem_incoming with
                                              | head _ => exact eq_head;
                                              | tail _ mem_incoming => exact LOOP mem_incoming;
                            case _ ne_head => exact LOOP mem_incoming;
-  /- Lemma: Simplify "orig" at "get_rule.outgoing" -/
+  /- Lemma: Simplify "orig" at "DLDS.get_out_dedges" -/
   theorem Simp_Orig_Outgoing {NODE : Node} {G : DLDS} {EDGE : DEdge} :
-    ( EDGE ∈ get_rule.outgoing NODE G ) →
+    ( EDGE ∈ DLDS.get_out_dedges G NODE ) →
     ------------------------------------
     ( EDGE.orig = NODE ) := by
-  simp only [get_rule.outgoing];
+  simp only [DLDS.get_out_dedges];
   induction G.dedges with
   | nil => intro mem_incoming;
-           simp only [get_rule.outgoing.loop] at mem_incoming;
+           simp only [DLDS.get_out_dedges.loop] at mem_incoming;
            trivial;
   | cons HEAD TAIL LOOP => intro mem_incoming;
-                           simp only [get_rule.outgoing.loop] at mem_incoming;
+                           simp only [DLDS.get_out_dedges.loop] at mem_incoming;
                            split at mem_incoming;
                            case _ eq_head => cases mem_incoming with
                                              | head _ => exact eq_head;
@@ -1070,7 +1056,7 @@ namespace COLLAPSE
     ------------------------------------
     ( AEdge.mk (Orig : Node) NODE₁ (Colors : List Nat) ∈ get_rule.direct NODE₁ G ) := by
   simp only [get_rule.indirect];
-  induction get_rule.incoming NODE₀ G with
+  induction DLDS.get_inc_dedges G NODE₀ with
   | nil => intro prop_indirect₀;
            simp only [get_rule.indirect.loop] at prop_indirect₀;
            trivial;
@@ -1084,12 +1070,12 @@ namespace COLLAPSE
                            | inr prop_tail₀ => exact LOOP prop_tail₀;
   /- Lemma: Simplify "get_rule.direct" at "get_rule.indirect" -/
   theorem Simp_Direct_Indirect₀₂ {NODE : Node} {G : DLDS} {EDGE : DEdge} :
-    ( EDGE ∈ get_rule.incoming NODE G ) →
+    ( EDGE ∈ DLDS.get_inc_dedges G NODE ) →
     ( get_rule.indirect NODE G = [] ) →
     ------------------------------------
     ( get_rule.direct EDGE.orig G = [] ) := by
   simp only [get_rule.indirect];
-  induction get_rule.incoming NODE G with
+  induction DLDS.get_inc_dedges G NODE with
   | nil => intro _ prop_indirect;
            simp only [get_rule.indirect.loop] at prop_indirect;
            trivial;
@@ -1214,11 +1200,11 @@ namespace COLLAPSE
     ( U.isCollapsed = true ) →
     ( CLPS.is_collapse U V G ) →
     /- Incoming Nodes -/-------------------------------------------------------------
-    ( ∀{inc : DEdge}, ( inc ∈ get_rule.incoming U G ) →
+    ( ∀{inc : DEdge}, ( inc ∈ DLDS.get_inc_dedges G U ) →
       -----------------------------------------------------------------------------
     ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
-                                     ( get_rule.incoming inc.orig G )
-  /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (get_rule.outgoing inc.orig G) )
+                                     ( DLDS.get_inc_dedges G inc.orig )
+  /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (DLDS.get_out_dedges G inc.orig) )
   /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct inc.orig G )
                                      ( get_rule.indirect inc.orig G ) ) ) := by
   intro prop_col prop_collapse;
@@ -1231,16 +1217,16 @@ namespace COLLAPSE
     ( U.isCollapsed = false ) →
     ( CLPS.is_collapse U V G ) →
     /- Incoming Nodes -/-------------------------------------------------------------
-    ( ∀{inc : DEdge}, ( inc ∈ get_rule.incoming U G ) →
+    ( ∀{inc : DEdge}, ( inc ∈ DLDS.get_inc_dedges G U ) →
       -----------------------------------------------------------------------------
       ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
-                                       ( get_rule.incoming inc.orig G )
-    /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (get_rule.outgoing inc.orig G) )
+                                       ( DLDS.get_inc_dedges G inc.orig )
+    /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (DLDS.get_out_dedges G inc.orig) )
     /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.orig )
                                                               ( pre_collapse.indirect ( U.id )
                                                                                       ( U.isHypothesis )
-                                                                                      ( get_rule.incoming U G )
-                                                                                      ( get_rule.outgoing U G )
+                                                                                      ( DLDS.get_inc_dedges G U )
+                                                                                      ( DLDS.get_out_dedges G U )
                                                                                       ( get_rule.direct U G ) ) )
                                        ( get_rule.indirect inc.orig G ) ) ) := by
   intro prop_col prop_collapse;
@@ -1253,16 +1239,16 @@ namespace COLLAPSE
   theorem Simp_Rule_Above_Right {U V : Node} {G CLPS : DLDS} :
     ( CLPS.is_collapse U V G ) →
     /- Incoming Nodes -/-------------------------------------------------------------
-    ( ∀{inc : DEdge}, ( inc ∈ get_rule.incoming V G ) →
+    ( ∀{inc : DEdge}, ( inc ∈ DLDS.get_inc_dedges G V ) →
       -----------------------------------------------------------------------------
       ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
-                                       ( get_rule.incoming inc.orig G )
-    /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (get_rule.outgoing inc.orig G) )
+                                       ( DLDS.get_inc_dedges G inc.orig )
+    /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (DLDS.get_out_dedges G inc.orig) )
     /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.orig )
                                                               ( pre_collapse.indirect ( V.id )
                                                                                       ( V.isHypothesis )
-                                                                                      ( get_rule.incoming V G )
-                                                                                      ( get_rule.outgoing V G )
+                                                                                      ( DLDS.get_inc_dedges G V )
+                                                                                      ( DLDS.get_out_dedges G V )
                                                                                       ( get_rule.direct V G ) ) )
                                        ( get_rule.indirect inc.orig G ) ) ) := by
   intro prop_collapse;
@@ -7712,7 +7698,7 @@ namespace COVERAGE.UP.T0H
   theorem Not_Above_T0H {NODE : Node} {G : DLDS} :
     ( type0_hypothesis (get_rule NODE G) ) →
     ---------------------------
-    ( get_rule.incoming NODE G = [] ) := by
+    ( DLDS.get_inc_dedges G NODE = [] ) := by
   intro prop_type;
   simp only [get_rule] at prop_type;
   simp only [type0_hypothesis] at prop_type;
@@ -7732,8 +7718,8 @@ namespace COVERAGE.UP.T0E
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T0E {U0 U1 : Node} {G : DLDS} :
     ( type0_elimination (get_rule U0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 G )
-                         ∧ ( edge ∈ get_rule.incoming U0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
     ------------------------------------------------------
     ( ¬type2_elimination (get_rule U1 G) )
   ∧ ( ¬type2_introduction (get_rule U1 G) )
@@ -7886,8 +7872,8 @@ namespace COVERAGE.UP.T0E
     ( CLPS.is_collapse U0 V0 G ) →
     ( type0_elimination (get_rule U0 G) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 G )
-                         ∧ ( edge ∈ get_rule.incoming U0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
   ∧ ( type0_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
@@ -8170,8 +8156,8 @@ namespace COVERAGE.UP.T0E
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
     ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
     ( type0_elimination (get_rule V0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing V1 G )
-                         ∧ ( edge ∈ get_rule.incoming V0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G V1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G V0 ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
   ∧ ( type0_elimination (get_rule V1 G) → type2_elimination (get_rule V1 CLPS) )
@@ -8479,8 +8465,8 @@ namespace COVERAGE.UP.T0I
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T0I {U0 U1 : Node} {G : DLDS} :
     ( type0_introduction (get_rule U0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 G )
-                         ∧ ( edge ∈ get_rule.incoming U0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
     ------------------------------------------------------
     ( ¬type2_elimination (get_rule U1 G) )
   ∧ ( ¬type2_introduction (get_rule U1 G) )
@@ -8632,8 +8618,8 @@ namespace COVERAGE.UP.T0I
     ( CLPS.is_collapse U0 V0 G ) →
     ( type0_introduction (get_rule U0 G) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 G )
-                         ∧ ( edge ∈ get_rule.incoming U0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
   ∧ ( type0_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
@@ -8904,8 +8890,8 @@ namespace COVERAGE.UP.T0I
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
     ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
     ( type0_introduction (get_rule V0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing V1 G )
-                         ∧ ( edge ∈ get_rule.incoming V0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G V1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G V0 ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
   ∧ ( type0_elimination (get_rule V1 G) → type2_elimination (get_rule V1 CLPS) )
@@ -9203,7 +9189,7 @@ namespace COVERAGE.UP.T2H
   theorem Not_Above_T2H {NODE : Node} {G : DLDS} :
     ( type2_hypothesis (get_rule NODE G) ) →
     ---------------------------
-    ( get_rule.incoming NODE G = [] ) := by
+    ( DLDS.get_inc_dedges G NODE = [] ) := by
   intro prop_type;
   simp only [get_rule] at prop_type;
   simp only [type2_hypothesis] at prop_type;
@@ -9236,8 +9222,8 @@ namespace COVERAGE.UP.T2E
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T2E {U0 U1 : Node} {G : DLDS} :
     ( type2_elimination (get_rule U0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 G )
-                         ∧ ( edge ∈ get_rule.incoming U0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
     ------------------------------------------------------
     ( ¬type2_elimination (get_rule U1 G) )
   ∧ ( ¬type2_introduction (get_rule U1 G) )
@@ -9403,8 +9389,8 @@ namespace COVERAGE.UP.T2E
     ( CLPS.is_collapse U0 V0 G ) →
     ( type2_elimination (get_rule U0 G) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 G )
-                         ∧ ( edge ∈ get_rule.incoming U0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
   ∧ ( type0_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
@@ -9697,8 +9683,8 @@ namespace COVERAGE.UP.T2E
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
     ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
     ( type2_elimination (get_rule V0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing V1 G )
-                         ∧ ( edge ∈ get_rule.incoming V0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G V1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G V0 ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
   ∧ ( type0_elimination (get_rule V1 G) → type2_elimination (get_rule V1 CLPS) )
@@ -10016,8 +10002,8 @@ namespace COVERAGE.UP.T2I
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T2I {U0 U1 : Node} {G : DLDS} :
     ( type2_introduction (get_rule U0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 G )
-                         ∧ ( edge ∈ get_rule.incoming U0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
     ------------------------------------------------------
     ( ¬type2_elimination (get_rule U1 G) )
   ∧ ( ¬type2_introduction (get_rule U1 G) )
@@ -10182,8 +10168,8 @@ namespace COVERAGE.UP.T2I
     ( CLPS.is_collapse U0 V0 G ) →
     ( type2_introduction (get_rule U0 G) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 G )
-                         ∧ ( edge ∈ get_rule.incoming U0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
   ∧ ( type0_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
@@ -10464,8 +10450,8 @@ namespace COVERAGE.UP.T2I
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
     ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
     ( type2_introduction (get_rule V0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing V1 G )
-                         ∧ ( edge ∈ get_rule.incoming V0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G V1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G V0 ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
   ∧ ( type0_elimination (get_rule V1 G) → type2_elimination (get_rule V1 CLPS) )
@@ -10772,8 +10758,8 @@ namespace COVERAGE.UP.T1X
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T1X {U0 U1 : Node} {G : DLDS} :
     ( type1_collapse (get_rule U0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 G )
-                         ∧ ( edge ∈ get_rule.incoming U0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
     ------------------------------------------------------
     ( ¬type0_elimination (get_rule U1 G) )
   ∧ ( ¬type0_introduction (get_rule U1 G) )
@@ -10887,8 +10873,8 @@ namespace COVERAGE.UP.T1X
     ( CLPS.is_collapse U0 V0 G ) →
     ( type1_collapse (get_rule U0 G) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 G )
-                         ∧ ( edge ∈ get_rule.incoming U0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
   ∧ ( type2_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
@@ -11195,8 +11181,8 @@ namespace COVERAGE.UP.T3X
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T3X {U0 U1 : Node} {G : DLDS} :
     ( type3_collapse (get_rule U0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 G )
-                         ∧ ( edge ∈ get_rule.incoming U0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
     ------------------------------------------------------
     ( ¬type0_elimination (get_rule U1 G) )
   ∧ ( ¬type0_introduction (get_rule U1 G) )
@@ -11311,8 +11297,8 @@ namespace COVERAGE.UP.T3X
     ( CLPS.is_collapse U0 V0 G ) →
     ( type3_collapse (get_rule U0 G) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 G )
-                         ∧ ( edge ∈ get_rule.incoming U0 G ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
+                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
   ∧ ( type2_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
