@@ -52,7 +52,7 @@ structure Vertex where
 
 def Vertex.decEq (x₁ x₂ : Vertex) : Decidable (x₁ = x₂) :=
   match x₁, x₂ with
-  | (.mk n₁ l₁ f₁ h₁ c₁ p₁), (.mk n₂ l₂ f₂ h₂ c₂ p₂) => by
+  | .mk n₁ l₁ f₁ h₁ c₁ p₁, .mk n₂ l₂ f₂ h₂ c₂ p₂ => by
     rewrite [Vertex.mk.injEq];
     have _ : Decidable (n₁ = n₂) := Nat.decEq n₁ n₂;
     have _ : Decidable (l₁ = l₂) := Nat.decEq l₁ l₂;
@@ -77,7 +77,7 @@ structure DEdge where
 
 def DEdge.decEq (e₁ e₂ : DEdge) : Decidable (e₁ = e₂) :=
   match e₁, e₂ with
-  | (.mk i₁ j₁ c₁ ds₁), (.mk i₂ j₂ c₂ ds₂) => by
+  | .mk i₁ j₁ c₁ ds₁, .mk i₂ j₂ c₂ ds₂ => by
     rewrite [DEdge.mk.injEq];
     have _ : Decidable (i₁ = i₂) := Vertex.decEq i₁ i₂;
     have _ : Decidable (j₁ = j₂) := Vertex.decEq j₁ j₂;
@@ -97,7 +97,7 @@ structure AEdge where
 
 def AEdge.decEq (a₁ a₂ : @& AEdge) : Decidable (a₁ = a₂) :=
   match a₁, a₂ with
-  | (AEdge.mk i₁ j₁ cs₁), (AEdge.mk i₂ j₂ cs₂) => by
+  | .mk i₁ j₁ cs₁, .mk i₂ j₂ cs₂ => by
     rewrite [AEdge.mk.injEq];
     have _ : Decidable (i₁ = i₂) := Vertex.decEq i₁ i₂;
     have _ : Decidable (j₁ = j₂) := Vertex.decEq j₁ j₂;
@@ -108,13 +108,24 @@ def AEdge.decEq (a₁ a₂ : @& AEdge) : Decidable (a₁ = a₂) :=
 instance : DecidableEq AEdge := AEdge.decEq
 
 structure Graph where
-dlds :: (NODES : List Vertex)
-        (EDGES : List DEdge)
-        (PATHS : List AEdge)
-deriving Repr
-export Graph (dlds)
+  (vertices : List Vertex)
+  (dedges : List DEdge)
+  (aedges : List AEdge)
+  deriving Repr
 
-/- DLDS: Neighborhoods -/
+def Graph.decEq (G₁ G₂ : Graph) : Decidable (G₁ = G₂) := by
+  match G₁, G₂ with
+  | .mk xs₁ ds₁ as₁, .mk xs₂ ds₂ as₂ =>
+    rewrite [Graph.mk.injEq];
+    have _ : Decidable (xs₁ = xs₂) := List.hasDecEq xs₁ xs₂;
+    have _ : Decidable (ds₁ = ds₂) := List.hasDecEq ds₁ ds₂;
+    have _ : Decidable (as₁ = as₂) := List.hasDecEq as₁ as₂;
+    have _ := @instDecidableAnd (ds₁ = ds₂) (as₁ = as₂) _ _;
+    exact @instDecidableAnd (xs₁ = xs₂) (ds₁ = ds₂ ∧ as₁ = as₂) _ _;
+
+instance : DecidableEq Graph := Graph.decEq
+
+
 structure Neighborhood where
 rule :: (CENTER : Vertex)
         (INCOMING : List DEdge)
@@ -134,22 +145,6 @@ namespace List
 end List
 
 
-/- Instances of Decidability: Labels -/
-/- Instances of Decidability: Vertices -/
-/- Instances of Decidability: DEdge Edges -/
-
-/- Instances of Decidability: AEdge Paths -/
-/- Instances of Decidability: Graph -/
-@[inline] def Graph.decEq (DLDS₁ DLDS₂ : @& Graph) : Decidable (DLDS₁ = DLDS₂) := by
-match DLDS₁, DLDS₂ with
-| (dlds NODES₁ EDGES₁ PATHS₁), (dlds NODES₂ EDGES₂ PATHS₂) =>
-  rewrite [Graph.dlds.injEq];
-  have DecNODES : Decidable (NODES₁ = NODES₂) := List.hasDecEq NODES₁ NODES₂;
-  have DecEDGES : Decidable (EDGES₁ = EDGES₂) := List.hasDecEq EDGES₁ EDGES₂;
-  have DecPATHS : Decidable (PATHS₁ = PATHS₂) := List.hasDecEq PATHS₁ PATHS₂;
-  have DecAND := @instDecidableAnd (EDGES₁ = EDGES₂) (PATHS₁ = PATHS₂) DecEDGES DecPATHS;
-  exact @instDecidableAnd (NODES₁ = NODES₂) (EDGES₁ = EDGES₂ ∧ PATHS₁ = PATHS₂) DecNODES DecAND;
-@[inline] instance : DecidableEq Graph := Graph.decEq
 /- Instances of Decidability: Neighborhoods -/
 @[inline] def Neighborhood.decEq (RULE₁ RULE₂ : @& Neighborhood) : Decidable (RULE₁ = RULE₂) :=
 match RULE₁, RULE₂ with
@@ -206,7 +201,7 @@ match PATH₁, PATH₂ with
 /- Methods & Definitions -/
 /- Get: Incoming DEdges -/--------------------------------------------------------------------------------------------------
 def get_rule.incoming (NODE : Vertex) (DLDS : Graph) : List DEdge :=
-    loop NODE DLDS.EDGES
+    loop NODE DLDS.dedges
     where loop (NODE : Vertex) (EDGES : List DEdge) : List DEdge :=
           match EDGES with
           | [] => []
@@ -216,7 +211,7 @@ def get_rule.incoming (NODE : Vertex) (DLDS : Graph) : List DEdge :=
     ----------------------------------------------------------------------------------------------------------------------------
 /- Get: Outgoing DEdges -/--------------------------------------------------------------------------------------------------
 def get_rule.outgoing (NODE : Vertex) (DLDS : Graph) : List DEdge :=
-    loop NODE DLDS.EDGES
+    loop NODE DLDS.dedges
     where loop (NODE : Vertex) (EDGES : List DEdge) : List DEdge :=
           match EDGES with
           | [] => []
@@ -226,7 +221,7 @@ def get_rule.outgoing (NODE : Vertex) (DLDS : Graph) : List DEdge :=
     ----------------------------------------------------------------------------------------------------------------------------
 /- Get: Direct AEdges -/----------------------------------------------------------------------------------------------------
 def get_rule.direct (NODE : Vertex) (DLDS : Graph) : List AEdge :=
-    loop NODE DLDS.PATHS
+    loop NODE DLDS.aedges
     where loop (NODE : Vertex) (PATHS : List AEdge) : List AEdge :=
           match PATHS with
           | [] => []
@@ -236,7 +231,7 @@ def get_rule.direct (NODE : Vertex) (DLDS : Graph) : List AEdge :=
     ----------------------------------------------------------------------------------------------------------------------------
 /- Get: Indirect AEdges -/--------------------------------------------------------------------------------------------------
 def get_rule.indirect (NODE : Vertex) (DLDS : Graph) : List AEdge :=
-    loop (get_rule.incoming NODE DLDS) DLDS.PATHS
+    loop (get_rule.incoming NODE DLDS) DLDS.aedges
     where loop (EDGES : List DEdge) (PATHS : List AEdge) : List AEdge :=
           match EDGES with
           | [] => []
@@ -258,16 +253,16 @@ def check_numbers (ns : List Nat) : Prop :=
 
 /- Check: Nodes Set (Graph) -/----------------------------------------------------------------------------------------------
 def check_dlds (DLDS : Graph) : Prop :=
-    ( ∀{NODE₁ NODE₂ : Vertex}, ( NODE₁ ∈ DLDS.NODES ) →
-                               ( NODE₂ ∈ DLDS.NODES ) →
+    ( ∀{NODE₁ NODE₂ : Vertex}, ( NODE₁ ∈ DLDS.vertices ) →
+                               ( NODE₂ ∈ DLDS.vertices ) →
       --------------------------------------
       ( ( NODE₁.id = NODE₂.id ) ↔ ( NODE₁ = NODE₂ ) ) )
-  ∧ ( ∀{EDGE : DEdge}, ( EDGE ∈ DLDS.EDGES ) →
+  ∧ ( ∀{EDGE : DEdge}, ( EDGE ∈ DLDS.dedges ) →
       --------------------------------------
-      ( EDGE.orig ∈ DLDS.NODES ∧ EDGE.dest ∈ DLDS.NODES ) )
-  ∧ ( ∀{PATH : AEdge}, ( PATH ∈ DLDS.PATHS ) →
+      ( EDGE.orig ∈ DLDS.vertices ∧ EDGE.dest ∈ DLDS.vertices ) )
+  ∧ ( ∀{PATH : AEdge}, ( PATH ∈ DLDS.aedges ) →
       --------------------------------------
-      ( PATH.orig ∈ DLDS.NODES ∧ PATH.dest ∈ DLDS.NODES ) )
+      ( PATH.orig ∈ DLDS.vertices ∧ PATH.dest ∈ DLDS.vertices ) )
     ------------------------------------------------------------------------------------------------------------------------
 /- Check: Collapse Nodes (Vertexes) & Incoming Edges (DEdges) -/--------------------------------------------------------
 def check_collapse_nodes (RULEᵤ RULEᵥ : Neighborhood) : Prop :=
@@ -1030,7 +1025,7 @@ namespace COLLAPSE
     ------------------------------------
     ( EDGE.dest = NODE ) := by
   simp only [get_rule.incoming];
-  induction DLDS.EDGES with
+  induction DLDS.dedges with
   | nil => intro mem_incoming;
            simp only [get_rule.incoming.loop] at mem_incoming;
            trivial;
@@ -1047,7 +1042,7 @@ namespace COLLAPSE
     ------------------------------------
     ( EDGE.orig = NODE ) := by
   simp only [get_rule.outgoing];
-  induction DLDS.EDGES with
+  induction DLDS.dedges with
   | nil => intro mem_incoming;
            simp only [get_rule.outgoing.loop] at mem_incoming;
            trivial;
@@ -1064,7 +1059,7 @@ namespace COLLAPSE
     ------------------------------------
     ( PATH.dest = NODE ) := by
   simp only [get_rule.direct];
-  induction DLDS.PATHS with
+  induction DLDS.aedges with
   | nil => intro mem_direct;
            simp only [get_rule.direct.loop] at mem_direct;
            trivial;
