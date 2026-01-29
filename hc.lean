@@ -68,34 +68,59 @@ def Vertex.decEq (x₁ x₂ : Vertex) : Decidable (x₁ = x₂) :=
 
 instance : DecidableEq Vertex := Vertex.decEq
 
-structure Deduction where
-  (START : Vertex)
-  (END : Vertex)
-  (COLOR : Nat)
-  (DEPENDENCY : List Formula)
+structure DEdge where
+  (orig : Vertex)
+  (dest : Vertex)
+  (color : Nat)
+  (deps : List Formula)
   deriving Repr
 
-structure Ancestral where
-  (START : Vertex)
-  (END : Vertex)
-  (COLORS : List Nat)
+def DEdge.decEq (e₁ e₂ : DEdge) : Decidable (e₁ = e₂) :=
+  match e₁, e₂ with
+  | (.mk i₁ j₁ c₁ ds₁), (.mk i₂ j₂ c₂ ds₂) => by
+    rewrite [DEdge.mk.injEq];
+    have _ : Decidable (i₁ = i₂) := Vertex.decEq i₁ i₂;
+    have _ : Decidable (j₁ = j₂) := Vertex.decEq j₁ j₂;
+    have _ : Decidable (c₁ = c₂) := Nat.decEq c₁ c₂;
+    have _ : Decidable (ds₁ = ds₂) := List.hasDecEq ds₁ ds₂;
+    have _ := @instDecidableAnd (c₁ = c₂) (ds₁ = ds₂) _ _;
+    have _ := @instDecidableAnd (j₁ = j₂) (c₁ = c₂ ∧ ds₁ = ds₂) _ _;
+    exact @instDecidableAnd (i₁ = i₂) (j₁ = j₂ ∧ c₁ = c₂ ∧ ds₁ = ds₂) _ _;
+
+instance : DecidableEq DEdge := DEdge.decEq
+
+structure AEdge where
+  (orig : Vertex)
+  (dest : Vertex)
+  (colors : List Nat)
   deriving Repr
 
-/- DLDS: Graph -/
+def AEdge.decEq (a₁ a₂ : @& AEdge) : Decidable (a₁ = a₂) :=
+  match a₁, a₂ with
+  | (AEdge.mk i₁ j₁ cs₁), (AEdge.mk i₂ j₂ cs₂) => by
+    rewrite [AEdge.mk.injEq];
+    have _ : Decidable (i₁ = i₂) := Vertex.decEq i₁ i₂;
+    have _ : Decidable (j₁ = j₂) := Vertex.decEq j₁ j₂;
+    have _ : Decidable (cs₁ = cs₂) := List.hasDecEq cs₁ cs₂;
+    have _ := @instDecidableAnd (j₁ = j₂) (cs₁ = cs₂) _ _;
+    exact @instDecidableAnd (i₁ = i₂) (j₁ = j₂ ∧ cs₁ = cs₂) _ _;
+
+instance : DecidableEq AEdge := AEdge.decEq
+
 structure Graph where
 dlds :: (NODES : List Vertex)
-        (EDGES : List Deduction)
-        (PATHS : List Ancestral)
+        (EDGES : List DEdge)
+        (PATHS : List AEdge)
 deriving Repr
 export Graph (dlds)
 
 /- DLDS: Neighborhoods -/
 structure Neighborhood where
 rule :: (CENTER : Vertex)
-        (INCOMING : List Deduction)
-        (OUTGOING : List Deduction)
-        (DIRECT : List Ancestral)
-        (INDIRECT : List Ancestral)
+        (INCOMING : List DEdge)
+        (OUTGOING : List DEdge)
+        (DIRECT : List AEdge)
+        (INDIRECT : List AEdge)
 deriving Repr
 export Neighborhood (rule)
 
@@ -111,30 +136,9 @@ end List
 
 /- Instances of Decidability: Labels -/
 /- Instances of Decidability: Vertices -/
-/- Instances of Decidability: Deduction Edges -/
-@[inline] def Deduction.decEq (EDGE₁ EDGE₂ : @& Deduction) : Decidable (EDGE₁ = EDGE₂) :=
-match EDGE₁, EDGE₂ with
-| (.mk STT₁ END₁ CLR₁ DEP₁), (.mk STT₂ END₂ CLR₂ DEP₂) => by
-  rewrite [Deduction.mk.injEq];
-  have DecSTT : Decidable (STT₁ = STT₂) := Vertex.decEq STT₁ STT₂;
-  have DecEND : Decidable (END₁ = END₂) := Vertex.decEq END₁ END₂;
-  have DecCLR : Decidable (CLR₁ = CLR₂) := Nat.decEq CLR₁ CLR₂;
-  have DecDEP : Decidable (DEP₁ = DEP₂) := List.hasDecEq DEP₁ DEP₂;
-  have DecAND₁ := @instDecidableAnd (CLR₁ = CLR₂) (DEP₁ = DEP₂) DecCLR DecDEP;
-  have DecAND₂ := @instDecidableAnd (END₁ = END₂) (CLR₁ = CLR₂ ∧ DEP₁ = DEP₂) DecEND DecAND₁;
-  exact @instDecidableAnd (STT₁ = STT₂) (END₁ = END₂ ∧ CLR₁ = CLR₂ ∧ DEP₁ = DEP₂) DecSTT DecAND₂;
-@[inline] instance : DecidableEq Deduction := Deduction.decEq
-/- Instances of Decidability: Ancestral Paths -/
-@[inline] def Ancestral.decEq (PATH₁ PATH₂ : @& Ancestral) : Decidable (PATH₁ = PATH₂) :=
-match PATH₁, PATH₂ with
-| (Ancestral.mk STT₁ END₁ CLRS₁), (Ancestral.mk STT₂ END₂ CLRS₂) => by
-  rewrite [Ancestral.mk.injEq];
-  have DecSTT : Decidable (STT₁ = STT₂) := Vertex.decEq STT₁ STT₂;
-  have DecEND : Decidable (END₁ = END₂) := Vertex.decEq END₁ END₂;
-  have DecCLRS : Decidable (CLRS₁ = CLRS₂) := List.hasDecEq CLRS₁ CLRS₂;
-  have DecAND := @instDecidableAnd (END₁ = END₂) (CLRS₁ = CLRS₂) DecEND DecCLRS;
-  exact @instDecidableAnd (STT₁ = STT₂) (END₁ = END₂ ∧ CLRS₁ = CLRS₂) DecSTT DecAND;
-@[inline] instance : DecidableEq Ancestral := Ancestral.decEq
+/- Instances of Decidability: DEdge Edges -/
+
+/- Instances of Decidability: AEdge Paths -/
 /- Instances of Decidability: Graph -/
 @[inline] def Graph.decEq (DLDS₁ DLDS₂ : @& Graph) : Decidable (DLDS₁ = DLDS₂) := by
 match DLDS₁, DLDS₂ with
@@ -180,63 +184,63 @@ theorem Vertex.mk.injEq' {NODE₁ NODE₂ : Vertex} :
 match NODE₁, NODE₂ with
 | (Vertex.mk NBR₁ LVL₁ FML₁ HPT₁ COL₁ PST₁),
   (Vertex.mk NBR₂ LVL₂ FML₂ HPT₂ COL₂ PST₂) => simp only [Vertex.mk.injEq];
-/- Unfold Equality: Deduction -/
-theorem Deduction.mk.injEq' {EDGE₁ EDGE₂ : Deduction} :
+/- Unfold Equality: DEdge -/
+theorem DEdge.mk.injEq' {EDGE₁ EDGE₂ : DEdge} :
   -----------------------------------------------------------------------------------
-  ( (EDGE₁ = EDGE₂) ↔ ( EDGE₁.START = EDGE₂.START
-                      ∧ EDGE₁.END = EDGE₂.END
-                      ∧ EDGE₁.COLOR = EDGE₂.COLOR
-                      ∧ EDGE₁.DEPENDENCY = EDGE₂.DEPENDENCY ) ) := by
+  ( (EDGE₁ = EDGE₂) ↔ ( EDGE₁.orig = EDGE₂.orig
+                      ∧ EDGE₁.dest = EDGE₂.dest
+                      ∧ EDGE₁.color = EDGE₂.color
+                      ∧ EDGE₁.deps = EDGE₂.deps ) ) := by
 match EDGE₁, EDGE₂ with
-| (.mk STT₁ END₁ CLR₁ DEP₁), (.mk STT₂ END₂ CLR₂ DEP₂) => simp only [Deduction.mk.injEq];
-/- Unfold Equality: Ancestral -/
-theorem Ancestral.mk.injEq' {PATH₁ PATH₂ : Ancestral} :
+| (.mk STT₁ dest₁ CLR₁ DEP₁), (.mk STT₂ dest₂ CLR₂ DEP₂) => simp only [DEdge.mk.injEq];
+/- Unfold Equality: AEdge -/
+theorem AEdge.mk.injEq' {PATH₁ PATH₂ : AEdge} :
   -----------------------------------------------------------------------------------
-  ( (PATH₁ = PATH₂) ↔ ( PATH₁.START = PATH₂.START
-                      ∧ PATH₁.END = PATH₂.END
-                      ∧ PATH₁.COLORS = PATH₂.COLORS ) ) := by
+  ( (PATH₁ = PATH₂) ↔ ( PATH₁.orig = PATH₂.orig
+                      ∧ PATH₁.dest = PATH₂.dest
+                      ∧ PATH₁.colors = PATH₂.colors ) ) := by
 match PATH₁, PATH₂ with
-| (Ancestral.mk STT₁ END₁ CLRS₁), (Ancestral.mk STT₂ END₂ CLRS₂) => simp only [Ancestral.mk.injEq];
+| (AEdge.mk STT₁ dest₁ CLRS₁), (AEdge.mk STT₂ dest₂ CLRS₂) => simp only [AEdge.mk.injEq];
 
 
 /- Methods & Definitions -/
-/- Get: Incoming Deductions -/--------------------------------------------------------------------------------------------------
-def get_rule.incoming (NODE : Vertex) (DLDS : Graph) : List Deduction :=
+/- Get: Incoming DEdges -/--------------------------------------------------------------------------------------------------
+def get_rule.incoming (NODE : Vertex) (DLDS : Graph) : List DEdge :=
     loop NODE DLDS.EDGES
-    where loop (NODE : Vertex) (EDGES : List Deduction) : List Deduction :=
+    where loop (NODE : Vertex) (EDGES : List DEdge) : List DEdge :=
           match EDGES with
           | [] => []
-          | (EDGE::EDGES) => if   ( EDGE.END = NODE )
+          | (EDGE::EDGES) => if   ( EDGE.dest = NODE )
                              then ( EDGE :: loop NODE EDGES )
                              else ( loop NODE EDGES )
     ----------------------------------------------------------------------------------------------------------------------------
-/- Get: Outgoing Deductions -/--------------------------------------------------------------------------------------------------
-def get_rule.outgoing (NODE : Vertex) (DLDS : Graph) : List Deduction :=
+/- Get: Outgoing DEdges -/--------------------------------------------------------------------------------------------------
+def get_rule.outgoing (NODE : Vertex) (DLDS : Graph) : List DEdge :=
     loop NODE DLDS.EDGES
-    where loop (NODE : Vertex) (EDGES : List Deduction) : List Deduction :=
+    where loop (NODE : Vertex) (EDGES : List DEdge) : List DEdge :=
           match EDGES with
           | [] => []
-          | (EDGE::EDGES) => if   ( EDGE.START = NODE )
+          | (EDGE::EDGES) => if   ( EDGE.orig = NODE )
                              then ( EDGE :: loop NODE EDGES )
                              else ( loop NODE EDGES )
     ----------------------------------------------------------------------------------------------------------------------------
-/- Get: Direct Ancestrals -/----------------------------------------------------------------------------------------------------
-def get_rule.direct (NODE : Vertex) (DLDS : Graph) : List Ancestral :=
+/- Get: Direct AEdges -/----------------------------------------------------------------------------------------------------
+def get_rule.direct (NODE : Vertex) (DLDS : Graph) : List AEdge :=
     loop NODE DLDS.PATHS
-    where loop (NODE : Vertex) (PATHS : List Ancestral) : List Ancestral :=
+    where loop (NODE : Vertex) (PATHS : List AEdge) : List AEdge :=
           match PATHS with
           | [] => []
-          | (PATH::PATHS) => if   ( PATH.END = NODE )
+          | (PATH::PATHS) => if   ( PATH.dest = NODE )
                              then ( PATH :: loop NODE PATHS )
                              else ( loop NODE PATHS )
     ----------------------------------------------------------------------------------------------------------------------------
-/- Get: Indirect Ancestrals -/--------------------------------------------------------------------------------------------------
-def get_rule.indirect (NODE : Vertex) (DLDS : Graph) : List Ancestral :=
+/- Get: Indirect AEdges -/--------------------------------------------------------------------------------------------------
+def get_rule.indirect (NODE : Vertex) (DLDS : Graph) : List AEdge :=
     loop (get_rule.incoming NODE DLDS) DLDS.PATHS
-    where loop (EDGES : List Deduction) (PATHS : List Ancestral) : List Ancestral :=
+    where loop (EDGES : List DEdge) (PATHS : List AEdge) : List AEdge :=
           match EDGES with
           | [] => []
-          | (EDGE::EDGES) => get_rule.direct.loop EDGE.START PATHS ++ loop EDGES PATHS
+          | (EDGE::EDGES) => get_rule.direct.loop EDGE.orig PATHS ++ loop EDGES PATHS
     ----------------------------------------------------------------------------------------------------------------------------
 /- Collapse: NODE × DLDS → Neighborhood -/--------------------------------------------------------------------------------------
 def get_rule (NODE : Vertex) (DLDS : Graph) : Neighborhood :=
@@ -248,7 +252,7 @@ def get_rule (NODE : Vertex) (DLDS : Graph) : Neighborhood :=
     ----------------------------------------------------------------------------------------------------------------------------
 
 /- Collapse & Type Conditionals -/
-/- Check: Past Collapses (Vertex) & Path Colors (Ancestral) -/-------------------------------------------------------------
+/- Check: Past Collapses (Vertex) & Path Colors (AEdge) -/-------------------------------------------------------------
 def check_numbers (ns : List Nat) : Prop :=
   ns ≠ [] ∧ ∀ {n : Nat}, n ∈ ns → n > 0
 
@@ -258,40 +262,40 @@ def check_dlds (DLDS : Graph) : Prop :=
                                ( NODE₂ ∈ DLDS.NODES ) →
       --------------------------------------
       ( ( NODE₁.id = NODE₂.id ) ↔ ( NODE₁ = NODE₂ ) ) )
-  ∧ ( ∀{EDGE : Deduction}, ( EDGE ∈ DLDS.EDGES ) →
+  ∧ ( ∀{EDGE : DEdge}, ( EDGE ∈ DLDS.EDGES ) →
       --------------------------------------
-      ( EDGE.START ∈ DLDS.NODES ∧ EDGE.END ∈ DLDS.NODES ) )
-  ∧ ( ∀{PATH : Ancestral}, ( PATH ∈ DLDS.PATHS ) →
+      ( EDGE.orig ∈ DLDS.NODES ∧ EDGE.dest ∈ DLDS.NODES ) )
+  ∧ ( ∀{PATH : AEdge}, ( PATH ∈ DLDS.PATHS ) →
       --------------------------------------
-      ( PATH.START ∈ DLDS.NODES ∧ PATH.END ∈ DLDS.NODES ) )
+      ( PATH.orig ∈ DLDS.NODES ∧ PATH.dest ∈ DLDS.NODES ) )
     ------------------------------------------------------------------------------------------------------------------------
-/- Check: Collapse Nodes (Vertexes) & Incoming Edges (Deductions) -/--------------------------------------------------------
+/- Check: Collapse Nodes (Vertexes) & Incoming Edges (DEdges) -/--------------------------------------------------------
 def check_collapse_nodes (RULEᵤ RULEᵥ : Neighborhood) : Prop :=
     ( RULEᵤ.CENTER.id > RULEᵥ.CENTER.id )
   ∧ ( RULEᵥ.CENTER.id ∉ RULEᵤ.CENTER.past )
   ∧ ( RULEᵤ.CENTER.level = RULEᵥ.CENTER.level )
   ∧ ( RULEᵤ.CENTER.formula = RULEᵥ.CENTER.formula )
-  ∧ ( ∀{INCᵤ INCᵥ : Deduction}, ( INCᵤ ∈ RULEᵤ.INCOMING ) →
+  ∧ ( ∀{INCᵤ INCᵥ : DEdge}, ( INCᵤ ∈ RULEᵤ.INCOMING ) →
                                 ( INCᵥ ∈ RULEᵥ.INCOMING ) →
-                                ( INCᵤ.START ≠ INCᵥ.START ) )
+                                ( INCᵤ.orig ≠ INCᵥ.orig ) )
     ------------------------------------------------------------------------------------------------------------------------
-/- Check: Outgoing Edges (Deductions) & Collapse Nodes (Vertexes) & Incoming Edges (Deductions) -/-------------------------
+/- Check: Outgoing Edges (DEdges) & Collapse Nodes (Vertexes) & Incoming Edges (DEdges) -/-------------------------
 def check_collapse_edges (RULEᵤ RULEᵥ : Neighborhood) : Prop :=
-    ( ∃(OUTᵤ OUTᵥ : Deduction), ( OUTᵤ ∈ RULEᵤ.OUTGOING )
+    ( ∃(OUTᵤ OUTᵥ : DEdge), ( OUTᵤ ∈ RULEᵤ.OUTGOING )
                               ∧ ( OUTᵥ ∈ RULEᵥ.OUTGOING )
-                              ∧ ( OUTᵤ.COLOR > 0 )
-                              ∧ ( OUTᵥ.END = OUTᵤ.END )
-                              ∧ ( OUTᵥ.COLOR = OUTᵤ.COLOR )
-                              ∧ ( OUTᵥ.DEPENDENCY = OUTᵤ.DEPENDENCY ) )
+                              ∧ ( OUTᵤ.color > 0 )
+                              ∧ ( OUTᵥ.dest = OUTᵤ.dest )
+                              ∧ ( OUTᵥ.color = OUTᵤ.color )
+                              ∧ ( OUTᵥ.deps = OUTᵤ.deps ) )
   ∧ ( RULEᵤ.CENTER.level = RULEᵥ.CENTER.level )
   ∧ ( RULEᵤ.CENTER.formula = RULEᵥ.CENTER.formula )
-  ∧ ( ∀{INCᵤ INCᵥ : Deduction}, ( INCᵤ ∈ RULEᵤ.INCOMING ) →
+  ∧ ( ∀{INCᵤ INCᵥ : DEdge}, ( INCᵤ ∈ RULEᵤ.INCOMING ) →
                                 ( INCᵥ ∈ RULEᵥ.INCOMING ) →
-                                ( INCᵤ.START ≠ INCᵥ.START ) )
+                                ( INCᵤ.orig ≠ INCᵥ.orig ) )
     ------------------------------------------------------------------------------------------------------------------------
 
 /- Neighborhood Type Hierarchy -/
-/- Neighborhood: Type 0 (Non-Collapsed Node Without Incoming Ancestral Paths) ⊇-Elimination -/
+/- Neighborhood: Type 0 (Non-Collapsed Node Without Incoming AEdge Paths) ⊇-Elimination -/
 def type0_elimination (RULE : Neighborhood) : Prop :=
     ( RULE.CENTER.id > 0 ) ∧ ( RULE.CENTER.level > 0 ) ∧ ( RULE.CENTER.isHypothesis = false )
   ∧ ( RULE.CENTER.isCollapsed = false ) ∧ ( RULE.CENTER.past = [] )
@@ -301,7 +305,7 @@ def type0_elimination (RULE : Neighborhood) : Prop :=
       ∃(major_dep minor_dep : List Formula),
       ------------------------------------------------------
       ( inc_nbr > 0 ) ∧ ( out_nbr > 0 )
-    ∧ RULE.INCOMING = [ Deduction.mk (Vertex.mk (inc_nbr+1)
+    ∧ RULE.INCOMING = [ DEdge.mk (Vertex.mk (inc_nbr+1)
                                    (RULE.CENTER.level+1)
                                    (antecedent⊃RULE.CENTER.formula)
                                    (major_hpt)
@@ -310,18 +314,18 @@ def type0_elimination (RULE : Neighborhood) : Prop :=
                              RULE.CENTER
                              0
                              #major_dep,
-                        Deduction.mk (Vertex.mk inc_nbr (RULE.CENTER.level+1) antecedent minor_hpt false []) /- Right Child & Minor Premise -/
+                        DEdge.mk (Vertex.mk inc_nbr (RULE.CENTER.level+1) antecedent minor_hpt false []) /- Right Child & Minor Premise -/
                              RULE.CENTER
                              0
                              #minor_dep ]
-    ∧ RULE.OUTGOING = [ Deduction.mk RULE.CENTER
+    ∧ RULE.OUTGOING = [ DEdge.mk RULE.CENTER
                              (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml false false [])
                              0
                              (minor_dep ∪ major_dep) ]
     ∧ RULE.DIRECT   = []
     ∧ RULE.INDIRECT = [] )
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Neighborhood: Type 0 (Non-Collapsed Node Without Incoming Ancestral Paths) ⊇-Introduction -/
+/- Neighborhood: Type 0 (Non-Collapsed Node Without Incoming AEdge Paths) ⊇-Introduction -/
 def type0_introduction (RULE : Neighborhood) : Prop :=
     ( RULE.CENTER.id > 0 ) ∧ ( RULE.CENTER.level > 0 ) ∧ ( RULE.CENTER.isHypothesis = false )
   ∧ ( RULE.CENTER.isCollapsed = false ) ∧ ( RULE.CENTER.past = [] )
@@ -331,18 +335,18 @@ def type0_introduction (RULE : Neighborhood) : Prop :=
     ------------------------------------------------------
       ( RULE.CENTER.formula = antecedent⊃consequent )
     ∧ ( inc_nbr > 0 ) ∧ ( out_nbr > 0 )
-    ∧ RULE.INCOMING = [ Deduction.mk (Vertex.mk inc_nbr (RULE.CENTER.level+1) consequent false false [])  /- Unique Child & Sole Premise -/
+    ∧ RULE.INCOMING = [ DEdge.mk (Vertex.mk inc_nbr (RULE.CENTER.level+1) consequent false false [])  /- Unique Child & Sole Premise -/
                              RULE.CENTER
                              0
                              #inc_dep ]
-    ∧ RULE.OUTGOING = [ Deduction.mk RULE.CENTER
+    ∧ RULE.OUTGOING = [ DEdge.mk RULE.CENTER
                              (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml false false [])
                              0
                              (inc_dep − [antecedent]) ]
     ∧ RULE.DIRECT   = []
     ∧ RULE.INDIRECT = [] )
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Neighborhood: Type 0 (Non-Collapsed Node Without Incoming Ancestral Paths) Hypothesis (Top Formula) -/
+/- Neighborhood: Type 0 (Non-Collapsed Node Without Incoming AEdge Paths) Hypothesis (Top Formula) -/
 def type0_hypothesis (RULE : Neighborhood) : Prop :=
     ( RULE.CENTER.id > 0 ) ∧ ( RULE.CENTER.level > 0 ) ∧ ( RULE.CENTER.isHypothesis = true )
   ∧ ( RULE.CENTER.isCollapsed = false ) ∧ ( RULE.CENTER.past = [] )
@@ -351,7 +355,7 @@ def type0_hypothesis (RULE : Neighborhood) : Prop :=
     ------------------------------------------------------
       ( out_nbr > 0 )
     ∧ RULE.INCOMING = []
-    ∧ RULE.OUTGOING = [ Deduction.mk RULE.CENTER
+    ∧ RULE.OUTGOING = [ DEdge.mk RULE.CENTER
                              (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml false false [])
                              0
                              [RULE.CENTER.formula] ]
@@ -359,7 +363,7 @@ def type0_hypothesis (RULE : Neighborhood) : Prop :=
     ∧ RULE.INDIRECT = [] )
     -----------------------------------------------------------------------------------------------------------------------------------------
 
-/- Neighborhood: Type 2 (Non-Collapsed Node With Incoming Ancestral Paths) ⊇-Elimination -/
+/- Neighborhood: Type 2 (Non-Collapsed Node With Incoming AEdge Paths) ⊇-Elimination -/
 def type2_elimination (RULE : Neighborhood) : Prop :=
     ( RULE.CENTER.id > 0 ) ∧ ( RULE.CENTER.level > 0 ) ∧ ( RULE.CENTER.isHypothesis = false )
   ∧ ( RULE.CENTER.isCollapsed = false ) ∧ ( RULE.CENTER.past = [] )
@@ -372,24 +376,24 @@ def type2_elimination (RULE : Neighborhood) : Prop :=
       ( inc_nbr > 0 ) ∧ ( out_nbr > 0 )
     ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = RULE.CENTER.level )
     ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( check_numbers (past::pasts) ) ∧ ( check_numbers (color::colors) )
-    ∧ RULE.INCOMING = [ Deduction.mk (Vertex.mk (inc_nbr+1) (RULE.CENTER.level+1) (antecedent⊃RULE.CENTER.formula) major_hpt false []) /- Right Child & Major Premise -/
+    ∧ RULE.INCOMING = [ DEdge.mk (Vertex.mk (inc_nbr+1) (RULE.CENTER.level+1) (antecedent⊃RULE.CENTER.formula) major_hpt false []) /- Right Child & Major Premise -/
                              RULE.CENTER
                              0
                              #major_dep,
-                        Deduction.mk (Vertex.mk inc_nbr (RULE.CENTER.level+1) antecedent minor_hpt false [])                            /- Left Child & Minor Premise -/
+                        DEdge.mk (Vertex.mk inc_nbr (RULE.CENTER.level+1) antecedent minor_hpt false [])                            /- Left Child & Minor Premise -/
                              RULE.CENTER
                              0
                              #minor_dep ]
-    ∧ RULE.OUTGOING = [ Deduction.mk RULE.CENTER
+    ∧ RULE.OUTGOING = [ DEdge.mk RULE.CENTER
                              (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml out_hpt true (past::pasts))
                              0
                              (minor_dep ∪ major_dep) ]
-    ∧ RULE.DIRECT   = [ Ancestral.mk (Vertex.mk anc_nbr anc_lvl anc_fml false false [])
+    ∧ RULE.DIRECT   = [ AEdge.mk (Vertex.mk anc_nbr anc_lvl anc_fml false false [])
                              RULE.CENTER
                              (0::color::colors) ]
     ∧ RULE.INDIRECT = [] )
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Neighborhood: Type 2 (Non-Collapsed Node With Incoming Ancestral Paths) ⊇-Introduction -/
+/- Neighborhood: Type 2 (Non-Collapsed Node With Incoming AEdge Paths) ⊇-Introduction -/
 def type2_introduction (RULE : Neighborhood) : Prop :=
     ( RULE.CENTER.id > 0 ) ∧ ( RULE.CENTER.level > 0 ) ∧ ( RULE.CENTER.isHypothesis = false )
   ∧ ( RULE.CENTER.isCollapsed = false ) ∧ ( RULE.CENTER.past = [] )
@@ -403,20 +407,20 @@ def type2_introduction (RULE : Neighborhood) : Prop :=
     ∧ ( inc_nbr > 0 ) ∧ ( out_nbr > 0 )
     ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = RULE.CENTER.level )
     ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( check_numbers (past::pasts) ) ∧ ( check_numbers (color::colors) )
-    ∧ RULE.INCOMING = [ Deduction.mk (Vertex.mk inc_nbr (RULE.CENTER.level+1) consequent false false [])  /- Unique Child & Sole Premise -/
+    ∧ RULE.INCOMING = [ DEdge.mk (Vertex.mk inc_nbr (RULE.CENTER.level+1) consequent false false [])  /- Unique Child & Sole Premise -/
                              RULE.CENTER
                              0
                              #inc_dep ]
-    ∧ RULE.OUTGOING = [ Deduction.mk RULE.CENTER
+    ∧ RULE.OUTGOING = [ DEdge.mk RULE.CENTER
                              (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml out_hpt true (past::pasts))
                              0
                              (inc_dep − [antecedent]) ]
-    ∧ RULE.DIRECT   = [ Ancestral.mk (Vertex.mk anc_nbr anc_lvl anc_fml false false [])
+    ∧ RULE.DIRECT   = [ AEdge.mk (Vertex.mk anc_nbr anc_lvl anc_fml false false [])
                              RULE.CENTER
                              (0::color::colors) ]
     ∧ RULE.INDIRECT = [] )
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Neighborhood: Type 2 (Non-Collapsed Node With Incoming Ancestral Paths) Hypothesis (Top Formula) -/
+/- Neighborhood: Type 2 (Non-Collapsed Node With Incoming AEdge Paths) Hypothesis (Top Formula) -/
 def type2_hypothesis (RULE : Neighborhood) : Prop :=
     ( RULE.CENTER.id > 0 ) ∧ ( RULE.CENTER.level > 0 ) ∧ ( RULE.CENTER.isHypothesis = true )
   ∧ ( RULE.CENTER.isCollapsed = false ) ∧ ( RULE.CENTER.past = [] )
@@ -429,227 +433,227 @@ def type2_hypothesis (RULE : Neighborhood) : Prop :=
     ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = RULE.CENTER.level )
     ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( check_numbers (past::pasts) ) ∧ ( check_numbers (color::colors) )
     ∧ RULE.INCOMING = []
-    ∧ RULE.OUTGOING = [ Deduction.mk RULE.CENTER
+    ∧ RULE.OUTGOING = [ DEdge.mk RULE.CENTER
                              (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml out_hpt true (past::pasts))
                              0
                              [RULE.CENTER.formula] ]
-    ∧ RULE.DIRECT   = [ Ancestral.mk (Vertex.mk anc_nbr anc_lvl anc_fml false false [])
+    ∧ RULE.DIRECT   = [ AEdge.mk (Vertex.mk anc_nbr anc_lvl anc_fml false false [])
                              RULE.CENTER
                              (0::color::colors) ]
     ∧ RULE.INDIRECT = [] )
     -----------------------------------------------------------------------------------------------------------------------------------------
 
 /- Neighborhood: Check Incoming Edges (Type 1 & 3) -/--------------------------------------------------------------------------------------------------------------------------
-def type_incoming (RULE : Neighborhood) : Prop := ∀{INC : Deduction}, ( INC ∈ RULE.INCOMING ) → ( check INC RULE.CENTER RULE.INDIRECT )
-  where check (INC : Deduction) (CENTER : Vertex) (INDIRECT : List Ancestral) : Prop :=
-        /- Start Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
-        ( ( INC.START.id > 0 ) ∧ ( INC.START.level = CENTER.level + 1 )
-        ∧ ( INC.START.isCollapsed = false ) ∧ ( INC.START.past = [] ) )
-        /- End Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( INC.END = CENTER )
+def type_incoming (RULE : Neighborhood) : Prop := ∀{INC : DEdge}, ( INC ∈ RULE.INCOMING ) → ( check INC RULE.CENTER RULE.INDIRECT )
+  where check (INC : DEdge) (CENTER : Vertex) (INDIRECT : List AEdge) : Prop :=
+        /- Orig Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
+        ( ( INC.orig.id > 0 ) ∧ ( INC.orig.level = CENTER.level + 1 )
+        ∧ ( INC.orig.isCollapsed = false ) ∧ ( INC.orig.past = [] ) )
+        /- Dest Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( INC.dest = CENTER )
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( INC.COLOR = 0 )                                                                                                /- := Incoming Edge => -/
-        /- Deduction-Ancestral Duo: -/-----------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ∃(color : Nat)(colors : List Nat)(anc : Vertex), ( Ancestral.mk anc INC.START (0::color::colors) ∈ INDIRECT ) )     /- => Indirect Path => -/
+      ∧ ( INC.color = 0 )                                                                                                /- := Incoming Edge => -/
+        /- DEdge-AEdge Duo: -/-----------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( ∃(color : Nat)(colors : List Nat)(anc : Vertex), ( AEdge.mk anc INC.orig (0::color::colors) ∈ INDIRECT ) )     /- => Indirect Path => -/
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /- Neighborhood: Check Outgoing Edges (Type 1) -/------------------------------------------------------------------------------------------------------------------------------
-def type_outgoing₁ (RULE : Neighborhood) : Prop := ∀{OUT : Deduction}, ( OUT ∈ RULE.OUTGOING ) → ( type_outgoing₁.check_h₁ OUT RULE.CENTER
+def type_outgoing₁ (RULE : Neighborhood) : Prop := ∀{OUT : DEdge}, ( OUT ∈ RULE.OUTGOING ) → ( type_outgoing₁.check_h₁ OUT RULE.CENTER
                                                                                                  ∨ type_outgoing₁.check_ie₁ OUT RULE.CENTER RULE.INDIRECT )
-  where check_h₁ (OUT : Deduction) (CENTER : Vertex) : Prop :=
+  where check_h₁ (OUT : DEdge) (CENTER : Vertex) : Prop :=
         /- Type 1 Hypothesis -/------------------------------------------------------------------------------------------------------------------------------------------------
         ( CENTER.isHypothesis = true )
-        /- Start Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( OUT.START = CENTER )
-        /- End Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ( OUT.END.id > 0 ) ∧ ( OUT.END.level = CENTER.level - 1 )
-        ∧ ( OUT.END.isCollapsed = false ) ∧ ( OUT.END.past = [] ) )
+        /- Orig Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( OUT.orig = CENTER )
+        /- Dest Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( ( OUT.dest.id > 0 ) ∧ ( OUT.dest.level = CENTER.level - 1 )
+        ∧ ( OUT.dest.isCollapsed = false ) ∧ ( OUT.dest.past = [] ) )
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( OUT.COLOR = 0 )
+      ∧ ( OUT.color = 0 )
         -----------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        check_ie₁ (OUT : Deduction) (CENTER : Vertex) (INDIRECT : List Ancestral) : Prop :=
+        check_ie₁ (OUT : DEdge) (CENTER : Vertex) (INDIRECT : List AEdge) : Prop :=
         /- Type 1 Introduction & Elimination -/--------------------------------------------------------------------------------------------------------------------------------
         ( ( CENTER.isHypothesis = false ) ∨ ( CENTER.isCollapsed = true ) )
-        /- Start Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( OUT.START = CENTER )
-        /- End Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ( OUT.END.id > 0 ) ∧ ( OUT.END.level = CENTER.level - 1 )
-        ∧ ( OUT.END.isCollapsed = false ) ∧ ( OUT.END.past = [] ) )
+        /- Orig Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( OUT.orig = CENTER )
+        /- Dest Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( ( OUT.dest.id > 0 ) ∧ ( OUT.dest.level = CENTER.level - 1 )
+        ∧ ( OUT.dest.isCollapsed = false ) ∧ ( OUT.dest.past = [] ) )
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( OUT.COLOR ∈ (CENTER.id::CENTER.past) )                                                                             /- := Outgoing Edge => -/
-        /- Deduction-Ancestral Duo: -/-----------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ∃(inc : Vertex), ( Ancestral.mk OUT.END inc [0, OUT.COLOR] ∈ INDIRECT ) )                                                      /- => Indirect Path => -/
+      ∧ ( OUT.color ∈ (CENTER.id::CENTER.past) )                                                                             /- := Outgoing Edge => -/
+        /- DEdge-AEdge Duo: -/-----------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( ∃(inc : Vertex), ( AEdge.mk OUT.dest inc [0, OUT.color] ∈ INDIRECT ) )                                                      /- => Indirect Path => -/
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /- Neighborhood: Check Outgoing Edges (Type 3) -/------------------------------------------------------------------------------------------------------------------------------
-def type_outgoing₃ (RULE : Neighborhood) : Prop := ∀{OUT : Deduction}, ( OUT ∈ RULE.OUTGOING ) → ( ( type_outgoing₁.check_h₁ OUT RULE.CENTER
+def type_outgoing₃ (RULE : Neighborhood) : Prop := ∀{OUT : DEdge}, ( OUT ∈ RULE.OUTGOING ) → ( ( type_outgoing₁.check_h₁ OUT RULE.CENTER
                                                                                                    ∨ type_outgoing₁.check_ie₁ OUT RULE.CENTER RULE.INDIRECT )
                                                                                                  ∨ ( type_outgoing₃.check_h₃ OUT RULE.CENTER RULE.DIRECT
                                                                                                    ∨ type_outgoing₃.check_ie₃ OUT RULE.CENTER RULE.INDIRECT ) )
-  where check_h₃ (OUT : Deduction) (CENTER : Vertex) (DIRECT : List Ancestral) : Prop :=
+  where check_h₃ (OUT : DEdge) (CENTER : Vertex) (DIRECT : List AEdge) : Prop :=
         /- Type 3 Hypothesis -/------------------------------------------------------------------------------------------------------------------------------------------------
         ( CENTER.isHypothesis = true )
-        /- Start Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( OUT.START = CENTER )
-        /- End Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ( OUT.END.id > 0 ) ∧ ( OUT.END.level = CENTER.level - 1 )
-        ∧ ( OUT.END.isCollapsed = true ) ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_numbers (past::pasts) )
-                                                                          ∧ ( OUT.END.past = (past::pasts) ) ) )
+        /- Orig Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( OUT.orig = CENTER )
+        /- Dest Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( ( OUT.dest.id > 0 ) ∧ ( OUT.dest.level = CENTER.level - 1 )
+        ∧ ( OUT.dest.isCollapsed = true ) ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_numbers (past::pasts) )
+                                                                          ∧ ( OUT.dest.past = (past::pasts) ) ) )
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( OUT.COLOR ∈ (CENTER.id::CENTER.past) )                                                                             /- := Outgoing Edge => -/
-        /- Deduction-Ancestral Duo: -/-----------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ∃(colors : List Nat)(anc : Vertex), ( Ancestral.mk anc CENTER (OUT.COLOR::colors) ∈ DIRECT ) )                               /- => Direct Path . -/
+      ∧ ( OUT.color ∈ (CENTER.id::CENTER.past) )                                                                             /- := Outgoing Edge => -/
+        /- DEdge-AEdge Duo: -/-----------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( ∃(colors : List Nat)(anc : Vertex), ( AEdge.mk anc CENTER (OUT.color::colors) ∈ DIRECT ) )                               /- => Direct Path . -/
         -----------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        check_ie₃ (OUT : Deduction) (CENTER : Vertex) (INDIRECT : List Ancestral) : Prop :=
+        check_ie₃ (OUT : DEdge) (CENTER : Vertex) (INDIRECT : List AEdge) : Prop :=
         /- Type 3 Introduction & Elimination -/--------------------------------------------------------------------------------------------------------------------------------
         ( ( CENTER.isHypothesis = false ) ∨ ( CENTER.isCollapsed = true ) )
-        /- Start Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( OUT.START = CENTER )
-        /- End Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ( OUT.END.id > 0 ) ∧ ( OUT.END.level = CENTER.level - 1 )
-        ∧ ( OUT.END.isCollapsed = true ) ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_numbers (past::pasts) )
-                                                                          ∧ ( OUT.END.past = (past::pasts) ) ) )
+        /- Orig Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( OUT.orig = CENTER )
+        /- Dest Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( ( OUT.dest.id > 0 ) ∧ ( OUT.dest.level = CENTER.level - 1 )
+        ∧ ( OUT.dest.isCollapsed = true ) ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_numbers (past::pasts) )
+                                                                          ∧ ( OUT.dest.past = (past::pasts) ) ) )
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( OUT.COLOR ∈ (CENTER.id::CENTER.past) )                                                                             /- := Outgoing Edge => -/
-        /- Deduction-Ancestral Duo: -/-----------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ∃(colors : List Nat)(inc anc : Vertex), ( Ancestral.mk anc inc (0::OUT.COLOR::colors) ∈ INDIRECT ) )                         /- => Indirect Path => -/
+      ∧ ( OUT.color ∈ (CENTER.id::CENTER.past) )                                                                             /- := Outgoing Edge => -/
+        /- DEdge-AEdge Duo: -/-----------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( ∃(colors : List Nat)(inc anc : Vertex), ( AEdge.mk anc inc (0::OUT.color::colors) ∈ INDIRECT ) )                         /- => Indirect Path => -/
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /- Neighborhood: Check Direct Paths (Type 1 & 3) -/----------------------------------------------------------------------------------------------------------------------------
-def type_direct (RULE : Neighborhood) : Prop := ∀{DIR : Ancestral}, ( DIR ∈ RULE.DIRECT ) → ( check DIR RULE.CENTER RULE.OUTGOING )
-  where check (DIR : Ancestral) (CENTER : Vertex) (OUTGOING : List Deduction) : Prop :=
-        /- Start Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
-        ( ( DIR.START.id > 0 ) ∧ ( DIR.START.level ≤ CENTER.level - 1 ) ∧ ( DIR.START.isHypothesis = false )
-        ∧ ( DIR.START.isCollapsed = false ) ∧ ( DIR.START.past = [] ) )
-        /- End Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( DIR.END = CENTER )
+def type_direct (RULE : Neighborhood) : Prop := ∀{DIR : AEdge}, ( DIR ∈ RULE.DIRECT ) → ( check DIR RULE.CENTER RULE.OUTGOING )
+  where check (DIR : AEdge) (CENTER : Vertex) (OUTGOING : List DEdge) : Prop :=
+        /- Orig Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
+        ( ( DIR.orig.id > 0 ) ∧ ( DIR.orig.level ≤ CENTER.level - 1 ) ∧ ( DIR.orig.isHypothesis = false )
+        ∧ ( DIR.orig.isCollapsed = false ) ∧ ( DIR.orig.past = [] ) )
+        /- Dest Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( DIR.dest = CENTER )
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( DIR.START.level + List.length (DIR.COLORS) = CENTER.level )
+      ∧ ( DIR.orig.level + List.length (DIR.colors) = CENTER.level )
       ∧ ( ∃(color₁ color₂ : Nat),
           ∃(colors : List Nat), ( check_numbers (color₁::color₂::colors) )
                                ∧ ( color₁ ∈ (CENTER.id::CENTER.past) )
-                               ∧ ( DIR.COLORS = (color₁::color₂::colors) )                                                /- := Direct Path => -/
-                                 /- Deduction-Ancestral Duo: -/----------------------------------------------------------------------------------------------------------------
+                               ∧ ( DIR.colors = (color₁::color₂::colors) )                                                /- := Direct Path => -/
+                                 /- DEdge-AEdge Duo: -/----------------------------------------------------------------------------------------------------------------
                                ∧ ( ∃(out : Vertex),                                                                           /- => Outgoing Edge . -/
                                    ∃(dep_out : List Formula), ( out.isCollapsed = true )
                                                             ∧ ( color₂ ∈ (out.id::out.past) )
-                                                            ∧ ( Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING )
-                                                            ∧ ( ∀{all_out : Deduction}, ( all_out ∈ OUTGOING ) →
-                                                                                        ( ( all_out.COLOR = color₁ ) ↔ ( all_out = Deduction.mk CENTER out color₁ dep_out ) ) ) ) )
+                                                            ∧ ( DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING )
+                                                            ∧ ( ∀{all_out : DEdge}, ( all_out ∈ OUTGOING ) →
+                                                                                        ( ( all_out.color = color₁ ) ↔ ( all_out = DEdge.mk CENTER out color₁ dep_out ) ) ) ) )
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /- Neighborhood: Check Indirect Paths (Type 1 & 3) -/--------------------------------------------------------------------------------------------------------------------------
-def type_indirect (RULE : Neighborhood) : Prop := ∀{IND : Ancestral}, ( IND ∈ RULE.INDIRECT ) → ( check IND RULE.CENTER RULE.INCOMING RULE.OUTGOING )
-  where check (IND : Ancestral) (CENTER : Vertex) (INCOMING OUTGOING : List Deduction) : Prop :=
-        /- Start Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
-        ( ( IND.START.id > 0 ) ∧ ( IND.START.level ≤ CENTER.level - 1 ) ∧ ( IND.START.isHypothesis = false )
-        ∧ ( IND.START.isCollapsed = false ) ∧ ( IND.START.past = [] ) )
-        /- End Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ( IND.END.id > 0 ) ∧ ( IND.END.level = CENTER.level + 1 )
-        ∧ ( IND.END.isCollapsed = false ) ∧ ( IND.END.past = [] ) )
+def type_indirect (RULE : Neighborhood) : Prop := ∀{IND : AEdge}, ( IND ∈ RULE.INDIRECT ) → ( check IND RULE.CENTER RULE.INCOMING RULE.OUTGOING )
+  where check (IND : AEdge) (CENTER : Vertex) (INCOMING OUTGOING : List DEdge) : Prop :=
+        /- Orig Node: -/------------------------------------------------------------------------------------------------------------------------------------------------------
+        ( ( IND.orig.id > 0 ) ∧ ( IND.orig.level ≤ CENTER.level - 1 ) ∧ ( IND.orig.isHypothesis = false )
+        ∧ ( IND.orig.isCollapsed = false ) ∧ ( IND.orig.past = [] ) )
+        /- Dest Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
+      ∧ ( ( IND.dest.id > 0 ) ∧ ( IND.dest.level = CENTER.level + 1 )
+        ∧ ( IND.dest.isCollapsed = false ) ∧ ( IND.dest.past = [] ) )
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( IND.START.level + List.length (IND.COLORS) = CENTER.level + 1 )
+      ∧ ( IND.orig.level + List.length (IND.colors) = CENTER.level + 1 )
       ∧ ( ∃(color : Nat),
           ∃(colors : List Nat), ( check_numbers (color::colors) )
                                ∧ ( color ∈ (CENTER.id::CENTER.past) )
-                               ∧ ( IND.COLORS = (0::color::colors) )                                                         /- := Indirect Path => -/
-                                 /- Deduction-Ancestral Trio: -/---------------------------------------------------------------------------------------------------------------
-                               ∧ ( ∃(dep_inc : List Formula), ( Deduction.mk IND.END CENTER 0 dep_inc ∈ INCOMING )                      /- => Incoming Edge => -/
-                                                            ∧ ( ∀{all_inc : Deduction}, ( all_inc ∈ INCOMING ) →
-                                                                                        ( ( all_inc.START = IND.END ) ↔ ( all_inc = Deduction.mk IND.END CENTER 0 dep_inc ) ) ) )
+                               ∧ ( IND.colors = (0::color::colors) )                                                         /- := Indirect Path => -/
+                                 /- DEdge-AEdge Trio: -/---------------------------------------------------------------------------------------------------------------
+                               ∧ ( ∃(dep_inc : List Formula), ( DEdge.mk IND.dest CENTER 0 dep_inc ∈ INCOMING )                      /- => Incoming Edge => -/
+                                                            ∧ ( ∀{all_inc : DEdge}, ( all_inc ∈ INCOMING ) →
+                                                                                        ( ( all_inc.orig = IND.dest ) ↔ ( all_inc = DEdge.mk IND.dest CENTER 0 dep_inc ) ) ) )
                                ∧ ( ∃(out : Vertex),                                                                             /- => Outgoing Edge . -/
-                                   ∃(dep_out : List Formula), ( ( colors = [] ) ↔ ( out = IND.START ) )
-                                                            ∧ ( Deduction.mk CENTER out color dep_out ∈ OUTGOING )
-                                                            ∧ ( ∀{all_out : Deduction}, ( all_out ∈ OUTGOING ) →
-                                                                                        ( ( all_out.COLOR = color ) ↔ ( all_out = Deduction.mk CENTER out color dep_out ) ) ) ) )
+                                   ∃(dep_out : List Formula), ( ( colors = [] ) ↔ ( out = IND.orig ) )
+                                                            ∧ ( DEdge.mk CENTER out color dep_out ∈ OUTGOING )
+                                                            ∧ ( ∀{all_out : DEdge}, ( all_out ∈ OUTGOING ) →
+                                                                                        ( ( all_out.color = color ) ↔ ( all_out = DEdge.mk CENTER out color dep_out ) ) ) ) )
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-/- Neighborhood: Pre-Type 1 (Collapsed Nodes With Short Neighboring Ancestral Paths) Collapsed Node -/
+/- Neighborhood: Pre-Type 1 (Collapsed Nodes With Short Neighboring AEdge Paths) Collapsed Node -/
 def type1_pre_collapse (RULE : Neighborhood) : Prop :=
     /- Check Center -/-----------------------------------------------------------------------------------------------------------------------
     ( ( RULE.CENTER.id > 0 ) ∧ ( RULE.CENTER.level > 0 )
     ∧ ( RULE.CENTER.isCollapsed = false )
     ∧ ( RULE.CENTER.past = [] )
-    /- Check Deduction Edges -/--------------------------------------------------------------------------------------------------------------
+    /- Check DEdge Edges -/--------------------------------------------------------------------------------------------------------------
     ∧ ( ( RULE.INCOMING = [] ) ↔ ( RULE.CENTER.isHypothesis = true ) )
     ∧ ( List.length (RULE.INCOMING) ≤ 2 )
-    ∧ ( ∃(out : Deduction), ( RULE.OUTGOING = [out] ) )
-    ∧ ( ∀{OUT₁ OUT₂ : Deduction}, ( OUT₁ ∈ RULE.OUTGOING ) →
+    ∧ ( ∃(out : DEdge), ( RULE.OUTGOING = [out] ) )
+    ∧ ( ∀{OUT₁ OUT₂ : DEdge}, ( OUT₁ ∈ RULE.OUTGOING ) →
                                   ( OUT₂ ∈ RULE.OUTGOING ) →
-                                  ( OUT₁.COLOR > 0 ∨ OUT₂.COLOR > 0 ) →
-                                  ( ( OUT₁.COLOR = OUT₂.COLOR ) ↔ ( OUT₁ = OUT₂ ) ) )
-    /- Check Ancestral Paths -/--------------------------------------------------------------------------------------------------------------
+                                  ( OUT₁.color > 0 ∨ OUT₂.color > 0 ) →
+                                  ( ( OUT₁.color = OUT₂.color ) ↔ ( OUT₁ = OUT₂ ) ) )
+    /- Check AEdge Paths -/--------------------------------------------------------------------------------------------------------------
     ∧ ( RULE.DIRECT = [] )
-    ∧ ( ∀{ind₁ ind₂ : Ancestral}, ( ind₁ ∈ RULE.INDIRECT ) →
-                                  ( ind₂ ∈ RULE.INDIRECT ) → ( ( ind₁.COLORS = ind₂.COLORS ) ↔ ( ind₁.START = ind₂.START ) ) )
+    ∧ ( ∀{ind₁ ind₂ : AEdge}, ( ind₁ ∈ RULE.INDIRECT ) →
+                                  ( ind₂ ∈ RULE.INDIRECT ) → ( ( ind₁.colors = ind₂.colors ) ↔ ( ind₁.orig = ind₂.orig ) ) )
     ∧ ( List.length (RULE.INDIRECT) = List.length (RULE.INCOMING) )
-    ∧ ( ∀{ind : Ancestral}, ( ind ∈ RULE.INDIRECT ) → ( ind.COLORS = [0, RULE.CENTER.id] ) )
+    ∧ ( ∀{ind : AEdge}, ( ind ∈ RULE.INDIRECT ) → ( ind.colors = [0, RULE.CENTER.id] ) )
     /- Generic Properties -/-----------------------------------------------------------------------------------------------------------------
     ∧ ( type_incoming RULE ) ∧ ( type_outgoing₁ RULE )
     ∧ ( type_indirect RULE ) )
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Neighborhood: Type 1 (Collapsed Nodes With Short Neighboring Ancestral Paths) Collapsed Node -/
+/- Neighborhood: Type 1 (Collapsed Nodes With Short Neighboring AEdge Paths) Collapsed Node -/
 def type1_collapse (RULE : Neighborhood) : Prop :=
     /- Check Center -/-----------------------------------------------------------------------------------------------------------------------
     ( ( RULE.CENTER.id > 0 ) ∧ ( RULE.CENTER.level > 0 )
     ∧ ( RULE.CENTER.isCollapsed = true )
     ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_numbers (past::pasts) )
                                        ∧ ( RULE.CENTER.past = (past::pasts) ) )
-    /- Check Deduction Edges -/--------------------------------------------------------------------------------------------------------------
+    /- Check DEdge Edges -/--------------------------------------------------------------------------------------------------------------
     ∧ ( ( RULE.INCOMING = [] ) → ( RULE.CENTER.isHypothesis = true ) )
-    ∧ ( ∃(out : Deduction)(outs : List Deduction), ( RULE.OUTGOING = (out::outs) ) )
-    ∧ ( ∀{OUT₁ OUT₂ : Deduction}, ( OUT₁ ∈ RULE.OUTGOING ) →
+    ∧ ( ∃(out : DEdge)(outs : List DEdge), ( RULE.OUTGOING = (out::outs) ) )
+    ∧ ( ∀{OUT₁ OUT₂ : DEdge}, ( OUT₁ ∈ RULE.OUTGOING ) →
                                   ( OUT₂ ∈ RULE.OUTGOING ) →
-                                  ( OUT₁.COLOR > 0 ∨ OUT₂.COLOR > 0 ) →
-                                  ( ( OUT₁.COLOR = OUT₂.COLOR ) ↔ ( OUT₁ = OUT₂ ) ) )
-    /- Check Ancestral Paths -/--------------------------------------------------------------------------------------------------------------
+                                  ( OUT₁.color > 0 ∨ OUT₂.color > 0 ) →
+                                  ( ( OUT₁.color = OUT₂.color ) ↔ ( OUT₁ = OUT₂ ) ) )
+    /- Check AEdge Paths -/--------------------------------------------------------------------------------------------------------------
     ∧ ( RULE.DIRECT = [] )
     ∧ ( List.length (RULE.INDIRECT) = List.length (RULE.INCOMING) )
-    ∧ ( ∀{ind : Ancestral}, ( ind ∈ RULE.INDIRECT ) → ( ∃(color : Nat), ( ind.COLORS = [0, color] ) ) )
+    ∧ ( ∀{ind : AEdge}, ( ind ∈ RULE.INDIRECT ) → ( ∃(color : Nat), ( ind.colors = [0, color] ) ) )
     /- Generic Properties -/-----------------------------------------------------------------------------------------------------------------
     ∧ ( type_incoming RULE ) ∧ ( type_outgoing₁ RULE )
     ∧ ( type_indirect RULE ) )
     -----------------------------------------------------------------------------------------------------------------------------------------
 
-/- Neighborhood: Pre-Type 3 (Collapsed Nodes With Long Neighboring Ancestral Paths) Collapsed Node -/
+/- Neighborhood: Pre-Type 3 (Collapsed Nodes With Long Neighboring AEdge Paths) Collapsed Node -/
 def type3_pre_collapse (RULE : Neighborhood) : Prop :=
     /- Check Center -/-----------------------------------------------------------------------------------------------------------------------
     ( ( RULE.CENTER.id > 0 ) ∧ ( RULE.CENTER.level > 0 )
     ∧ ( RULE.CENTER.isCollapsed = false )
     ∧ ( RULE.CENTER.past = [] )
-    /- Check Deduction Edges -/--------------------------------------------------------------------------------------------------------------
+    /- Check DEdge Edges -/--------------------------------------------------------------------------------------------------------------
     ∧ ( ( RULE.INCOMING = [] ) ↔ ( RULE.CENTER.isHypothesis = true ) )
     ∧ ( List.length (RULE.INCOMING) ≤ 2 )
-    ∧ ( ∃(out : Deduction), ( RULE.OUTGOING = [out] ) )
-    ∧ ( ∀{OUT₁ OUT₂ : Deduction}, ( OUT₁ ∈ RULE.OUTGOING ) →
+    ∧ ( ∃(out : DEdge), ( RULE.OUTGOING = [out] ) )
+    ∧ ( ∀{OUT₁ OUT₂ : DEdge}, ( OUT₁ ∈ RULE.OUTGOING ) →
                                   ( OUT₂ ∈ RULE.OUTGOING ) →
-                                  ( OUT₁.COLOR > 0 ∨ OUT₂.COLOR > 0 ) →
-                                  ( ( OUT₁.COLOR = OUT₂.COLOR ) ↔ ( OUT₁ = OUT₂ ) ) )
-    /- Check Ancestral Paths -/--------------------------------------------------------------------------------------------------------------
+                                  ( OUT₁.color > 0 ∨ OUT₂.color > 0 ) →
+                                  ( ( OUT₁.color = OUT₂.color ) ↔ ( OUT₁ = OUT₂ ) ) )
+    /- Check AEdge Paths -/--------------------------------------------------------------------------------------------------------------
     ∧ ( ( RULE.CENTER.isHypothesis = false ) → ( RULE.DIRECT = [] ) )
     ∧ ( ( RULE.DIRECT ≠ [] ) → ( RULE.CENTER.isHypothesis = true ) )
-    ∧ ( ( RULE.DIRECT = [] ) ∨ ( ∃(dir : Ancestral), ( RULE.DIRECT = [dir] ) ) )
-    ∧ ( ∀{ind₁ ind₂ : Ancestral}, ( ind₁ ∈ RULE.INDIRECT ) →
-                                  ( ind₂ ∈ RULE.INDIRECT ) → ( ( ind₁.COLORS = ind₂.COLORS ) ↔ ( ind₁.START = ind₂.START ) ) )
+    ∧ ( ( RULE.DIRECT = [] ) ∨ ( ∃(dir : AEdge), ( RULE.DIRECT = [dir] ) ) )
+    ∧ ( ∀{ind₁ ind₂ : AEdge}, ( ind₁ ∈ RULE.INDIRECT ) →
+                                  ( ind₂ ∈ RULE.INDIRECT ) → ( ( ind₁.colors = ind₂.colors ) ↔ ( ind₁.orig = ind₂.orig ) ) )
     ∧ ( List.length (RULE.INDIRECT) = List.length (RULE.INCOMING) )
     /- Generic Properties -/-----------------------------------------------------------------------------------------------------------------
     ∧ ( type_incoming RULE ) ∧ ( type_outgoing₃ RULE )
     ∧ ( type_direct RULE ) ∧ ( type_indirect RULE ) )
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Neighborhood: Type 3 (Collapsed Nodes With Long Neighboring Ancestral Paths) Collapsed Node -/
+/- Neighborhood: Type 3 (Collapsed Nodes With Long Neighboring AEdge Paths) Collapsed Node -/
 def type3_collapse (RULE : Neighborhood) : Prop :=
     /- Check Center -/-----------------------------------------------------------------------------------------------------------------------
     ( ( RULE.CENTER.id > 0 ) ∧ ( RULE.CENTER.level > 0 )
     ∧ ( RULE.CENTER.isCollapsed = true )
     ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_numbers (past::pasts) )
                                        ∧ ( RULE.CENTER.past = (past::pasts) ) )
-    /- Check Deduction Edges -/--------------------------------------------------------------------------------------------------------------
+    /- Check DEdge Edges -/--------------------------------------------------------------------------------------------------------------
     ∧ ( ( RULE.INCOMING = [] ) → ( RULE.CENTER.isHypothesis = true ) )
-    ∧ ( ∃(out : Deduction)(outs : List Deduction), ( RULE.OUTGOING = (out::outs) ) )
-    ∧ ( ∀{OUT₁ OUT₂ : Deduction}, ( OUT₁ ∈ RULE.OUTGOING ) →
+    ∧ ( ∃(out : DEdge)(outs : List DEdge), ( RULE.OUTGOING = (out::outs) ) )
+    ∧ ( ∀{OUT₁ OUT₂ : DEdge}, ( OUT₁ ∈ RULE.OUTGOING ) →
                                   ( OUT₂ ∈ RULE.OUTGOING ) →
-                                  ( OUT₁.COLOR > 0 ∨ OUT₂.COLOR > 0 ) →
-                                  ( ( OUT₁.COLOR = OUT₂.COLOR ) ↔ ( OUT₁ = OUT₂ ) ) )
-    /- Check Ancestral Paths -/--------------------------------------------------------------------------------------------------------------
+                                  ( OUT₁.color > 0 ∨ OUT₂.color > 0 ) →
+                                  ( ( OUT₁.color = OUT₂.color ) ↔ ( OUT₁ = OUT₂ ) ) )
+    /- Check AEdge Paths -/--------------------------------------------------------------------------------------------------------------
     ∧ ( ( RULE.CENTER.isHypothesis = false ) → ( RULE.DIRECT = [] ) )
     ∧ ( ( RULE.DIRECT ≠ [] ) → ( RULE.CENTER.isHypothesis = true ) )
     ∧ ( List.length (RULE.INDIRECT) = List.length (RULE.INCOMING) )
@@ -659,8 +663,8 @@ def type3_collapse (RULE : Neighborhood) : Prop :=
     -----------------------------------------------------------------------------------------------------------------------------------------
 
 /- Pre-Collapse Methods -/
-/- Paint: Deduction Edge -/------------------------------------------------------------------------------------------------------------------
-def pre_collapse.outgoing (COLOR : Nat) (HYPOTHESIS : Bool) (OUTGOING : List Deduction) (DIRECT : List Ancestral) : List Deduction :=
+/- Paint: DEdge Edge -/------------------------------------------------------------------------------------------------------------------
+def pre_collapse.outgoing (COLOR : Nat) (HYPOTHESIS : Bool) (OUTGOING : List DEdge) (DIRECT : List AEdge) : List DEdge :=
     match HYPOTHESIS, OUTGOING, DIRECT with
     | _, [], _ => panic! "Zero Outgoing Edges!!!"
     | _, (_::_::_), _ => panic! "Multiple Outgoing Edges!!!"
@@ -668,14 +672,14 @@ def pre_collapse.outgoing (COLOR : Nat) (HYPOTHESIS : Bool) (OUTGOING : List Ded
     -- Hypothesis ∧ Single Outgoing Edge ∧ Zero Direct Paths => Return Outgoing Edge (Unpainted)
     | true, [_], [] => OUTGOING
     -- Hypothesis ∧ Single Outgoing Edge ∧ Single Direct Path => Return Outgoing Edge (Painted)
-    | true, [OUT], [_] => [ Deduction.mk OUT.START OUT.END COLOR OUT.DEPENDENCY ]
+    | true, [OUT], [_] => [ DEdge.mk OUT.orig OUT.dest COLOR OUT.deps ]
     -- Non-Hypothesis ∧ Single Outgoing Edge ∧ Zero Direct Paths => Return Outgoing Edge (Painted)
-    | false, [OUT], [] => [ Deduction.mk OUT.START OUT.END COLOR OUT.DEPENDENCY ]
+    | false, [OUT], [] => [ DEdge.mk OUT.orig OUT.dest COLOR OUT.deps ]
     -- Non-Hypothesis ∧ Single Outgoing Edge ∧ Single Direct Path => Return Outgoing Edge (Painted)
-    | false, [OUT], [_] => [ Deduction.mk OUT.START OUT.END COLOR OUT.DEPENDENCY ]
+    | false, [OUT], [_] => [ DEdge.mk OUT.orig OUT.dest COLOR OUT.deps ]
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Rewrite: Ancestral Paths -/---------------------------------------------------------------------------------------------------------------
-def pre_collapse.direct (COLOR : Nat) (HYPOTHESIS : Bool) (DIRECT : List Ancestral) : List Ancestral :=
+/- Rewrite: AEdge Paths -/---------------------------------------------------------------------------------------------------------------
+def pre_collapse.direct (COLOR : Nat) (HYPOTHESIS : Bool) (DIRECT : List AEdge) : List AEdge :=
     match HYPOTHESIS, DIRECT with
     | _, (_::_::_) => panic! "Multiple Direct Paths!!!"
     -- Hypothesis ∧ Zero Direct Paths => Return Nothing
@@ -686,15 +690,15 @@ def pre_collapse.direct (COLOR : Nat) (HYPOTHESIS : Bool) (DIRECT : List Ancestr
     | false, [] => []
     -- Non-Hypothesis ∧ Single Direct Path => Return Nothing
     | false, [_] => []
-  where paint (COLOR : Nat) (PATH : Ancestral) : List Ancestral :=
-        match PATH.COLORS with
+  where paint (COLOR : Nat) (PATH : AEdge) : List AEdge :=
+        match PATH.colors with
         | [] => panic! "Blank Path!!!"
         | ((_+1)::_) => panic! "Broken Path!!!"
         -- Correctly Colored Path => Return Indirect Path(s)
-        | (0::COLORS) => [ Ancestral.mk PATH.START PATH.END (COLOR::COLORS) ]
+        | (0::COLORS) => [ AEdge.mk PATH.orig PATH.dest (COLOR::COLORS) ]
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Create: Ancestral Paths -/----------------------------------------------------------------------------------------------------------------
-def pre_collapse.indirect (COLOR : Nat) (HYPOTHESIS : Bool) (INCOMING OUTGOING : List Deduction) (DIRECT : List Ancestral) : List Ancestral :=
+/- Create: AEdge Paths -/----------------------------------------------------------------------------------------------------------------
+def pre_collapse.indirect (COLOR : Nat) (HYPOTHESIS : Bool) (INCOMING OUTGOING : List DEdge) (DIRECT : List AEdge) : List AEdge :=
     match HYPOTHESIS, INCOMING, OUTGOING, DIRECT with
     | true, (_::_), _, _ => panic! "Hypothesis With Incoming Edge(s)!!!"
     | false, [], _, _ => panic! "Non-Hypothesis Without Incoming Edge(s)"
@@ -709,17 +713,17 @@ def pre_collapse.indirect (COLOR : Nat) (HYPOTHESIS : Bool) (INCOMING OUTGOING :
     | false, (_::_), [OUT], [] => create COLOR INCOMING OUT
     -- Non-Hypothesis ∧ Single Outgoing Edge ∧ Single Direct Path => Move-Up Direct Path(s)
     | false, (_::_), [_], [PATH] => move_up COLOR INCOMING PATH
-  where create (COLOR : Nat) (INCOMING : List Deduction) (OUT : Deduction) : List Ancestral :=
+  where create (COLOR : Nat) (INCOMING : List DEdge) (OUT : DEdge) : List AEdge :=
         match INCOMING with
         | [] => []
-        | (IN::INS) => ( Ancestral.mk OUT.END IN.START [0, COLOR] )
+        | (IN::INS) => ( AEdge.mk OUT.dest IN.orig [0, COLOR] )
                     :: ( create COLOR INS OUT )
-        move_up (COLOR : Nat) (INCOMING : List Deduction) (PATH : Ancestral) : List Ancestral :=
+        move_up (COLOR : Nat) (INCOMING : List DEdge) (PATH : AEdge) : List AEdge :=
         match INCOMING, PATH with
-        | _, (Ancestral.mk _ _ []) => panic! "Blank Path!!!"
+        | _, (AEdge.mk _ _ []) => panic! "Blank Path!!!"
         -- Colored Path => Return Indirect Path(s)
-        | [], (Ancestral.mk _ _ (_::_)) => []
-        | (IN::INS), (Ancestral.mk _ _ (ZERO::COLORS)) => ( Ancestral.mk PATH.START IN.START (ZERO::COLOR::COLORS) )
+        | [], (AEdge.mk _ _ (_::_)) => []
+        | (IN::INS), (AEdge.mk _ _ (ZERO::COLORS)) => ( AEdge.mk PATH.orig IN.orig (ZERO::COLOR::COLORS) )
                                                 :: ( move_up COLOR INS PATH )
     -----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -745,23 +749,23 @@ def collapse.center (LEFT RIGHT : Vertex) : Vertex :=
          ( true )
          ( RIGHT.id :: LEFT.past )
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Rewrite: Deduction Edge End -/------------------------------------------------------------------------------------------------------------
-def collapse.rewrite_incoming (COLLAPSE : Vertex) (EDGES : List Deduction) : List Deduction :=
+/- Rewrite: DEdge Edge Dest -/------------------------------------------------------------------------------------------------------------
+def collapse.rewrite_incoming (COLLAPSE : Vertex) (EDGES : List DEdge) : List DEdge :=
     match EDGES with
     | [] => []
-    | (EDGE::EDGES) => ( Deduction.mk EDGE.START COLLAPSE EDGE.COLOR EDGE.DEPENDENCY ) :: ( rewrite_incoming COLLAPSE EDGES )
+    | (EDGE::EDGES) => ( DEdge.mk EDGE.orig COLLAPSE EDGE.color EDGE.deps ) :: ( rewrite_incoming COLLAPSE EDGES )
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Rewrite: Deduction Edge Start -/----------------------------------------------------------------------------------------------------------
-def collapse.rewrite_outgoing (COLLAPSE : Vertex) (EDGES : List Deduction) : List Deduction :=
+/- Rewrite: DEdge Edge Orig -/----------------------------------------------------------------------------------------------------------
+def collapse.rewrite_outgoing (COLLAPSE : Vertex) (EDGES : List DEdge) : List DEdge :=
     match EDGES with
     | [] => []
-    | (EDGE::EDGES) => ( Deduction.mk COLLAPSE EDGE.END EDGE.COLOR EDGE.DEPENDENCY ) :: ( rewrite_outgoing COLLAPSE EDGES )
+    | (EDGE::EDGES) => ( DEdge.mk COLLAPSE EDGE.dest EDGE.color EDGE.deps ) :: ( rewrite_outgoing COLLAPSE EDGES )
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Rewrite: Ancestral Edge End -/------------------------------------------------------------------------------------------------------------
-def collapse.rewrite_direct (COLLAPSE : Vertex) (PATHS : List Ancestral) : List Ancestral :=
+/- Rewrite: AEdge Edge Dest -/------------------------------------------------------------------------------------------------------------
+def collapse.rewrite_direct (COLLAPSE : Vertex) (PATHS : List AEdge) : List AEdge :=
     match PATHS with
     | [] => []
-    | (PATH::PATHS) => ( Ancestral.mk PATH.START COLLAPSE PATH.COLORS ) :: ( rewrite_direct COLLAPSE PATHS )
+    | (PATH::PATHS) => ( AEdge.mk PATH.orig COLLAPSE PATH.colors ) :: ( rewrite_direct COLLAPSE PATHS )
     -----------------------------------------------------------------------------------------------------------------------------------------
 
 /- Collapse Definitions (Collapses a Single Pair of Nodes) -/
@@ -787,90 +791,90 @@ def collapse_rule (U V : Vertex) (DLDS : Graph) : Neighborhood := collapse ( pre
 ---------------------------------------------------------------------------------------------------------------------------------------------
 
 /- Is-Collapse Methods (DLDS) -/
-/- Updade: Deduction Edge End -/------------------------------------------------------------------------------------------------------------
-def is_collapse.update_edges_end (OLD NEW : Vertex) (EDGES : List Deduction) : List Deduction :=
+/- Updade: DEdge Edge Dest -/------------------------------------------------------------------------------------------------------------
+def is_collapse.update_edges_end (OLD NEW : Vertex) (EDGES : List DEdge) : List DEdge :=
     match EDGES with
     | [] => []
     | (EDGE::EDGES) => ( loop OLD NEW EDGE ) :: ( update_edges_end OLD NEW EDGES )
-  where loop (OLD NEW : Vertex) (EDGE : Deduction) : Deduction :=
-        Deduction.mk EDGE.START
-            (if EDGE.END = OLD then NEW else EDGE.END)
-            EDGE.COLOR
-            EDGE.DEPENDENCY
+  where loop (OLD NEW : Vertex) (EDGE : DEdge) : DEdge :=
+        DEdge.mk EDGE.orig
+            (if EDGE.dest = OLD then NEW else EDGE.dest)
+            EDGE.color
+            EDGE.deps
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Updade: Deduction Edge Start -/----------------------------------------------------------------------------------------------------------
-def is_collapse.update_edges_start (OLD NEW : Vertex) (EDGES : List Deduction) : List Deduction :=
+/- Updade: DEdge Edge Orig -/----------------------------------------------------------------------------------------------------------
+def is_collapse.update_edges_orig (OLD NEW : Vertex) (EDGES : List DEdge) : List DEdge :=
     match EDGES with
     | [] => []
-    | (EDGE::EDGES) => ( loop OLD NEW EDGE ) :: ( update_edges_start OLD NEW EDGES )
-  where loop (OLD NEW : Vertex) (EDGE : Deduction) : Deduction :=
-        Deduction.mk (if EDGE.START = OLD then NEW else EDGE.START)
-             EDGE.END
-             EDGE.COLOR
-             EDGE.DEPENDENCY
+    | (EDGE::EDGES) => ( loop OLD NEW EDGE ) :: ( update_edges_orig OLD NEW EDGES )
+  where loop (OLD NEW : Vertex) (EDGE : DEdge) : DEdge :=
+        DEdge.mk (if EDGE.orig = OLD then NEW else EDGE.orig)
+             EDGE.dest
+             EDGE.color
+             EDGE.deps
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Updade: Ancestral Edge End -/------------------------------------------------------------------------------------------------------------
-def is_collapse.update_paths_end (OLD NEW : Vertex) (PATHS : List Ancestral) : List Ancestral :=
+/- Updade: AEdge Edge Dest -/------------------------------------------------------------------------------------------------------------
+def is_collapse.update_paths_end (OLD NEW : Vertex) (PATHS : List AEdge) : List AEdge :=
     match PATHS with
     | [] => []
     | (PATH::PATHS) => ( loop OLD NEW PATH ) :: ( update_paths_end OLD NEW PATHS )
-  where loop (OLD NEW : Vertex) (PATH : Ancestral) : Ancestral :=
-        Ancestral.mk PATH.START
-             (if PATH.END = OLD then NEW else PATH.END)
-             PATH.COLORS
+  where loop (OLD NEW : Vertex) (PATH : AEdge) : AEdge :=
+        AEdge.mk PATH.orig
+             (if PATH.dest = OLD then NEW else PATH.dest)
+             PATH.colors
     -----------------------------------------------------------------------------------------------------------------------------------------
-/- Updade: Deduction Edge Start -/----------------------------------------------------------------------------------------------------------
-def is_collapse.update_paths_start (OLD NEW : Vertex) (PATHS : List Ancestral) : List Ancestral :=
+/- Updade: DEdge Edge Orig -/----------------------------------------------------------------------------------------------------------
+def is_collapse.update_paths_orig (OLD NEW : Vertex) (PATHS : List AEdge) : List AEdge :=
     match PATHS with
     | [] => []
-    | (PATH::PATHS) => ( loop OLD NEW PATH ) :: ( update_paths_start OLD NEW PATHS )
-  where loop (OLD NEW : Vertex) (PATH : Ancestral) : Ancestral :=
-        Ancestral.mk (if PATH.START = OLD then NEW else PATH.START)
-             PATH.END
-             PATH.COLORS
+    | (PATH::PATHS) => ( loop OLD NEW PATH ) :: ( update_paths_orig OLD NEW PATHS )
+  where loop (OLD NEW : Vertex) (PATH : AEdge) : AEdge :=
+        AEdge.mk (if PATH.orig = OLD then NEW else PATH.orig)
+             PATH.dest
+             PATH.colors
     -----------------------------------------------------------------------------------------------------------------------------------------
 
 /- Is-Collapse: Vertex × Vertex × Graph × Graph → Prop -/-------------------------------------------------------------------------------------------
 def Graph.is_collapse (U V : Vertex) : Graph → Graph → Prop
                 /- Incoming Nodes -/-------------------------------------------------------------------------------------------------------------
                 /- Above & Right Side (Collapsed Child) -/---------------------------------------------------------------------------------------
-| CLPS, DLDS => ( ∀{inc : Deduction}, ( U.isCollapsed = true ) →
+| CLPS, DLDS => ( ∀{inc : DEdge}, ( U.isCollapsed = true ) →
                                       ( inc ∈ get_rule.incoming U DLDS ) →
                   ---------------------------------------------------------------------
-                  ( get_rule inc.START CLPS = rule ( inc.START )
-                                                   ( get_rule.incoming inc.START DLDS )
-                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (get_rule.outgoing inc.START DLDS) )
-                /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct inc.START DLDS )
-                                                   ( get_rule.indirect inc.START DLDS ) ) )
+                  ( get_rule inc.orig CLPS = rule ( inc.orig )
+                                                   ( get_rule.incoming inc.orig DLDS )
+                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (get_rule.outgoing inc.orig DLDS) )
+                /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct inc.orig DLDS )
+                                                   ( get_rule.indirect inc.orig DLDS ) ) )
                 ---------------------------------------------------------------------------------------------------------------------------------
                 /- Aboce & Right Side (Non-Collapsed Child) -/-----------------------------------------------------------------------------------
-              ∧ ( ∀{inc : Deduction}, ( U.isCollapsed = false ) →
+              ∧ ( ∀{inc : DEdge}, ( U.isCollapsed = false ) →
                                       ( inc ∈ get_rule.incoming U DLDS ) →
                   ---------------------------------------------------------------------
-                  ( get_rule inc.START CLPS = rule ( inc.START )
-                                                   ( get_rule.incoming inc.START DLDS )
-                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (get_rule.outgoing inc.START DLDS) )
-                /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.START )
+                  ( get_rule inc.orig CLPS = rule ( inc.orig )
+                                                   ( get_rule.incoming inc.orig DLDS )
+                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (get_rule.outgoing inc.orig DLDS) )
+                /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.orig )
                                                                           ( pre_collapse.indirect ( U.id )
                                                                                                   ( U.isHypothesis )
                                                                                                   ( get_rule.incoming U DLDS )
                                                                                                   ( get_rule.outgoing U DLDS )
                                                                                                   ( get_rule.direct U DLDS ) ) )
-                                                   ( get_rule.indirect inc.START DLDS ) ) )
+                                                   ( get_rule.indirect inc.orig DLDS ) ) )
                 ---------------------------------------------------------------------------------------------------------------------------------
                 /- Above & Left Side -/----------------------------------------------------------------------------------------------------------
-              ∧ ( ∀{inc : Deduction}, ( inc ∈ get_rule.incoming V DLDS ) →
+              ∧ ( ∀{inc : DEdge}, ( inc ∈ get_rule.incoming V DLDS ) →
                   ---------------------------------------------------------------------
-                  ( get_rule inc.START CLPS = rule ( inc.START )
-                                                   ( get_rule.incoming inc.START DLDS )
-                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (get_rule.outgoing inc.START DLDS) )
-                /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.START )
+                  ( get_rule inc.orig CLPS = rule ( inc.orig )
+                                                   ( get_rule.incoming inc.orig DLDS )
+                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (get_rule.outgoing inc.orig DLDS) )
+                /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.orig )
                                                                           ( pre_collapse.indirect ( V.id )
                                                                                                   ( V.isHypothesis )
                                                                                                   ( get_rule.incoming V DLDS )
                                                                                                   ( get_rule.outgoing V DLDS )
                                                                                                   ( get_rule.direct V DLDS ) ) )
-                                                   ( get_rule.indirect inc.START DLDS ) ) )
+                                                   ( get_rule.indirect inc.orig DLDS ) ) )
     ---------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -1020,11 +1024,11 @@ namespace COLLAPSE
                        | head _ => exact prop_head;
                        | tail _ mem_cases => exact prop_mem mem_cases; );
 
-  /- Lemma: Simplify "END" at "get_rule.incoming" -/
-  theorem Simp_End_Incoming {NODE : Vertex} {DLDS : Graph} {EDGE : Deduction} :
+  /- Lemma: Simplify "dest" at "get_rule.incoming" -/
+  theorem Simp_Dest_Incoming {NODE : Vertex} {DLDS : Graph} {EDGE : DEdge} :
     ( EDGE ∈ get_rule.incoming NODE DLDS ) →
     ------------------------------------
-    ( EDGE.END = NODE ) := by
+    ( EDGE.dest = NODE ) := by
   simp only [get_rule.incoming];
   induction DLDS.EDGES with
   | nil => intro mem_incoming;
@@ -1037,11 +1041,11 @@ namespace COLLAPSE
                                              | head _ => exact eq_head;
                                              | tail _ mem_incoming => exact LOOP mem_incoming;
                            case _ ne_head => exact LOOP mem_incoming;
-  /- Lemma: Simplify "START" at "get_rule.outgoing" -/
-  theorem Simp_Start_Outgoing {NODE : Vertex} {DLDS : Graph} {EDGE : Deduction} :
+  /- Lemma: Simplify "orig" at "get_rule.outgoing" -/
+  theorem Simp_Orig_Outgoing {NODE : Vertex} {DLDS : Graph} {EDGE : DEdge} :
     ( EDGE ∈ get_rule.outgoing NODE DLDS ) →
     ------------------------------------
-    ( EDGE.START = NODE ) := by
+    ( EDGE.orig = NODE ) := by
   simp only [get_rule.outgoing];
   induction DLDS.EDGES with
   | nil => intro mem_incoming;
@@ -1054,11 +1058,11 @@ namespace COLLAPSE
                                              | head _ => exact eq_head;
                                              | tail _ mem_incoming => exact LOOP mem_incoming;
                            case _ ne_head => exact LOOP mem_incoming;
-  /- Lemma: Simplify "END" at "get_rule.direct" -/
-  theorem Simp_End_Direct {NODE : Vertex} {DLDS : Graph} {PATH : Ancestral} :
+  /- Lemma: Simplify "dest" at "get_rule.direct" -/
+  theorem Simp_Dest_Direct {NODE : Vertex} {DLDS : Graph} {PATH : AEdge} :
     ( PATH ∈ get_rule.direct NODE DLDS ) →
     ------------------------------------
-    ( PATH.END = NODE ) := by
+    ( PATH.dest = NODE ) := by
   simp only [get_rule.direct];
   induction DLDS.PATHS with
   | nil => intro mem_direct;
@@ -1074,9 +1078,9 @@ namespace COLLAPSE
 
   /- Lemma: Simplify "get_rule.direct" at "get_rule.indirect" -/
   theorem Simp_Direct_Indirect₁₃ {NODE₀ NODE₁ : Vertex} {DLDS : Graph} :
-    ( Ancestral.mk (Start : Vertex) NODE₁ (Colors : List Nat) ∈ get_rule.indirect NODE₀ DLDS ) →
+    ( AEdge.mk (Orig : Vertex) NODE₁ (Colors : List Nat) ∈ get_rule.indirect NODE₀ DLDS ) →
     ------------------------------------
-    ( Ancestral.mk (Start : Vertex) NODE₁ (Colors : List Nat) ∈ get_rule.direct NODE₁ DLDS ) := by
+    ( AEdge.mk (Orig : Vertex) NODE₁ (Colors : List Nat) ∈ get_rule.direct NODE₁ DLDS ) := by
   simp only [get_rule.indirect];
   induction get_rule.incoming NODE₀ DLDS with
   | nil => intro prop_indirect₀;
@@ -1087,15 +1091,15 @@ namespace COLLAPSE
                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at prop_indirect₀;
                            cases prop_indirect₀ with
                            | inl prop_head₀ => rewrite [←get_rule.direct] at prop_head₀;    /- Revert; Fold at "prop_head₀" -/
-                                               rewrite [←COLLAPSE.Simp_End_Direct prop_head₀] at prop_head₀;
+                                               rewrite [←COLLAPSE.Simp_Dest_Direct prop_head₀] at prop_head₀;
                                                exact prop_head₀;
                            | inr prop_tail₀ => exact LOOP prop_tail₀;
   /- Lemma: Simplify "get_rule.direct" at "get_rule.indirect" -/
-  theorem Simp_Direct_Indirect₀₂ {NODE : Vertex} {DLDS : Graph} {EDGE : Deduction} :
+  theorem Simp_Direct_Indirect₀₂ {NODE : Vertex} {DLDS : Graph} {EDGE : DEdge} :
     ( EDGE ∈ get_rule.incoming NODE DLDS ) →
     ( get_rule.indirect NODE DLDS = [] ) →
     ------------------------------------
-    ( get_rule.direct EDGE.START DLDS = [] ) := by
+    ( get_rule.direct EDGE.orig DLDS = [] ) := by
   simp only [get_rule.indirect];
   induction get_rule.incoming NODE DLDS with
   | nil => intro _ prop_indirect;
@@ -1112,107 +1116,107 @@ namespace COLLAPSE
                                                        exact prop_indirect_head;
                            | inr prop_incoming_tail => exact LOOP prop_incoming_tail prop_indirect_tail;
 
-  /- Lemma: Simplify "END" at "type_incoming" -/
-  theorem Simp_Inc_End {INC : Deduction} {CENTER : Vertex} {INDIRECT : List Ancestral} :
+  /- Lemma: Simplify "dest" at "type_incoming" -/
+  theorem Simp_Inc_Dest {INC : DEdge} {CENTER : Vertex} {INDIRECT : List AEdge} :
     ( type_incoming.check INC CENTER INDIRECT ) →
     ---------------------------------------------------------------------------------
-    ( INC.END = CENTER ) := by
+    ( INC.dest = CENTER ) := by
   intro inc_case;
   simp only [type_incoming.check] at inc_case;
-  cases inc_case with | intro prop_start inc_case =>
+  cases inc_case with | intro prop_orig inc_case =>
   cases inc_case with | intro prop_end prop_color =>
   exact prop_end;
-  /- Lemma: Simplify "START" at "type_outgoing₁" -/
-  theorem Simp_Out_Start₁ {OUT : Deduction} {CENTER : Vertex} {INDIRECT : List Ancestral} :
+  /- Lemma: Simplify "orig" at "type_outgoing₁" -/
+  theorem Simp_Out_Orig₁ {OUT : DEdge} {CENTER : Vertex} {INDIRECT : List AEdge} :
     ( ( type_outgoing₁.check_h₁ OUT CENTER ) ∨ ( type_outgoing₁.check_ie₁ OUT CENTER INDIRECT ) ) →
     ---------------------------------------------------------------------------------
-    ( OUT.START = CENTER ) := by
+    ( OUT.orig = CENTER ) := by
   intro out_cases;
   cases out_cases with
   | inl out_caseₕ₁ => simp only [type_outgoing₁.check_h₁] at out_caseₕ₁;
                        cases out_caseₕ₁ with | intro prop_hptₕ₁ out_caseₕ₁ =>
-                       cases out_caseₕ₁ with | intro prop_startₕ₁ out_caseₕ₁ =>
-                       exact prop_startₕ₁;
+                       cases out_caseₕ₁ with | intro prop_origₕ₁ out_caseₕ₁ =>
+                       exact prop_origₕ₁;
   | inr out_caseᵢₑ₁ => simp only [type_outgoing₁.check_ie₁] at out_caseᵢₑ₁;
                         cases out_caseᵢₑ₁ with | intro prop_hptᵢₑ₁ out_caseᵢₑ₁ =>
-                        cases out_caseᵢₑ₁ with | intro prop_startᵢₑ₁ out_caseᵢₑ₁ =>
-                        exact prop_startᵢₑ₁;
-  /- Lemma: Simplify "START" at "type_outgoing₃" -/
-  theorem Simp_Out_Start₃ {OUT : Deduction} {CENTER : Vertex} {DIRECT INDIRECT : List Ancestral} :
+                        cases out_caseᵢₑ₁ with | intro prop_origᵢₑ₁ out_caseᵢₑ₁ =>
+                        exact prop_origᵢₑ₁;
+  /- Lemma: Simplify "orig" at "type_outgoing₃" -/
+  theorem Simp_Out_Orig₃ {OUT : DEdge} {CENTER : Vertex} {DIRECT INDIRECT : List AEdge} :
     ( ( ( type_outgoing₁.check_h₁ OUT CENTER ) ∨ ( type_outgoing₁.check_ie₁ OUT CENTER INDIRECT ) )
     ∨ ( ( type_outgoing₃.check_h₃ OUT CENTER DIRECT ) ∨ ( type_outgoing₃.check_ie₃ OUT CENTER INDIRECT ) ) ) →
     ---------------------------------------------------------------------------------
-    ( OUT.START = CENTER ) := by
+    ( OUT.orig = CENTER ) := by
   intro out_cases;
   cases out_cases with
   | inl out_case₁ => cases out_case₁ with
                       | inl out_caseₕ₁ => simp only [type_outgoing₁.check_h₁] at out_caseₕ₁;
                                            cases out_caseₕ₁ with | intro prop_hptₕ₁ out_caseₕ₁ =>
-                                           cases out_caseₕ₁ with | intro prop_startₕ₁ out_caseₕ₁ =>
-                                           exact prop_startₕ₁;
+                                           cases out_caseₕ₁ with | intro prop_origₕ₁ out_caseₕ₁ =>
+                                           exact prop_origₕ₁;
                       | inr out_caseᵢₑ₁ => simp only [type_outgoing₁.check_ie₁] at out_caseᵢₑ₁;
                                             cases out_caseᵢₑ₁ with | intro prop_hptᵢₑ₁ out_caseᵢₑ₁ =>
-                                            cases out_caseᵢₑ₁ with | intro prop_startᵢₑ₁ out_caseᵢₑ₁ =>
-                                            exact prop_startᵢₑ₁;
+                                            cases out_caseᵢₑ₁ with | intro prop_origᵢₑ₁ out_caseᵢₑ₁ =>
+                                            exact prop_origᵢₑ₁;
   | inr out_case₃ => cases out_case₃ with
                       | inl out_caseₕ₃ => simp only [type_outgoing₁.check_h₁] at out_caseₕ₃;
                                            cases out_caseₕ₃ with | intro prop_hptₕ₃ out_caseₕ₃ =>
-                                           cases out_caseₕ₃ with | intro prop_startₕ₃ out_caseₕ₃ =>
-                                           exact prop_startₕ₃;
+                                           cases out_caseₕ₃ with | intro prop_origₕ₃ out_caseₕ₃ =>
+                                           exact prop_origₕ₃;
                       | inr out_caseᵢₑ₃ => simp only [type_outgoing₁.check_ie₁] at out_caseᵢₑ₃;
                                             cases out_caseᵢₑ₃ with | intro prop_hptᵢₑ₃ out_caseᵢₑ₃ =>
-                                            cases out_caseᵢₑ₃ with | intro prop_startᵢₑ₃ out_caseᵢₑ₃ =>
-                                            exact prop_startᵢₑ₃;
+                                            cases out_caseᵢₑ₃ with | intro prop_origᵢₑ₃ out_caseᵢₑ₃ =>
+                                            exact prop_origᵢₑ₃;
   /- Lemma: Simplify "COLOR" at "type_outgoing₁" -/
-  theorem Simp_Out_Color₁ {OUT : Deduction} {CENTER : Vertex} {INDIRECT : List Ancestral} :
+  theorem Simp_Out_Color₁ {OUT : DEdge} {CENTER : Vertex} {INDIRECT : List AEdge} :
     ( ( type_outgoing₁.check_h₁ OUT CENTER ) ∨ ( type_outgoing₁.check_ie₁ OUT CENTER INDIRECT ) ) →
     ---------------------------------------------------------------------------------
-    ( ( OUT.COLOR = 0 )
-    ∨ ( OUT.COLOR ∈ (CENTER.id::CENTER.past) ) ) := by
+    ( ( OUT.color = 0 )
+    ∨ ( OUT.color ∈ (CENTER.id::CENTER.past) ) ) := by
   intro out_cases;
   cases out_cases with
   | inl out_caseₕ₁ => simp only [type_outgoing₁.check_h₁] at out_caseₕ₁;
                        cases out_caseₕ₁ with | intro prop_hptₕ₁ out_caseₕ₁ =>
-                       cases out_caseₕ₁ with | intro prop_startₕ₁ out_caseₕ₁ =>
+                       cases out_caseₕ₁ with | intro prop_origₕ₁ out_caseₕ₁ =>
                        cases out_caseₕ₁ with | intro prop_endₕ₁ prop_colorₕ₁ =>
                        exact Or.inl prop_colorₕ₁;
   | inr out_caseᵢₑ₁ => simp only [type_outgoing₁.check_ie₁] at out_caseᵢₑ₁;
                         cases out_caseᵢₑ₁ with | intro prop_hptᵢₑ₁ out_caseᵢₑ₁ =>
-                        cases out_caseᵢₑ₁ with | intro prop_startᵢₑ₁ out_caseᵢₑ₁ =>
+                        cases out_caseᵢₑ₁ with | intro prop_origᵢₑ₁ out_caseᵢₑ₁ =>
                         cases out_caseᵢₑ₁ with | intro prop_endᵢₑ₁ out_caseᵢₑ₁ =>
                         cases out_caseᵢₑ₁ with | intro prop_colorᵢₑ₁ prop_out_indᵢₑ₁ =>
                         exact Or.inr prop_colorᵢₑ₁;
   /- Lemma: Simplify "COLOR" at "type_outgoing₃" -/
-  theorem Simp_Out_Color₃ {OUT : Deduction} {CENTER : Vertex} {DIRECT INDIRECT : List Ancestral} :
+  theorem Simp_Out_Color₃ {OUT : DEdge} {CENTER : Vertex} {DIRECT INDIRECT : List AEdge} :
     ( ( ( type_outgoing₁.check_h₁ OUT CENTER ) ∨ ( type_outgoing₁.check_ie₁ OUT CENTER INDIRECT ) )
     ∨ ( ( type_outgoing₃.check_h₃ OUT CENTER DIRECT ) ∨ ( type_outgoing₃.check_ie₃ OUT CENTER INDIRECT ) ) ) →
     ---------------------------------------------------------------------------------
-    ( ( OUT.COLOR = 0 )
-    ∨ ( OUT.COLOR ∈ (CENTER.id::CENTER.past) ) ) := by
+    ( ( OUT.color = 0 )
+    ∨ ( OUT.color ∈ (CENTER.id::CENTER.past) ) ) := by
   intro out_cases;
   cases out_cases with
   | inl out_case₁ => cases out_case₁ with
                       | inl out_caseₕ₁ => simp only [type_outgoing₁.check_h₁] at out_caseₕ₁;
                                            cases out_caseₕ₁ with | intro prop_hptₕ₁ out_caseₕ₁ =>
-                                           cases out_caseₕ₁ with | intro prop_startₕ₁ out_caseₕ₁ =>
+                                           cases out_caseₕ₁ with | intro prop_origₕ₁ out_caseₕ₁ =>
                                            cases out_caseₕ₁ with | intro prop_endₕ₁ prop_colorₕ₁ =>
                                            exact Or.inl prop_colorₕ₁;
                       | inr out_caseᵢₑ₁ => simp only [type_outgoing₁.check_ie₁] at out_caseᵢₑ₁;
                                             cases out_caseᵢₑ₁ with | intro prop_hptᵢₑ₁ out_caseᵢₑ₁ =>
-                                            cases out_caseᵢₑ₁ with | intro prop_startᵢₑ₁ out_caseᵢₑ₁ =>
+                                            cases out_caseᵢₑ₁ with | intro prop_origᵢₑ₁ out_caseᵢₑ₁ =>
                                             cases out_caseᵢₑ₁ with | intro prop_endᵢₑ₁ out_caseᵢₑ₁ =>
                                             cases out_caseᵢₑ₁ with | intro prop_colorᵢₑ₁ prop_out_indᵢₑ₁ =>
                                             exact Or.inr prop_colorᵢₑ₁;
   | inr out_case₃ => cases out_case₃ with
                       | inl out_caseₕ₃ => simp only [type_outgoing₁.check_h₁] at out_caseₕ₃;
                                            cases out_caseₕ₃ with | intro prop_hptₕ₃ out_caseₕ₃ =>
-                                           cases out_caseₕ₃ with | intro prop_startₕ₃ out_caseₕ₃ =>
+                                           cases out_caseₕ₃ with | intro prop_origₕ₃ out_caseₕ₃ =>
                                            cases out_caseₕ₃ with | intro prop_endₕ₃ out_caseₕ₃ =>
                                            cases out_caseₕ₃ with | intro prop_colorₕ₃ prop_out_dirₕ₃ =>
                                            exact Or.inr prop_colorₕ₃;
                       | inr out_caseᵢₑ₃ => simp only [type_outgoing₁.check_ie₁] at out_caseᵢₑ₃;
                                             cases out_caseᵢₑ₃ with | intro prop_hptᵢₑ₃ out_caseᵢₑ₃ =>
-                                            cases out_caseᵢₑ₃ with | intro prop_startᵢₑ₃ out_caseᵢₑ₃ =>
+                                            cases out_caseᵢₑ₃ with | intro prop_origᵢₑ₃ out_caseᵢₑ₃ =>
                                             cases out_caseᵢₑ₃ with | intro prop_endᵢₑ₃ out_caseᵢₑ₃ =>
                                             cases out_caseᵢₑ₃ with | intro prop_colorᵢₑ₃ prop_out_indᵢₑ₃ =>
                                             exact Or.inr prop_colorᵢₑ₃;
@@ -1222,13 +1226,13 @@ namespace COLLAPSE
     ( U.isCollapsed = true ) →
     ( CLPS.is_collapse U V DLDS ) →
     /- Incoming Nodes -/-------------------------------------------------------------
-    ( ∀{inc : Deduction}, ( inc ∈ get_rule.incoming U DLDS ) →
+    ( ∀{inc : DEdge}, ( inc ∈ get_rule.incoming U DLDS ) →
       -----------------------------------------------------------------------------
-    ( get_rule inc.START CLPS = rule ( inc.START )
-                                     ( get_rule.incoming inc.START DLDS )
-  /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (get_rule.outgoing inc.START DLDS) )
-  /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct inc.START DLDS )
-                                     ( get_rule.indirect inc.START DLDS ) ) ) := by
+    ( get_rule inc.orig CLPS = rule ( inc.orig )
+                                     ( get_rule.incoming inc.orig DLDS )
+  /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (get_rule.outgoing inc.orig DLDS) )
+  /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct inc.orig DLDS )
+                                     ( get_rule.indirect inc.orig DLDS ) ) ) := by
   intro prop_col prop_collapse;
   simp only [Graph.is_collapse] at prop_collapse;
   cases prop_collapse with | intro prop_incoming _ =>
@@ -1239,18 +1243,18 @@ namespace COLLAPSE
     ( U.isCollapsed = false ) →
     ( CLPS.is_collapse U V DLDS ) →
     /- Incoming Nodes -/-------------------------------------------------------------
-    ( ∀{inc : Deduction}, ( inc ∈ get_rule.incoming U DLDS ) →
+    ( ∀{inc : DEdge}, ( inc ∈ get_rule.incoming U DLDS ) →
       -----------------------------------------------------------------------------
-      ( get_rule inc.START CLPS = rule ( inc.START )
-                                       ( get_rule.incoming inc.START DLDS )
-    /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (get_rule.outgoing inc.START DLDS) )
-    /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.START )
+      ( get_rule inc.orig CLPS = rule ( inc.orig )
+                                       ( get_rule.incoming inc.orig DLDS )
+    /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (get_rule.outgoing inc.orig DLDS) )
+    /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.orig )
                                                               ( pre_collapse.indirect ( U.id )
                                                                                       ( U.isHypothesis )
                                                                                       ( get_rule.incoming U DLDS )
                                                                                       ( get_rule.outgoing U DLDS )
                                                                                       ( get_rule.direct U DLDS ) ) )
-                                       ( get_rule.indirect inc.START DLDS ) ) ) := by
+                                       ( get_rule.indirect inc.orig DLDS ) ) ) := by
   intro prop_col prop_collapse;
   simp only [Graph.is_collapse] at prop_collapse;
   cases prop_collapse with | intro _ prop_collapse =>
@@ -1261,18 +1265,18 @@ namespace COLLAPSE
   theorem Simp_Rule_Above_Right {U V : Vertex} {DLDS CLPS : Graph} :
     ( CLPS.is_collapse U V DLDS ) →
     /- Incoming Nodes -/-------------------------------------------------------------
-    ( ∀{inc : Deduction}, ( inc ∈ get_rule.incoming V DLDS ) →
+    ( ∀{inc : DEdge}, ( inc ∈ get_rule.incoming V DLDS ) →
       -----------------------------------------------------------------------------
-      ( get_rule inc.START CLPS = rule ( inc.START )
-                                       ( get_rule.incoming inc.START DLDS )
-    /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (get_rule.outgoing inc.START DLDS) )
-    /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.START )
+      ( get_rule inc.orig CLPS = rule ( inc.orig )
+                                       ( get_rule.incoming inc.orig DLDS )
+    /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (get_rule.outgoing inc.orig DLDS) )
+    /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.orig )
                                                               ( pre_collapse.indirect ( V.id )
                                                                                       ( V.isHypothesis )
                                                                                       ( get_rule.incoming V DLDS )
                                                                                       ( get_rule.outgoing V DLDS )
                                                                                       ( get_rule.direct V DLDS ) ) )
-                                       ( get_rule.indirect inc.START DLDS ) ) ) := by
+                                       ( get_rule.indirect inc.orig DLDS ) ) ) := by
   intro prop_collapse;
   simp only [Graph.is_collapse] at prop_collapse;
   cases prop_collapse with | intro _ prop_collapse =>
@@ -1287,17 +1291,17 @@ end COLLAPSE
 
 namespace DEFINE
   --333 set_option trace.Meta.Tactic.simp true
-  /- Lemma: Define Check Procedure for "ind.COLORS = [0, RULE.CENTER.id]" -/
-  def check_path_colors (COLORS : List Nat) (PATHS : List Ancestral) : Prop :=
+  /- Lemma: Define Check Procedure for "ind.colors = [0, RULE.CENTER.id]" -/
+  def check_path_colors (COLORS : List Nat) (PATHS : List AEdge) : Prop :=
       match PATHS with
       | [] => True
-      | (PATH::PATHS) => ( PATH.COLORS = COLORS )
+      | (PATH::PATHS) => ( PATH.colors = COLORS )
                        ∧ ( check_path_colors COLORS PATHS )
-  theorem Def_Check_Path_Colors {COLORS : List Nat} {PATH : Ancestral} {PATHS : List Ancestral} :
+  theorem Def_Check_Path_Colors {COLORS : List Nat} {PATH : AEdge} {PATHS : List AEdge} :
     ( PATH ∈ PATHS ) →
     ( check_path_colors COLORS PATHS ) →
     ---------------------------
-    ( PATH.COLORS = COLORS ) := by
+    ( PATH.colors = COLORS ) := by
   match PATHS with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases prop_check;
@@ -1307,63 +1311,63 @@ namespace DEFINE
                     | head _ => exact prop_check_head;
                     | tail _ mem_cases => exact Def_Check_Path_Colors mem_cases prop_check_tail;
 
-  /- Lemma: Define Check Procedure for "( ind₁.COLORS = ind₂.COLORS ) ↔ ( ind₁.START = ind₂.START )" -/
-  def check_path_starts (PATHS : List Ancestral) : Prop :=
+  /- Lemma: Define Check Procedure for "( ind₁.colors = ind₂.colors ) ↔ ( ind₁.orig = ind₂.orig )" -/
+  def check_path_origs (PATHS : List AEdge) : Prop :=
       match PATHS with
       | [] => True
       | (PATH₁::PATHS₂) => ( loop PATH₁ PATHS₂ )
-                         ∧ ( check_path_starts PATHS₂ )
-    where loop (PATH₁ : Ancestral) (PATHS₂ : List Ancestral) : Prop :=
+                         ∧ ( check_path_origs PATHS₂ )
+    where loop (PATH₁ : AEdge) (PATHS₂ : List AEdge) : Prop :=
           match PATHS₂ with
           | [] => True
-          | (PATH₂::PATHS₂) => ( PATH₁.COLORS = PATH₂.COLORS ↔ PATH₁.START = PATH₂.START )
+          | (PATH₂::PATHS₂) => ( PATH₁.colors = PATH₂.colors ↔ PATH₁.orig = PATH₂.orig )
                              ∧ ( loop PATH₁ PATHS₂ )
-  theorem Loop_Check_Path_Starts {PATH₁ PATH₂ : Ancestral} {PATHS₂ : List Ancestral} :
+  theorem Loop_Check_Path_Origs {PATH₁ PATH₂ : AEdge} {PATHS₂ : List AEdge} :
     ( PATH₂ ∈ PATHS₂ ) →
-    ( check_path_starts.loop PATH₁ PATHS₂ ) →
+    ( check_path_origs.loop PATH₁ PATHS₂ ) →
     ---------------------------
-    ( ( PATH₁.COLORS = PATH₂.COLORS ) ↔ ( PATH₁.START = PATH₂.START ) ) := by
+    ( ( PATH₁.colors = PATH₂.colors ) ↔ ( PATH₁.orig = PATH₂.orig ) ) := by
   match PATHS₂ with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro case_mem₂ prop_check_loop;
-                    simp only [check_path_starts.loop] at prop_check_loop;
+                    simp only [check_path_origs.loop] at prop_check_loop;
                     cases prop_check_loop with | intro prop_check_head prop_check_tail =>
                     cases case_mem₂ with
                     | head _ => exact prop_check_head;
-                    | tail _ case_mem₂ => exact Loop_Check_Path_Starts case_mem₂ prop_check_tail;
-  theorem Def_Check_Path_Starts {PATH₁ PATH₂ : Ancestral} {PATHS : List Ancestral} :
+                    | tail _ case_mem₂ => exact Loop_Check_Path_Origs case_mem₂ prop_check_tail;
+  theorem Def_Check_Path_Origs {PATH₁ PATH₂ : AEdge} {PATHS : List AEdge} :
     ( PATH₁ ∈ PATHS ) →
     ( PATH₂ ∈ PATHS ) →
-    ( check_path_starts PATHS ) →
+    ( check_path_origs PATHS ) →
     ---------------------------
-    ( ( PATH₁.COLORS = PATH₂.COLORS ) ↔ ( PATH₁.START = PATH₂.START ) ) := by
+    ( ( PATH₁.colors = PATH₂.colors ) ↔ ( PATH₁.orig = PATH₂.orig ) ) := by
   match PATHS with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro case_mem₁ case_mem₂ prop_check;
-                    simp only [check_path_starts] at prop_check;
+                    simp only [check_path_origs] at prop_check;
                     cases prop_check with | intro prop_check_loop prop_check_tail =>
                     cases case_mem₁ with
                     | head _ => cases case_mem₂ with
                                 | head _ => simp only [eq_self_iff_true];
-                                | tail _ case_mem₂ => exact Loop_Check_Path_Starts case_mem₂ prop_check_loop;
+                                | tail _ case_mem₂ => exact Loop_Check_Path_Origs case_mem₂ prop_check_loop;
                     | tail _ case_mem₁ => cases case_mem₂ with
                                           | head _ => rewrite [eq_comm];
-                                                      rewrite [Loop_Check_Path_Starts case_mem₁ prop_check_loop];
+                                                      rewrite [Loop_Check_Path_Origs case_mem₁ prop_check_loop];
                                                       rewrite [eq_comm];
                                                       trivial;
-                                          | tail _ case_mem₂ => exact Def_Check_Path_Starts case_mem₁ case_mem₂ prop_check_tail;
+                                          | tail _ case_mem₂ => exact Def_Check_Path_Origs case_mem₁ case_mem₂ prop_check_tail;
 
-  /- Lemma: Define Check Procedure for "( INC.START = IND.END ) ↔ ( INC = edge IND.END RULE.CENTER 0 dep_inc )" -/
-  def check_path_incoming (START END : Vertex) (DEPENDENCY : List Formula) (EDGES : List Deduction) : Prop :=
+  /- Lemma: Define Check Procedure for "( INC.orig = IND.dest ) ↔ ( INC = edge IND.dest RULE.CENTER 0 dep_inc )" -/
+  def check_path_incoming (orig dest : Vertex) (deps : List Formula) (EDGES : List DEdge) : Prop :=
       match EDGES with
       | [] => True
-      | (EDGE::EDGES) => ( EDGE.START = START ↔ EDGE = Deduction.mk START END 0 DEPENDENCY )
-                       ∧ ( check_path_incoming START END DEPENDENCY EDGES )
-  theorem Def_Check_Path_Incoming {START END : Vertex} {DEPENDENCY : List Formula} {EDGE : Deduction} {EDGES : List Deduction} :
+      | (EDGE::EDGES) => ( EDGE.orig = orig ↔ EDGE = DEdge.mk orig dest 0 deps )
+                       ∧ ( check_path_incoming orig dest deps EDGES )
+  theorem Def_Check_Path_Incoming {orig dest : Vertex} {deps : List Formula} {EDGE : DEdge} {EDGES : List DEdge} :
     ( EDGE ∈ EDGES ) →
-    ( check_path_incoming START END DEPENDENCY EDGES ) →
+    ( check_path_incoming orig dest deps EDGES ) →
     ---------------------------
-    ( EDGE.START = START ↔ EDGE = Deduction.mk START END 0 DEPENDENCY ) := by
+    ( EDGE.orig = orig ↔ EDGE = DEdge.mk orig dest 0 deps ) := by
   match EDGES with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases prop_check;
@@ -1373,17 +1377,17 @@ namespace DEFINE
                     | head _ => exact prop_check_head;
                     | tail _ mem_cases => exact Def_Check_Path_Incoming mem_cases prop_check_tail;
 
-  /- Lemma: Define Check Procedure for "( OUT.COLOR = color ) ↔ ( OUT = Deduction.mk RULE.CENTER out color dep_out )" -/
-  def check_path_outgoing (START END : Vertex) (COLOR : Nat) (DEPENDENCY : List Formula) (EDGES : List Deduction) : Prop :=
+  /- Lemma: Define Check Procedure for "( OUT.color = color ) ↔ ( OUT = DEdge.mk RULE.CENTER out color dep_out )" -/
+  def check_path_outgoing (orig dest : Vertex) (COLOR : Nat) (deps : List Formula) (EDGES : List DEdge) : Prop :=
       match EDGES with
       | [] => True
-      | (EDGE::EDGES) => ( EDGE.COLOR = COLOR ↔ EDGE = Deduction.mk START END COLOR DEPENDENCY )
-                       ∧ ( check_path_outgoing START END COLOR DEPENDENCY EDGES )
-  theorem Def_Check_Path_Outgoing {START END : Vertex} {COLOR : Nat} {DEPENDENCY : List Formula} {EDGE : Deduction} {EDGES : List Deduction} :
+      | (EDGE::EDGES) => ( EDGE.color = COLOR ↔ EDGE = DEdge.mk orig dest COLOR deps )
+                       ∧ ( check_path_outgoing orig dest COLOR deps EDGES )
+  theorem Def_Check_Path_Outgoing {orig dest : Vertex} {COLOR : Nat} {deps : List Formula} {EDGE : DEdge} {EDGES : List DEdge} :
     ( EDGE ∈ EDGES ) →
-    ( check_path_outgoing START END COLOR DEPENDENCY EDGES ) →
+    ( check_path_outgoing orig dest COLOR deps EDGES ) →
     ---------------------------
-    ( EDGE.COLOR = COLOR ↔ EDGE = Deduction.mk START END COLOR DEPENDENCY ) := by
+    ( EDGE.color = COLOR ↔ EDGE = DEdge.mk orig dest COLOR deps ) := by
   match EDGES with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases prop_check;
@@ -1398,14 +1402,14 @@ end DEFINE
 namespace REWRITE
   --333 set_option trace.Meta.Tactic.simp true
   /- Lemma: Method "rewrite_incoming" preserves "≠ []" -/
-  theorem NeNil_RwIncoming {COLLAPSE : Vertex} {INCOMING : List Deduction} :
+  theorem NeNil_RwIncoming {COLLAPSE : Vertex} {INCOMING : List DEdge} :
     -----------------------------------------------------------------------------------
     ( collapse.rewrite_incoming COLLAPSE INCOMING ≠ [] → INCOMING ≠ [] ) := by
   match INCOMING with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intros; exact List.cons_ne_nil HEAD TAIL;
   /- Lemma: Method "rewrite_incoming" preserves "List.length" -/
-  theorem Eq_Length_RwIncoming {COLLAPSE : Vertex} {INCOMING : List Deduction} :
+  theorem Eq_Length_RwIncoming {COLLAPSE : Vertex} {INCOMING : List DEdge} :
     -----------------------------------------------------------------------------------
     ( List.length (collapse.rewrite_incoming COLLAPSE INCOMING) = List.length INCOMING ) := by
   match INCOMING with
@@ -1413,23 +1417,23 @@ namespace REWRITE
   | (HEAD::TAIL) => simp only [collapse.rewrite_incoming];
                     simp only [List.length, Nat.succ.injEq];
                     exact Eq_Length_RwIncoming;
-  /- Lemma: Applications of "rewrite_incoming" have fixed "EDGE.END" -/
-  theorem Get_End_RwIncoming {COLLAPSE : Vertex} {RWRT : Deduction} {INCOMING : List Deduction} :
+  /- Lemma: Applications of "rewrite_incoming" have fixed "EDGE.dest" -/
+  theorem Get_Dest_RwIncoming {COLLAPSE : Vertex} {RWRT : DEdge} {INCOMING : List DEdge} :
     ( RWRT ∈ collapse.rewrite_incoming COLLAPSE INCOMING ) →
     -----------------------------------------------------------------------------------
-    ( RWRT.END = COLLAPSE ) := by
+    ( RWRT.dest = COLLAPSE ) := by
   match INCOMING with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases;
                     simp only [collapse.rewrite_incoming] at mem_cases;
                     cases mem_cases with
                     | head _ => trivial;
-                    | tail _ mem_cases => exact Get_End_RwIncoming mem_cases;
+                    | tail _ mem_cases => exact Get_Dest_RwIncoming mem_cases;
   /- Lemma: Predict "rewrite_incoming" membership -/
-  theorem Mem_RwIncoming_Of_Mem {COLLAPSE : Vertex} {INC : Deduction} {INCOMING : List Deduction} :
+  theorem Mem_RwIncoming_Of_Mem {COLLAPSE : Vertex} {INC : DEdge} {INCOMING : List DEdge} :
     ( INC ∈ INCOMING ) →
     -----------------------------------------------------------------------------------
-    ( Deduction.mk INC.START COLLAPSE INC.COLOR INC.DEPENDENCY ∈ collapse.rewrite_incoming COLLAPSE INCOMING ) := by
+    ( DEdge.mk INC.orig COLLAPSE INC.color INC.deps ∈ collapse.rewrite_incoming COLLAPSE INCOMING ) := by
   match INCOMING with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases;
@@ -1439,31 +1443,31 @@ namespace REWRITE
                     | tail _ mem_cases => apply List.Mem.tail;
                                           exact Mem_RwIncoming_Of_Mem mem_cases;
   /- Lemma: Resolve "rewrite_incoming" mebership -/
-  theorem Mem_Of_Mem_RwIncoming {COLLAPSE : Vertex} {RWRT : Deduction} {INCOMING : List Deduction} :
+  theorem Mem_Of_Mem_RwIncoming {COLLAPSE : Vertex} {RWRT : DEdge} {INCOMING : List DEdge} :
     ( RWRT ∈ collapse.rewrite_incoming COLLAPSE INCOMING ) →
     -----------------------------------------------------------------------------------
-    ( ∃(ORIGINAL : Vertex), ( Deduction.mk RWRT.START ORIGINAL RWRT.COLOR RWRT.DEPENDENCY ∈ INCOMING ) ) := by
+    ( ∃(ORIGINAL : Vertex), ( DEdge.mk RWRT.orig ORIGINAL RWRT.color RWRT.deps ∈ INCOMING ) ) := by
   match INCOMING with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases;
                     simp only [collapse.rewrite_incoming] at mem_cases;
                     cases mem_cases with
-                    | head _ => apply Exists.intro HEAD.END;
+                    | head _ => apply Exists.intro HEAD.dest;
                                 exact List.Mem.head _;
                     | tail _ mem_cases => have Case_Tail := Mem_Of_Mem_RwIncoming mem_cases;
-                                          cases Case_Tail with | intro End_Tail Mem_Tail =>
-                                          apply Exists.intro End_Tail;
+                                          cases Case_Tail with | intro Dest_Tail Mem_Tail =>
+                                          apply Exists.intro Dest_Tail;
                                           exact List.Mem.tail HEAD Mem_Tail;
 
   /- Lemma: Method "rewrite_outgoing" preserves "≠ []" -/
-  theorem NeNil_RwOutgoing {COLLAPSE : Vertex} {OUTGOING : List Deduction} :
+  theorem NeNil_RwOutgoing {COLLAPSE : Vertex} {OUTGOING : List DEdge} :
     -----------------------------------------------------------------------------------
     ( collapse.rewrite_outgoing COLLAPSE OUTGOING ≠ [] → OUTGOING ≠ [] ) := by
   match OUTGOING with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intros; exact List.cons_ne_nil HEAD TAIL;
   /- Lemma: Method "rewrite_outgoing" preserves "List.length" -/
-  theorem Eq_Length_RwOutgoing {COLLAPSE : Vertex} {OUTGOING : List Deduction} :
+  theorem Eq_Length_RwOutgoing {COLLAPSE : Vertex} {OUTGOING : List DEdge} :
     -----------------------------------------------------------------------------------
     ( List.length (collapse.rewrite_outgoing COLLAPSE OUTGOING) = List.length OUTGOING ) := by
   match OUTGOING with
@@ -1471,23 +1475,23 @@ namespace REWRITE
   | (HEAD::TAIL) => simp only [collapse.rewrite_outgoing];
                     simp only [List.length, Nat.succ.injEq];
                     exact Eq_Length_RwOutgoing;
-  /- Lemma: Applications of "rewrite_outgoing" have fixed "EDGE.START" -/
-  theorem Get_Start_RwOutgoing {COLLAPSE : Vertex} {RWRT : Deduction} {OUTGOING : List Deduction} :
+  /- Lemma: Applications of "rewrite_outgoing" have fixed "EDGE.orig" -/
+  theorem Get_Orig_RwOutgoing {COLLAPSE : Vertex} {RWRT : DEdge} {OUTGOING : List DEdge} :
     ( RWRT ∈ collapse.rewrite_outgoing COLLAPSE OUTGOING ) →
     -----------------------------------------------------------------------------------
-    ( RWRT.START = COLLAPSE ) := by
+    ( RWRT.orig = COLLAPSE ) := by
   match OUTGOING with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases;
                     simp only [collapse.rewrite_outgoing] at mem_cases;
                     cases mem_cases with
                     | head _ => trivial;
-                    | tail _ mem_cases => exact Get_Start_RwOutgoing mem_cases;
+                    | tail _ mem_cases => exact Get_Orig_RwOutgoing mem_cases;
   /- Lemma: Predict "rewrite_outgoing" membership -/
-  theorem Mem_RwOutgoing_Of_Mem {COLLAPSE : Vertex} {OUT : Deduction} {OUTGOING : List Deduction} :
+  theorem Mem_RwOutgoing_Of_Mem {COLLAPSE : Vertex} {OUT : DEdge} {OUTGOING : List DEdge} :
     ( OUT ∈ OUTGOING ) →
     -----------------------------------------------------------------------------------
-    ( Deduction.mk COLLAPSE OUT.END OUT.COLOR OUT.DEPENDENCY ∈ collapse.rewrite_outgoing COLLAPSE OUTGOING ) := by
+    ( DEdge.mk COLLAPSE OUT.dest OUT.color OUT.deps ∈ collapse.rewrite_outgoing COLLAPSE OUTGOING ) := by
   match OUTGOING with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases;
@@ -1497,31 +1501,31 @@ namespace REWRITE
                     | tail _ mem_cases => apply List.Mem.tail;
                                           exact Mem_RwOutgoing_Of_Mem mem_cases;
   /- Lemma: Resolve "rewrite_outgoing" mebership -/
-  theorem Mem_Of_Mem_RwOutgoing {COLLAPSE : Vertex} {RWRT : Deduction} {OUTGOING : List Deduction} :
+  theorem Mem_Of_Mem_RwOutgoing {COLLAPSE : Vertex} {RWRT : DEdge} {OUTGOING : List DEdge} :
     ( RWRT ∈ collapse.rewrite_outgoing COLLAPSE OUTGOING ) →
     -----------------------------------------------------------------------------------
-    ( ∃(ORIGINAL : Vertex), ( Deduction.mk ORIGINAL RWRT.END RWRT.COLOR RWRT.DEPENDENCY ∈ OUTGOING ) ) := by
+    ( ∃(ORIGINAL : Vertex), ( DEdge.mk ORIGINAL RWRT.dest RWRT.color RWRT.deps ∈ OUTGOING ) ) := by
   match OUTGOING with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases;
                     simp only [collapse.rewrite_outgoing] at mem_cases;
                     cases mem_cases with
-                    | head _ => apply Exists.intro HEAD.START;
+                    | head _ => apply Exists.intro HEAD.orig;
                                 exact List.Mem.head _;
                     | tail _ mem_cases => have Case_Tail := Mem_Of_Mem_RwOutgoing mem_cases;
-                                          cases Case_Tail with | intro Start_Tail Mem_Tail =>
-                                          apply Exists.intro Start_Tail;
+                                          cases Case_Tail with | intro Orig_Tail Mem_Tail =>
+                                          apply Exists.intro Orig_Tail;
                                           exact List.Mem.tail HEAD Mem_Tail;
 
   /- Lemma: Method "rewrite_direct" preserves "≠ []" -/
-  theorem NeNil_RwDirect {COLLAPSE : Vertex} {DIRECT : List Ancestral} :
+  theorem NeNil_RwDirect {COLLAPSE : Vertex} {DIRECT : List AEdge} :
     -----------------------------------------------------------------------------------
     ( collapse.rewrite_direct COLLAPSE DIRECT ≠ [] → DIRECT ≠ [] ) := by
   match DIRECT with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intros; exact List.cons_ne_nil HEAD TAIL;
   /- Lemma: Method "rewrite_direct" preserves "List.length" -/
-  theorem Eq_Length_RwDirect {COLLAPSE : Vertex} {DIRECT : List Ancestral} :
+  theorem Eq_Length_RwDirect {COLLAPSE : Vertex} {DIRECT : List AEdge} :
     -----------------------------------------------------------------------------------
     ( List.length (collapse.rewrite_direct COLLAPSE DIRECT) = List.length DIRECT ) := by
   match DIRECT with
@@ -1529,23 +1533,23 @@ namespace REWRITE
   | (HEAD::TAIL) => simp only [collapse.rewrite_direct];
                     simp only [List.length, Nat.succ.injEq];
                     exact Eq_Length_RwDirect;
-  /- Lemma: Applications of "rewrite_direct" have fixed "PATH.END" -/
-  theorem Get_End_RwDirect {COLLAPSE : Vertex} {RWRT : Ancestral} {DIRECT : List Ancestral} :
+  /- Lemma: Applications of "rewrite_direct" have fixed "PATH.dest" -/
+  theorem Get_Dest_RwDirect {COLLAPSE : Vertex} {RWRT : AEdge} {DIRECT : List AEdge} :
     ( RWRT ∈ collapse.rewrite_direct COLLAPSE DIRECT ) →
     -----------------------------------------------------------------------------------
-    ( RWRT.END = COLLAPSE ) := by
+    ( RWRT.dest = COLLAPSE ) := by
   match DIRECT with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases;
                     simp only [collapse.rewrite_direct] at mem_cases;
                     cases mem_cases with
                     | head _ => trivial;
-                    | tail _ mem_cases => exact Get_End_RwDirect mem_cases;
+                    | tail _ mem_cases => exact Get_Dest_RwDirect mem_cases;
   /- Lemma: Predict "rewrite_direct" membership -/
-  theorem Mem_RwDirect_Of_Mem {COLLAPSE : Vertex} {DIR : Ancestral} {DIRECT : List Ancestral} :
+  theorem Mem_RwDirect_Of_Mem {COLLAPSE : Vertex} {DIR : AEdge} {DIRECT : List AEdge} :
     ( DIR ∈ DIRECT ) →
     -----------------------------------------------------------------------------------
-    ( Ancestral.mk DIR.START COLLAPSE DIR.COLORS ∈ collapse.rewrite_direct COLLAPSE DIRECT ) := by
+    ( AEdge.mk DIR.orig COLLAPSE DIR.colors ∈ collapse.rewrite_direct COLLAPSE DIRECT ) := by
   match DIRECT with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases;
@@ -1555,20 +1559,20 @@ namespace REWRITE
                     | tail _ mem_cases => apply List.Mem.tail;
                                           exact Mem_RwDirect_Of_Mem mem_cases;
   /- Lemma: Resolve "rewrite_direct" mebership -/
-  theorem Mem_Of_Mem_RwDirect {COLLAPSE : Vertex} {RWRT : Ancestral} {DIRECT : List Ancestral} :
+  theorem Mem_Of_Mem_RwDirect {COLLAPSE : Vertex} {RWRT : AEdge} {DIRECT : List AEdge} :
     ( RWRT ∈ collapse.rewrite_direct COLLAPSE DIRECT ) →
     -----------------------------------------------------------------------------------
-    ( ∃(ORIGINAL : Vertex), ( Ancestral.mk RWRT.START ORIGINAL RWRT.COLORS ∈ DIRECT ) ) := by
+    ( ∃(ORIGINAL : Vertex), ( AEdge.mk RWRT.orig ORIGINAL RWRT.colors ∈ DIRECT ) ) := by
   match DIRECT with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases;
                     simp only [collapse.rewrite_direct] at mem_cases;
                     cases mem_cases with
-                    | head _ => apply Exists.intro HEAD.END;
+                    | head _ => apply Exists.intro HEAD.dest;
                                 exact List.Mem.head _;
                     | tail _ mem_cases => have Case_Tail := Mem_Of_Mem_RwDirect mem_cases;
-                                          cases Case_Tail with | intro Start_Tail Mem_Tail =>
-                                          apply Exists.intro Start_Tail;
+                                          cases Case_Tail with | intro Orig_Tail Mem_Tail =>
+                                          apply Exists.intro Orig_Tail;
                                           exact List.Mem.tail HEAD Mem_Tail;
 end REWRITE
 
@@ -1636,7 +1640,7 @@ namespace COVERAGE.T3_Of_T1
   cases prop_type with | intro prop_out_unit prop_type =>
   cases prop_type with | intro prop_out_colors prop_type =>
   cases prop_type with | intro prop_dir_nil prop_type =>
-  cases prop_type with | intro prop_ind_starts prop_type =>
+  cases prop_type with | intro prop_ind_origs prop_type =>
   cases prop_type with | intro prop_ind_len prop_type =>
   cases prop_type with | intro prop_ind_colors prop_type =>
   cases prop_type with | intro prop_incoming prop_type =>
@@ -1648,18 +1652,18 @@ namespace COVERAGE.T3_Of_T1
   apply And.intro ( by exact prop_lvl; );                         /- := RULE.CENTER.level > 0 -/
   apply And.intro ( by exact prop_col; );                         /- := RULE.CENTER.isCollapsed = false -/
   apply And.intro ( by exact prop_pst; );                         /- := RULE.CENTER.past = [] -/
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by exact prop_inc_nil; );                     /- := ( RULE.INCOMING = [] ) ↔ ( RULE.CENTER.isHypothesis = true ) -/
   apply And.intro ( by exact prop_inc_len; );                     /- := List.length (RULE.INCOMING) ≤ 2 -/
   apply And.intro ( by exact prop_out_unit; );                    /- := RULE.OUTGOING = [out] -/
-  apply And.intro ( by exact prop_out_colors; );                 /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
-  /- Check Ancestral Paths -/
+  apply And.intro ( by exact prop_out_colors; );                 /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
+  /- Check AEdge Paths -/
   apply And.intro ( by rewrite [prop_dir_nil];                    /- := ( RULE.CENTER.isHypothesis = false ) → ( RULE.DIRECT = [] ) -/
                        intros; trivial; );
   apply And.intro ( by rewrite [prop_dir_nil];                    /- := RULE.DIRECT ≠ [] → RULE.CENTER.isHypothesis = true -/
                        intros; trivial; );
   apply And.intro ( by exact Or.inl prop_dir_nil; );              /- := ( RULE.DIRECT ≠ [] ) ∨ ( RULE.DIRECT = [dir] ) -/
-  apply And.intro ( by exact prop_ind_starts; );                  /- := ( ind₁.COLORS = ind₂.COLORS ) ↔ ( ind₁.START = ind₂.START ) -/
+  apply And.intro ( by exact prop_ind_origs; );                  /- := ( ind₁.colors = ind₂.colors ) ↔ ( ind₁.orig = ind₂.orig ) -/
   apply And.intro ( by exact prop_ind_len; );                     /- := List.length (RULE.INCOMING) = List.length (RULE.INDIRECT) -/
   apply And.intro ( by exact prop_incoming; );                    /- := type_incoming RULE -/
   apply And.intro ( by simp only [type_outgoing₃];                /- := type_outgoing RULE -/
@@ -1697,11 +1701,11 @@ namespace COVERAGE.T3_Of_T1
   apply And.intro ( by exact prop_lvl; );                         /- := RULE.CENTER.level > 0 -/
   apply And.intro ( by exact prop_col; );                         /- := RULE.CENTER.isCollapsed = true -/
   apply And.intro ( by exact prop_pst; );                         /- := RULE.CENTER.past = (past::pasts) -/
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by exact prop_inc_nil; );                     /- := ( RULE.INCOMING = [] ) → ( RULE.CENTER.isHypothesis = true ) -/
   apply And.intro ( by exact prop_out_cons; );                    /- := RULE.OUTGOING = (out::outs) -/
-  apply And.intro ( by exact prop_out_colors; );                 /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
-  /- Check Ancestral Paths -/
+  apply And.intro ( by exact prop_out_colors; );                 /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
+  /- Check AEdge Paths -/
   apply And.intro ( by rewrite [prop_dir_nil];                    /- := ( RULE.CENTER.isHypothesis = false ) → ( RULE.DIRECT = [] ) -/
                        intros; trivial; );
   apply And.intro ( by rewrite [prop_dir_nil];                    /- := RULE.DIRECT ≠ [] → RULE.CENTER.isHypothesis = true -/
@@ -1761,7 +1765,7 @@ namespace COVERAGE.T1_Of_T0
   apply And.intro ( by exact prop_lvl; );                   /- := RULE.CENTER.level > 0 -/
   apply And.intro ( by exact prop_col; );                   /- := RULE.CENTER.isCollapsed = false -/
   apply And.intro ( by exact prop_pst; );                   /- := RULE.CENTER.past = [] -/
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by simp only [reduceCtorEq];            /- := ( RULE.INCOMING = [] ) ↔ ( RULE.CENTER.isHypothesis = true ) -/
                        rewrite [false_iff];
                        rewrite [Bool.not_eq_true];
@@ -1771,19 +1775,19 @@ namespace COVERAGE.T1_Of_T0
                        simp only [exists_and_right];
                        simp only [exists_eq'];
                        trivial; );
-  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂;               /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
+  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂;               /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
                        simp only [out_mem₁, out_mem₂];
                        intros; trivial; );
-  /- Check Ancestral Paths -/
+  /- Check AEdge Paths -/
   apply And.intro ( by trivial; );                                      /- := RULE.DIRECT = [] -/
-  apply And.intro ( by intro ind₁ ind₂ ind_mem₁ ind_mem₂;               /- := ( ind₁.COLORS = ind₂.COLORS ) ↔ ( ind₁.START = ind₂.START ) -/
-                       apply DEFINE.Def_Check_Path_Starts ind_mem₁ ind_mem₂;
-                       simp only [DEFINE.check_path_starts];
-                       simp only [DEFINE.check_path_starts.loop];
+  apply And.intro ( by intro ind₁ ind₂ ind_mem₁ ind_mem₂;               /- := ( ind₁.colors = ind₂.colors ) ↔ ( ind₁.orig = ind₂.orig ) -/
+                       apply DEFINE.Def_Check_Path_Origs ind_mem₁ ind_mem₂;
+                       simp only [DEFINE.check_path_origs];
+                       simp only [DEFINE.check_path_origs.loop];
                        trivial; );
   apply And.intro ( by simp only [List.length]; );                      /- := List.length (RULE.INDIRECT) = List.length (RULE.INCOMING) -/
-  apply And.intro ( by intro ind ind_mem;                               /- := ind.COLORS = [0, RULE.CENTER.id] -/
+  apply And.intro ( by intro ind ind_mem;                               /- := ind.colors = [0, RULE.CENTER.id] -/
                        apply DEFINE.Def_Check_Path_Colors ind_mem;
                        simp only [DEFINE.check_path_colors];
                        trivial; );
@@ -1792,20 +1796,20 @@ namespace COVERAGE.T1_Of_T0
                        simp only [type_incoming, type_incoming.check, and_assoc];
                        cases inc_cases with
                        | head _ => simp only [Vertex.mk.injEq, true_and, and_true];
-                                   apply And.intro ( by exact Nat.zero_lt_succ inc_nbr; );                                  /- := INC.START.id > 0 -/
+                                   apply And.intro ( by exact Nat.zero_lt_succ inc_nbr; );                                  /- := INC.orig.id > 0 -/
                                    /- Match-Verification Loop: -/
                                    apply Exists.intro RULE.CENTER.id;                                                   /- color (Path Notation) -/
                                    apply Exists.intro [];                                                                   /- colors (Path Notation) -/
-                                   apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level - 1) out_fml false false []);        /- anc (Ancestral Node) -/
-                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                   apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level - 1) out_fml false false []);        /- anc (AEdge Node) -/
+                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                        | tail _ inc_cases => cases inc_cases with
                                              | head _ => simp only [Vertex.mk.injEq, true_and, and_true];
-                                                         apply And.intro ( by exact prop_inc_nbr; );                                              /- := INC.START.id > 0 -/
+                                                         apply And.intro ( by exact prop_inc_nbr; );                                              /- := INC.orig.id > 0 -/
                                                          /- Match-Verification Loop: -/
                                                          apply Exists.intro RULE.CENTER.id;                                                   /- color (Path Notation) -/
                                                          apply Exists.intro [];                                                                   /- colors (Path Notation) -/
-                                                         apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level - 1) out_fml false false []);        /- anc (Ancestral Node) -/
-                                                         exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                                         apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level - 1) out_fml false false []);        /- anc (AEdge Node) -/
+                                                         exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                              | tail _ inc_cases => trivial; );
   /- Check Outgoing Edges -/--------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by intro out out_cases;
@@ -1814,36 +1818,36 @@ namespace COVERAGE.T1_Of_T0
                        cases out_cases with
                        | head _ => simp only [Vertex.mk.injEq, true_and];
                                    apply And.intro ( by exact Or.inl prop_hpt; );                      /- := CENTER.isHypothesis = false ∨ CENTER.isCollapsed = true -/
-                                   apply And.intro ( by exact prop_out_nbr; );                         /- := OUT.END.id > 0 -/
-                                   apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );       /- := OUT.COLOR ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
+                                   apply And.intro ( by exact prop_out_nbr; );                         /- := OUT.dest.id > 0 -/
+                                   apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );       /- := OUT.color ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
                                    /- Match-Verification Loop: -/
                                    apply Exists.intro (Vertex.mk inc_nbr (RULE.CENTER.level+1) antecedent minor_hpt false []);   /- inc (Incoming Node) -/
-                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                        | tail _ out_cases => trivial; );
   /- Check Indirect Paths -/--------------------------------------------------------------------------------------------------------------------------
   intro ind ind_cases;
   simp only [type_indirect, type_indirect.check, and_assoc];
   cases ind_cases with
   | head _ => simp only [Vertex.mk.injEq, true_and];
-              apply And.intro ( by exact prop_out_nbr; );                                         /- := IND.START.id > 0 -/
-              apply And.intro ( by exact Nat.le_refl (RULE.CENTER.level - 1); );                  /- := IND.START.level ≤ RULE.CENTER.level - 1 -/
-              apply And.intro ( by exact Nat.zero_lt_succ inc_nbr; );                             /- := IND.END.id > 0 -/
-              apply And.intro ( by simp only [List.length];                                       /- := IND.START.level + List.length (IND.COLORS) = RULE.CENTER.level + 1 -/
+              apply And.intro ( by exact prop_out_nbr; );                                         /- := IND.orig.id > 0 -/
+              apply And.intro ( by exact Nat.le_refl (RULE.CENTER.level - 1); );                  /- := IND.orig.level ≤ RULE.CENTER.level - 1 -/
+              apply And.intro ( by exact Nat.zero_lt_succ inc_nbr; );                             /- := IND.dest.id > 0 -/
+              apply And.intro ( by simp only [List.length];                                       /- := IND.orig.level + List.length (IND.colors) = RULE.CENTER.level + 1 -/
                                    simp only [Nat.zero_add, ←Nat.add_assoc];
                                    simp only [Nat.sub_add_cancel prop_lvl]; );
               apply Exists.intro RULE.CENTER.id;                                              /- color (Path Notation) -/
               apply Exists.intro [];                                                              /- colors (Path Notation) -/
               apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbr );                  /- := check_numbers (color::colors) -/
               apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                       /- := color ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
-              apply And.intro ( by trivial; );                                                    /- := IND.COLORS = (0::color::colors) -/
+              apply And.intro ( by trivial; );                                                    /- := IND.colors = (0::color::colors) -/
               /- Match-Verification Loop: -/
               exact And.intro ( by apply Exists.intro #major_dep;                                                              /- dep_inc (Incoming Dependency) -/
-                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := edge IND.END RULE.CENTER 0 dep_inc ∈ RULE.INCOMING -/
-                                   intro inc inc_cases;                                                                       /- := ( INC.START = IND.END ) ↔ ( INC = edge IND.END RULE.CENTER 0 dep_inc ) -/
+                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := edge IND.dest RULE.CENTER 0 dep_inc ∈ RULE.INCOMING -/
+                                   intro inc inc_cases;                                                                       /- := ( INC.orig = IND.dest ) ↔ ( INC = edge IND.dest RULE.CENTER 0 dep_inc ) -/
                                    apply DEFINE.Def_Check_Path_Incoming inc_cases;
                                    simp only [DEFINE.check_path_incoming];
                                    /- Resolve Missmatch: -/
-                                   simp only [Deduction.mk.injEq, true_and, and_true];
+                                   simp only [DEdge.mk.injEq, true_and, and_true];
                                    simp only [Vertex.mk.injEq, true_and, and_true];
                                    simp only [iff_self_and, and_imp];
                                    have succ_ne_self := Nat.succ_ne_self inc_nbr;
@@ -1852,34 +1856,34 @@ namespace COVERAGE.T1_Of_T0
                                    trivial; )
                               ( by apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level - 1) out_fml false false []);          /- out (Outgoing Node) -/
                                    apply Exists.intro (minor_dep ∪ major_dep);                                                /- dep_out (Outgoing Dependency) -/
-                                   apply And.intro ( by simp only [Vertex.mk.injEq]; );                                     /- := ( colors = [] ) ↔ ( out = IND.START ) -/
-                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := Deduction.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
-                                   intro out out_cases;                                                                       /- := ( OUT.COLOR = color ) ↔ ( OUT = Deduction.mk RULE.CENTER out color dep_out ) -/
+                                   apply And.intro ( by simp only [Vertex.mk.injEq]; );                                     /- := ( colors = [] ) ↔ ( out = IND.orig ) -/
+                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := DEdge.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
+                                   intro out out_cases;                                                                       /- := ( OUT.color = color ) ↔ ( OUT = DEdge.mk RULE.CENTER out color dep_out ) -/
                                    apply DEFINE.Def_Check_Path_Outgoing out_cases;
                                    simp only [DEFINE.check_path_outgoing];
                                    /- Perfect Match! -/
                                    trivial; );
   | tail _ ind_cases => cases ind_cases with
                         | head _ => simp only [Vertex.mk.injEq, true_and];
-                                    apply And.intro ( by exact prop_out_nbr; );                                         /- := IND.START.id > 0 -/
-                                    apply And.intro ( by exact Nat.le_refl (RULE.CENTER.level - 1); );                  /- := IND.START.level ≤ RULE.CENTER.level - 1 -/
-                                    apply And.intro ( by exact prop_inc_nbr; );                                         /- := IND.END.id > 0 -/
-                                    apply And.intro ( by simp only [List.length];                                       /- := IND.START.level + List.length (IND.COLORS) = RULE.CENTER.level + 1 -/
+                                    apply And.intro ( by exact prop_out_nbr; );                                         /- := IND.orig.id > 0 -/
+                                    apply And.intro ( by exact Nat.le_refl (RULE.CENTER.level - 1); );                  /- := IND.orig.level ≤ RULE.CENTER.level - 1 -/
+                                    apply And.intro ( by exact prop_inc_nbr; );                                         /- := IND.dest.id > 0 -/
+                                    apply And.intro ( by simp only [List.length];                                       /- := IND.orig.level + List.length (IND.colors) = RULE.CENTER.level + 1 -/
                                                          simp only [Nat.zero_add, ←Nat.add_assoc];
                                                          simp only [Nat.sub_add_cancel prop_lvl]; );
                                     apply Exists.intro RULE.CENTER.id;                                              /- color (Path Notation) -/
                                     apply Exists.intro [];                                                              /- colors (Path Notation) -/
                                     apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbr );                  /- := check_numbers (color::colors) -/
                                     apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                       /- := color ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
-                                    apply And.intro ( by trivial; );                                                    /- := IND.COLORS = (0::color::colors) -/
+                                    apply And.intro ( by trivial; );                                                    /- := IND.colors = (0::color::colors) -/
                                     /- Match-Verification Loop: -/
                                     exact And.intro ( by apply Exists.intro #minor_dep;                                                              /- dep_inc (Incoming Dependency) -/
-                                                         apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := edge IND.END RULE.CENTER 0 dep_inc ∈ RULE.INCOMING -/
-                                                         intro inc inc_cases;                                                                       /- := ( INC.START = IND.END ) ↔ ( INC = edge IND.END RULE.CENTER 0 dep_inc ) -/
+                                                         apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := edge IND.dest RULE.CENTER 0 dep_inc ∈ RULE.INCOMING -/
+                                                         intro inc inc_cases;                                                                       /- := ( INC.orig = IND.dest ) ↔ ( INC = edge IND.dest RULE.CENTER 0 dep_inc ) -/
                                                          apply DEFINE.Def_Check_Path_Incoming inc_cases;
                                                          simp only [DEFINE.check_path_incoming];
                                                          /- Resolve Missmatch: -/
-                                                         simp only [Deduction.mk.injEq, true_and, and_true];
+                                                         simp only [DEdge.mk.injEq, true_and, and_true];
                                                          simp only [Vertex.mk.injEq, true_and, and_true];
                                                          simp only [iff_self_and, and_imp];
                                                          have succ_ne_self := Nat.succ_ne_self inc_nbr;
@@ -1888,9 +1892,9 @@ namespace COVERAGE.T1_Of_T0
                                                          trivial; )
                                                     ( by apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level - 1) out_fml false false []);          /- out (Outgoing Node) -/
                                                          apply Exists.intro (minor_dep ∪ major_dep);                                                /- dep_out (Outgoing Dependency) -/
-                                                         apply And.intro ( by simp only [Vertex.mk.injEq]; );                                     /- := ( colors = [] ) ↔ ( out = IND.START ) -/
-                                                         apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := Deduction.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
-                                                         intro out out_cases;                                                                       /- := ( OUT.COLOR = color ) ↔ ( OUT = Deduction.mk RULE.CENTER out color dep_out ) -/
+                                                         apply And.intro ( by simp only [Vertex.mk.injEq]; );                                     /- := ( colors = [] ) ↔ ( out = IND.orig ) -/
+                                                         apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := DEdge.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
+                                                         intro out out_cases;                                                                       /- := ( OUT.color = color ) ↔ ( OUT = DEdge.mk RULE.CENTER out color dep_out ) -/
                                                          apply DEFINE.Def_Check_Path_Outgoing out_cases;
                                                          simp only [DEFINE.check_path_outgoing];
                                                          /- Perfect Match! -/
@@ -1936,7 +1940,7 @@ namespace COVERAGE.T1_Of_T0
   apply And.intro ( by exact prop_lvl; );                   /- := RULE.CENTER.level > 0 -/
   apply And.intro ( by exact prop_col; );                   /- := RULE.CENTER.isCollapsed = false -/
   apply And.intro ( by exact prop_pst; );                   /- := RULE.CENTER.past = [] -/
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by simp only [reduceCtorEq];            /- := ( RULE.INCOMING = [] ) ↔ ( RULE.CENTER.isHypothesis = true ) -/
                        rewrite [false_iff];
                        rewrite [Bool.not_eq_true];
@@ -1946,19 +1950,19 @@ namespace COVERAGE.T1_Of_T0
                        simp only [exists_and_right];
                        simp only [exists_eq'];
                        trivial; );
-  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂;               /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
+  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂;               /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
                        simp only [out_mem₁, out_mem₂];
                        intros; trivial; );
-  /- Check Ancestral Paths -/
+  /- Check AEdge Paths -/
   apply And.intro ( by trivial; );                                      /- := RULE.DIRECT = [] -/
-  apply And.intro ( by intro ind₁ ind₂ ind_mem₁ ind_mem₂;               /- := ( ind₁.COLORS = ind₂.COLORS ) ↔ ( ind₁.START = ind₂.START ) -/
-                       apply DEFINE.Def_Check_Path_Starts ind_mem₁ ind_mem₂;
-                       simp only [DEFINE.check_path_starts];
-                       simp only [DEFINE.check_path_starts.loop];
+  apply And.intro ( by intro ind₁ ind₂ ind_mem₁ ind_mem₂;               /- := ( ind₁.colors = ind₂.colors ) ↔ ( ind₁.orig = ind₂.orig ) -/
+                       apply DEFINE.Def_Check_Path_Origs ind_mem₁ ind_mem₂;
+                       simp only [DEFINE.check_path_origs];
+                       simp only [DEFINE.check_path_origs.loop];
                        trivial; );
   apply And.intro ( by simp only [List.length]; );                      /- := List.length (RULE.INDIRECT) = List.length (RULE.INCOMING) -/
-  apply And.intro ( by intro ind ind_mem;                               /- := ind.COLORS = [0, RULE.CENTER.id] -/
+  apply And.intro ( by intro ind ind_mem;                               /- := ind.colors = [0, RULE.CENTER.id] -/
                        apply DEFINE.Def_Check_Path_Colors ind_mem;
                        simp only [DEFINE.check_path_colors];
                        trivial; );
@@ -1967,12 +1971,12 @@ namespace COVERAGE.T1_Of_T0
                        simp only [type_incoming, type_incoming.check, and_assoc];
                        cases inc_cases with
                        | head _ => simp only [Vertex.mk.injEq, true_and, and_true];
-                                   apply And.intro ( by exact prop_inc_nbr; );                                              /- := INC.START.id > 0 -/
+                                   apply And.intro ( by exact prop_inc_nbr; );                                              /- := INC.orig.id > 0 -/
                                    /- Match-Verification Loop: -/
                                    apply Exists.intro RULE.CENTER.id;                                                   /- color (Path Notation) -/
                                    apply Exists.intro [];                                                                   /- colors (Path Notation) -/
-                                   apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level - 1) out_fml false false []);        /- anc (Ancestral Node) -/
-                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                   apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level - 1) out_fml false false []);        /- anc (AEdge Node) -/
+                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                        | tail _ inc_cases => trivial; );
   /- Check Outgoing Edges -/--------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by intro out out_cases;
@@ -1981,41 +1985,41 @@ namespace COVERAGE.T1_Of_T0
                        cases out_cases with
                        | head _ => simp only [Vertex.mk.injEq, true_and];
                                    apply And.intro ( by exact Or.inl prop_hpt; );                      /- := CENTER.isHypothesis = false ∨ CENTER.isCollapsed = true -/
-                                   apply And.intro ( by exact prop_out_nbr; );                         /- := OUT.END.id > 0 -/
-                                   apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );       /- := OUT.COLOR ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
+                                   apply And.intro ( by exact prop_out_nbr; );                         /- := OUT.dest.id > 0 -/
+                                   apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );       /- := OUT.color ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
                                    /- Match-Verification Loop: -/
                                    apply Exists.intro (Vertex.mk inc_nbr (RULE.CENTER.level+1) consequent false false []);       /- inc (Incoming Node) -/
-                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                        | tail _ out_cases => trivial; );
   /- Check Indirect Paths -/--------------------------------------------------------------------------------------------------------------------------
   intro ind ind_cases;
   simp only [type_indirect, type_indirect.check, and_assoc];
   cases ind_cases with
   | head _ => simp only [Vertex.mk.injEq, true_and];
-              apply And.intro ( by exact prop_out_nbr; );                                         /- := IND.START.id > 0 -/
-              apply And.intro ( by exact Nat.le_refl (RULE.CENTER.level - 1); );                  /- := IND.START.level ≤ RULE.CENTER.level - 1 -/
-              apply And.intro ( by exact prop_inc_nbr; );                                         /- := IND.END.id > 0 -/
-              apply And.intro ( by simp only [List.length];                                       /- := IND.START.level + List.length (IND.COLORS) = RULE.CENTER.level + 1 -/
+              apply And.intro ( by exact prop_out_nbr; );                                         /- := IND.orig.id > 0 -/
+              apply And.intro ( by exact Nat.le_refl (RULE.CENTER.level - 1); );                  /- := IND.orig.level ≤ RULE.CENTER.level - 1 -/
+              apply And.intro ( by exact prop_inc_nbr; );                                         /- := IND.dest.id > 0 -/
+              apply And.intro ( by simp only [List.length];                                       /- := IND.orig.level + List.length (IND.colors) = RULE.CENTER.level + 1 -/
                                    simp only [Nat.zero_add, ←Nat.add_assoc];
                                    simp only [Nat.sub_add_cancel prop_lvl]; );
               apply Exists.intro RULE.CENTER.id;                                              /- color (Path Notation) -/
               apply Exists.intro [];                                                              /- colors (Path Notation) -/
               apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbr );                  /- := check_numbers (color::colors) -/
               apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                       /- := color ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
-              apply And.intro ( by trivial; );                                                    /- := IND.COLORS = (0::color::colors) -/
+              apply And.intro ( by trivial; );                                                    /- := IND.colors = (0::color::colors) -/
               /- Match-Verification Loop: -/
               exact And.intro ( by apply Exists.intro #inc_dep;                                                               /- dep_inc (Incoming Dependency) -/
-                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := edge IND.END RULE.CENTER 0 dep_inc ∈ RULE.INCOMING -/
-                                   intro inc inc_cases;                                                                       /- := ( INC.START = IND.END ) ↔ ( INC = edge IND.END RULE.CENTER 0 dep_inc ) -/
+                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := edge IND.dest RULE.CENTER 0 dep_inc ∈ RULE.INCOMING -/
+                                   intro inc inc_cases;                                                                       /- := ( INC.orig = IND.dest ) ↔ ( INC = edge IND.dest RULE.CENTER 0 dep_inc ) -/
                                    apply DEFINE.Def_Check_Path_Incoming inc_cases;
                                    simp only [DEFINE.check_path_incoming];
                                    /- Perfect Match! -/
                                    trivial; )
                               ( by apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level - 1) out_fml false false []);          /- out (Outgoing Node) -/
                                    apply Exists.intro (inc_dep − [antecedent]);                                               /- dep_out (Outgoing Dependency) -/
-                                   apply And.intro ( by simp only [Vertex.mk.injEq]; );                                     /- := ( colors = [] ) ↔ ( out = IND.START ) -/
-                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := Deduction.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
-                                   intro out out_cases;                                                                       /- := ( OUT.COLOR = color ) ↔ ( OUT = Deduction.mk RULE.CENTER out color dep_out ) -/
+                                   apply And.intro ( by simp only [Vertex.mk.injEq]; );                                     /- := ( colors = [] ) ↔ ( out = IND.orig ) -/
+                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := DEdge.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
+                                   intro out out_cases;                                                                       /- := ( OUT.color = color ) ↔ ( OUT = DEdge.mk RULE.CENTER out color dep_out ) -/
                                    apply DEFINE.Def_Check_Path_Outgoing out_cases;
                                    simp only [DEFINE.check_path_outgoing];
                                    /- Perfect Match! -/
@@ -2054,24 +2058,24 @@ namespace COVERAGE.T1_Of_T0
   apply And.intro ( by exact prop_lvl; );                   /- := RULE.CENTER.level > 0 -/
   apply And.intro ( by exact prop_col; );                   /- := RULE.CENTER.isCollapsed = false -/
   apply And.intro ( by exact prop_pst; );                   /- := RULE.CENTER.past = [] -/
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by rewrite [prop_hpt]; trivial; );          /- := ( RULE.INCOMING = [] ) ↔ ( RULE.CENTER.isHypothesis = true ) -/
   apply And.intro ( by simp only [List.length]; trivial; );     /- := List.length (RULE.INCOMING) ≤ 2 -/
   apply And.intro ( by simp only [List.cons.injEq];             /- := RULE.OUTGOING = [out] -/
                        simp only [exists_and_right];
                        simp only [exists_eq'];
                        trivial; );
-  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂;               /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
+  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂;               /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
                        simp only [out_mem₁, out_mem₂];
                        intros; trivial; );
-  /- Check Ancestral Paths -/
+  /- Check AEdge Paths -/
   apply And.intro ( by trivial; );                                      /- := RULE.DIRECT = [] -/
-  apply And.intro ( by intro ind₁ ind₂ ind_mem₁ ind_mem₂;               /- := ( ind₁.COLORS = ind₂.COLORS ) ↔ ( ind₁.START = ind₂.START ) -/
-                       apply DEFINE.Def_Check_Path_Starts ind_mem₁ ind_mem₂;
-                       simp only [DEFINE.check_path_starts]; );
+  apply And.intro ( by intro ind₁ ind₂ ind_mem₁ ind_mem₂;               /- := ( ind₁.colors = ind₂.colors ) ↔ ( ind₁.orig = ind₂.orig ) -/
+                       apply DEFINE.Def_Check_Path_Origs ind_mem₁ ind_mem₂;
+                       simp only [DEFINE.check_path_origs]; );
   apply And.intro ( by simp only [List.length]; );                      /- := List.length (RULE.INDIRECT) = List.length (RULE.INCOMING) -/
-  apply And.intro ( by intro ind ind_mem;                               /- := ind.COLORS = [0, RULE.CENTER.id] -/
+  apply And.intro ( by intro ind ind_mem;                               /- := ind.colors = [0, RULE.CENTER.id] -/
                        apply DEFINE.Def_Check_Path_Colors ind_mem;
                        simp only [DEFINE.check_path_colors]; );
   /- Check Incoming Edges -/--------------------------------------------------------------------------------------------------------------------------
@@ -2083,8 +2087,8 @@ namespace COVERAGE.T1_Of_T0
                        cases out_cases with
                        | head _ => simp only [Vertex.mk.injEq, true_and];
                                    apply And.intro ( by exact prop_hpt; );                             /- := CENTER.isHypothesis = true -/
-                                   apply And.intro ( by exact prop_out_nbr; );                         /- := OUT.END.id > 0 -/
-                                   trivial;                                                            /- := OUT.COLOR = 0 -/
+                                   apply And.intro ( by exact prop_out_nbr; );                         /- := OUT.dest.id > 0 -/
+                                   trivial;                                                            /- := OUT.color = 0 -/
                        | tail _ out_cases => trivial; );
   /- Check Indirect Paths -/--------------------------------------------------------------------------------------------------------------------------
   intro ind ind_cases; trivial;
@@ -2146,7 +2150,7 @@ namespace COVERAGE.T3_Of_T2
   apply And.intro ( by exact prop_lvl; );                   /- := RULE.CENTER.level > 0 -/
   apply And.intro ( by exact prop_col; );                   /- := RULE.CENTER.isCollapsed = false -/
   apply And.intro ( by exact prop_pst; );                   /- := RULE.CENTER.past = [] -/
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by simp only [reduceCtorEq];            /- := ( RULE.INCOMING = [] ) ↔ ( RULE.CENTER.isHypothesis = true ) -/
                        rewrite [false_iff];
                        rewrite [Bool.not_eq_true];
@@ -2156,18 +2160,18 @@ namespace COVERAGE.T3_Of_T2
                        simp only [exists_and_right];
                        simp only [exists_eq'];
                        trivial; );
-  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂;               /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
+  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂;               /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
                        simp only [out_mem₁, out_mem₂];
                        intros; trivial; );
-  /- Check Ancestral Paths -/
+  /- Check AEdge Paths -/
   apply And.intro ( by rewrite [prop_hpt]; trivial; );                  /- := ( RULE.CENTER.isHypothesis = false ) → ( RULE.DIRECT = [] ) -/
   apply And.intro ( by rewrite [prop_hpt]; trivial; );                  /- := ( RULE.DIRECT ≠ [] ) → ( RULE.CENTER.isHypothesis = true ) -/
   apply And.intro ( by exact Or.inl trivial; );                         /- := ( RULE.DIRECT = [] ) ∨ ( RULE.DIRECT = [dir] ) -/
-  apply And.intro ( by intro ind₁ ind₂ ind_mem₁ ind_mem₂;               /- := ( ind₁.COLORS = ind₂.COLORS ) ↔ ( ind₁.START = ind₂.START ) -/
-                       apply DEFINE.Def_Check_Path_Starts ind_mem₁ ind_mem₂;
-                       simp only [DEFINE.check_path_starts];
-                       simp only [DEFINE.check_path_starts.loop];
+  apply And.intro ( by intro ind₁ ind₂ ind_mem₁ ind_mem₂;               /- := ( ind₁.colors = ind₂.colors ) ↔ ( ind₁.orig = ind₂.orig ) -/
+                       apply DEFINE.Def_Check_Path_Origs ind_mem₁ ind_mem₂;
+                       simp only [DEFINE.check_path_origs];
+                       simp only [DEFINE.check_path_origs.loop];
                        trivial; );
   apply And.intro ( by simp only [List.length]; );                      /- := List.length (RULE.INDIRECT) = List.length (RULE.INCOMING) -/
   /- Check Incoming Edges -/--------------------------------------------------------------------------------------------------------------------------
@@ -2175,20 +2179,20 @@ namespace COVERAGE.T3_Of_T2
                        simp only [type_incoming, type_incoming.check, and_assoc];
                        cases inc_cases with
                        | head _ => simp only [Vertex.mk.injEq, true_and, and_true];
-                                   apply And.intro ( by exact Nat.zero_lt_succ inc_nbr; );                                  /- := INC.START.id > 0 -/
+                                   apply And.intro ( by exact Nat.zero_lt_succ inc_nbr; );                                  /- := INC.orig.id > 0 -/
                                    /- Match-Verification Loop: -/
                                    apply Exists.intro RULE.CENTER.id;                                                   /- color (Path Notation) -/
                                    apply Exists.intro (color::colors);                                                    /- colors (Path Notation) -/
-                                   apply Exists.intro (Vertex.mk anc_nbr anc_lvl anc_fml false false []);                        /- anc (Ancestral Node) -/
-                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                   apply Exists.intro (Vertex.mk anc_nbr anc_lvl anc_fml false false []);                        /- anc (AEdge Node) -/
+                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                        | tail _ inc_cases => cases inc_cases with
                                              | head _ => simp only [Vertex.mk.injEq, true_and, and_true];
-                                                         apply And.intro ( by exact prop_inc_nbr; );                                              /- := INC.START.id > 0 -/
+                                                         apply And.intro ( by exact prop_inc_nbr; );                                              /- := INC.orig.id > 0 -/
                                                          /- Match-Verification Loop: -/
                                                          apply Exists.intro RULE.CENTER.id;                                                   /- color (Path Notation) -/
                                                          apply Exists.intro (color::colors);                                                    /- colors (Path Notation) -/
-                                                         apply Exists.intro (Vertex.mk anc_nbr anc_lvl anc_fml false false []);                        /- anc (Ancestral Node) -/
-                                                         exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                                         apply Exists.intro (Vertex.mk anc_nbr anc_lvl anc_fml false false []);                        /- anc (AEdge Node) -/
+                                                         exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                              | tail _ inc_cases => trivial; );
   /- Check Outgoing Edges -/--------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by intro out out_cases;
@@ -2197,17 +2201,17 @@ namespace COVERAGE.T3_Of_T2
                        cases out_cases with
                        | head _ => simp only [Vertex.mk.injEq, true_and];
                                    apply And.intro ( by exact Or.inl prop_hpt; );                                   /- := CENTER.isHypothesis = false ∨ CENTER.isCollapsed = true -/
-                                   apply And.intro ( by exact prop_out_nbr; );                                      /- := OUT.END.id > 0 -/
-                                   apply And.intro ( by apply Exists.intro past;                                    /- := check_numbers (past::pasts) ∧ OUT.END.past = (past::pasts) -/
+                                   apply And.intro ( by exact prop_out_nbr; );                                      /- := OUT.dest.id > 0 -/
+                                   apply And.intro ( by apply Exists.intro past;                                    /- := check_numbers (past::pasts) ∧ OUT.dest.past = (past::pasts) -/
                                                         apply Exists.intro pasts;
                                                         simp only [prop_pasts];
                                                         trivial; );
-                                   apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                    /- := OUT.COLOR ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
+                                   apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                    /- := OUT.color ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
                                    /- Match-Verification Loop: -/
                                    apply Exists.intro (color::colors);                                                    /- colors (Path Notation) -/
                                    apply Exists.intro (Vertex.mk inc_nbr (RULE.CENTER.level+1) antecedent minor_hpt false []);   /- inc (Incoming Node) -/
-                                   apply Exists.intro (Vertex.mk anc_nbr anc_lvl anc_fml false false []);                        /- anc (Ancestral Node) -/
-                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc inc (0::OUT.COLOR::colors) ∈ INDIRECT -/
+                                   apply Exists.intro (Vertex.mk anc_nbr anc_lvl anc_fml false false []);                        /- anc (AEdge Node) -/
+                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc inc (0::OUT.color::colors) ∈ INDIRECT -/
                        | tail _ out_cases => trivial; );
   /- Check Direct Paths -/----------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by intro dir dir_cases; trivial; );
@@ -2216,27 +2220,27 @@ namespace COVERAGE.T3_Of_T2
   simp only [type_indirect, type_indirect.check, and_assoc];
   cases ind_cases with
   | head _ => simp only [Vertex.mk.injEq, true_and];
-              apply And.intro ( by exact prop_anc_nbr; );                                         /- := IND.START.id > 0 -/
-              apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := IND.START.level ≤ RULE.CENTER.level - 1 -/
+              apply And.intro ( by exact prop_anc_nbr; );                                         /- := IND.orig.id > 0 -/
+              apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := IND.orig.level ≤ RULE.CENTER.level - 1 -/
                                    simp only [List.length];
                                    exact Nat.le_add_right anc_lvl (List.length colors + 1); );
-              apply And.intro ( by exact Nat.zero_lt_succ inc_nbr; );                             /- := IND.END.id > 0 -/
-              apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := IND.START.level + List.length (IND.COLORS) = RULE.CENTER.level + 1 -/
+              apply And.intro ( by exact Nat.zero_lt_succ inc_nbr; );                             /- := IND.dest.id > 0 -/
+              apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := IND.orig.level + List.length (IND.colors) = RULE.CENTER.level + 1 -/
                                    simp only [List.length];
                                    trivial; );
               apply Exists.intro RULE.CENTER.id;                                              /- color (Path Notation) -/
               apply Exists.intro (color::colors);                                               /- colors (Path Notation) -/
               apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbr prop_colors; );    /- := check_numbers (color::colors) -/
               apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                       /- := color ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
-              apply And.intro ( by trivial; );                                                    /- := IND.COLORS = (0::color::colors) -/
+              apply And.intro ( by trivial; );                                                    /- := IND.colors = (0::color::colors) -/
               /- Match-Verification Loop: -/
               exact And.intro ( by apply Exists.intro #major_dep;                                                              /- dep_inc (Incoming Dependency) -/
-                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := edge IND.END RULE.CENTER 0 dep_inc ∈ RULE.INCOMING -/
-                                   intro inc inc_cases;                                                                       /- := ( INC.START = IND.END ) ↔ ( INC = edge IND.END RULE.CENTER 0 dep_inc ) -/
+                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := edge IND.dest RULE.CENTER 0 dep_inc ∈ RULE.INCOMING -/
+                                   intro inc inc_cases;                                                                       /- := ( INC.orig = IND.dest ) ↔ ( INC = edge IND.dest RULE.CENTER 0 dep_inc ) -/
                                    apply DEFINE.Def_Check_Path_Incoming inc_cases;
                                    simp only [DEFINE.check_path_incoming];
                                    /- Resolve Missmatch: -/
-                                   simp only [Deduction.mk.injEq, true_and, and_true];
+                                   simp only [DEdge.mk.injEq, true_and, and_true];
                                    simp only [Vertex.mk.injEq, true_and, and_true];
                                    simp only [iff_self_and, and_imp];
                                    have succ_ne_self := Nat.succ_ne_self inc_nbr;
@@ -2245,7 +2249,7 @@ namespace COVERAGE.T3_Of_T2
                                    trivial; )
                               ( by apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml out_hpt true (past::pasts));  /- out (Outgoing Node) -/
                                    apply Exists.intro (minor_dep ∪ major_dep);                                                  /- dep_out (Outgoing Dependency) -/
-                                   apply And.intro ( by simp only [Vertex.mk.injEq];                                          /- := ( colors = [] ) ↔ ( out = IND.START ) -/
+                                   apply And.intro ( by simp only [Vertex.mk.injEq];                                          /- := ( colors = [] ) ↔ ( out = IND.orig ) -/
                                                         simp only [reduceCtorEq];
                                                         simp only [false_iff, not_and];
                                                         intro _ prop_ctr_lvl;
@@ -2255,35 +2259,35 @@ namespace COVERAGE.T3_Of_T2
                                                         simp only [Nat.add_sub_cancel] at prop_ctr_lvl;
                                                         have lt_self := Nat.add_lt_add_left (Nat.zero_lt_succ (List.length colors)) anc_lvl;
                                                         simp only [prop_ctr_lvl, Nat.add_zero, Nat.lt_irrefl] at lt_self; );
-                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );      /- := Deduction.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
-                                   intro out out_cases;                                                                         /- := ( OUT.COLOR = color ) ↔ ( OUT = Deduction.mk RULE.CENTER out color dep_out ) -/
+                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );      /- := DEdge.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
+                                   intro out out_cases;                                                                         /- := ( OUT.color = color ) ↔ ( OUT = DEdge.mk RULE.CENTER out color dep_out ) -/
                                    apply DEFINE.Def_Check_Path_Outgoing out_cases;
                                    simp only [DEFINE.check_path_outgoing];
                                    /- Perfect Match! -/
                                    trivial; );
   | tail _ ind_cases => cases ind_cases with
                         | head _ => simp only [Vertex.mk.injEq, true_and];
-                                    apply And.intro ( by exact prop_anc_nbr; );                                         /- := IND.START.id > 0 -/
-                                    apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := IND.START.level ≤ RULE.CENTER.level - 1 -/
+                                    apply And.intro ( by exact prop_anc_nbr; );                                         /- := IND.orig.id > 0 -/
+                                    apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := IND.orig.level ≤ RULE.CENTER.level - 1 -/
                                                          simp only [List.length];
                                                          exact Nat.le_add_right anc_lvl (List.length colors + 1); );
-                                    apply And.intro ( by exact prop_inc_nbr; );                                         /- := IND.END.id > 0 -/
-                                    apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := IND.START.level + List.length (IND.COLORS) = RULE.CENTER.level + 1 -/
+                                    apply And.intro ( by exact prop_inc_nbr; );                                         /- := IND.dest.id > 0 -/
+                                    apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := IND.orig.level + List.length (IND.colors) = RULE.CENTER.level + 1 -/
                                                          simp only [List.length];
                                                          trivial; );
                                     apply Exists.intro RULE.CENTER.id;                                              /- color (Path Notation) -/
                                     apply Exists.intro (color::colors);                                               /- colors (Path Notation) -/
                                     apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbr prop_colors; );    /- := check_numbers (color::colors) -/
                                     apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                       /- := color ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
-                                    apply And.intro ( by trivial; );                                                    /- := IND.COLORS = (0::color::colors) -/
+                                    apply And.intro ( by trivial; );                                                    /- := IND.colors = (0::color::colors) -/
                                     /- Match-Verification Loop: -/
                                     exact And.intro ( by apply Exists.intro #minor_dep;                                                              /- dep_inc (Incoming Dependency) -/
-                                                         apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := edge IND.END RULE.CENTER 0 dep_inc ∈ RULE.INCOMING -/
-                                                         intro inc inc_cases;                                                                       /- := ( INC.START = IND.END ) ↔ ( INC = edge IND.END RULE.CENTER 0 dep_inc ) -/
+                                                         apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := edge IND.dest RULE.CENTER 0 dep_inc ∈ RULE.INCOMING -/
+                                                         intro inc inc_cases;                                                                       /- := ( INC.orig = IND.dest ) ↔ ( INC = edge IND.dest RULE.CENTER 0 dep_inc ) -/
                                                          apply DEFINE.Def_Check_Path_Incoming inc_cases;
                                                          simp only [DEFINE.check_path_incoming];
                                                          /- Resolve Missmatch: -/
-                                                         simp only [Deduction.mk.injEq, true_and, and_true];
+                                                         simp only [DEdge.mk.injEq, true_and, and_true];
                                                          simp only [Vertex.mk.injEq, true_and, and_true];
                                                          simp only [iff_self_and, and_imp];
                                                          have succ_ne_self := Nat.succ_ne_self inc_nbr;
@@ -2292,7 +2296,7 @@ namespace COVERAGE.T3_Of_T2
                                                          trivial; )
                                                     ( by apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml out_hpt true (past::pasts));  /- out (Outgoing Node) -/
                                                          apply Exists.intro (minor_dep ∪ major_dep);                                                  /- dep_out (Outgoing Dependency) -/
-                                                         apply And.intro ( by simp only [Vertex.mk.injEq];                                          /- := ( colors = [] ) ↔ ( out = IND.START ) -/
+                                                         apply And.intro ( by simp only [Vertex.mk.injEq];                                          /- := ( colors = [] ) ↔ ( out = IND.orig ) -/
                                                                               simp only [reduceCtorEq];
                                                                               simp only [false_iff, not_and];
                                                                               intro _ prop_ctr_lvl;
@@ -2302,8 +2306,8 @@ namespace COVERAGE.T3_Of_T2
                                                                               simp only [Nat.add_sub_cancel] at prop_ctr_lvl;
                                                                               have lt_self := Nat.add_lt_add_left (Nat.zero_lt_succ (List.length colors)) anc_lvl;
                                                                               simp only [prop_ctr_lvl, Nat.add_zero, Nat.lt_irrefl] at lt_self; );
-                                                         apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );      /- := Deduction.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
-                                                         intro out out_cases;                                                                         /- := ( OUT.COLOR = color ) ↔ ( OUT = Deduction.mk RULE.CENTER out color dep_out ) -/
+                                                         apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );      /- := DEdge.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
+                                                         intro out out_cases;                                                                         /- := ( OUT.color = color ) ↔ ( OUT = DEdge.mk RULE.CENTER out color dep_out ) -/
                                                          apply DEFINE.Def_Check_Path_Outgoing out_cases;
                                                          /- Perfect Match! -/
                                                          simp only [DEFINE.check_path_outgoing];
@@ -2362,7 +2366,7 @@ namespace COVERAGE.T3_Of_T2
   apply And.intro ( by exact prop_lvl; );                   /- := RULE.CENTER.level > 0 -/
   apply And.intro ( by exact prop_col; );                   /- := RULE.CENTER.isCollapsed = false -/
   apply And.intro ( by exact prop_pst; );                   /- := RULE.CENTER.past = [] -/
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by simp only [reduceCtorEq];            /- := ( RULE.INCOMING = [] ) ↔ ( RULE.CENTER.isHypothesis = true ) -/
                        rewrite [false_iff];
                        rewrite [Bool.not_eq_true];
@@ -2372,18 +2376,18 @@ namespace COVERAGE.T3_Of_T2
                        simp only [exists_and_right];
                        simp only [exists_eq'];
                        trivial; );
-  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂;               /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
+  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂;               /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
                        simp only [out_mem₁, out_mem₂];
                        intros; trivial; );
-  /- Check Ancestral Paths -/
+  /- Check AEdge Paths -/
   apply And.intro ( by rewrite [prop_hpt]; trivial; );                  /- := ( RULE.CENTER.isHypothesis = false ) → ( RULE.DIRECT = [] ) -/
   apply And.intro ( by rewrite [prop_hpt]; trivial; );                  /- := ( RULE.DIRECT ≠ [] ) → ( RULE.CENTER.isHypothesis = true ) -/
   apply And.intro ( by exact Or.inl trivial; );                         /- := ( RULE.DIRECT ≠ [] ) ∨ ( RULE.DIRECT = [dir] ) -/
-  apply And.intro ( by intro ind₁ ind₂ ind_mem₁ ind_mem₂;               /- := ( ind₁.COLORS = ind₂.COLORS ) ↔ ( ind₁.START = ind₂.START ) -/
-                       apply DEFINE.Def_Check_Path_Starts ind_mem₁ ind_mem₂;
-                       simp only [DEFINE.check_path_starts];
-                       simp only [DEFINE.check_path_starts.loop];
+  apply And.intro ( by intro ind₁ ind₂ ind_mem₁ ind_mem₂;               /- := ( ind₁.colors = ind₂.colors ) ↔ ( ind₁.orig = ind₂.orig ) -/
+                       apply DEFINE.Def_Check_Path_Origs ind_mem₁ ind_mem₂;
+                       simp only [DEFINE.check_path_origs];
+                       simp only [DEFINE.check_path_origs.loop];
                        trivial; );
   apply And.intro ( by simp only [List.length]; );                      /- := List.length (RULE.INDIRECT) = List.length (RULE.INCOMING) -/
   /- Check Incoming Edges -/--------------------------------------------------------------------------------------------------------------------------
@@ -2391,12 +2395,12 @@ namespace COVERAGE.T3_Of_T2
                        simp only [type_incoming, type_incoming.check, and_assoc];
                        cases inc_cases with
                        | head _ => simp only [Vertex.mk.injEq, true_and, and_true];
-                                   apply And.intro ( by exact prop_inc_nbr; );                                              /- := INC.START.id > 0 -/
+                                   apply And.intro ( by exact prop_inc_nbr; );                                              /- := INC.orig.id > 0 -/
                                    /- Match-Verification Loop: -/
                                    apply Exists.intro RULE.CENTER.id;                                                   /- color (Path Notation) -/
                                    apply Exists.intro (color::colors);                                                    /- colors (Path Notation) -/
-                                   apply Exists.intro (Vertex.mk anc_nbr anc_lvl anc_fml false false []);                        /- anc (Ancestral Node) -/
-                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                   apply Exists.intro (Vertex.mk anc_nbr anc_lvl anc_fml false false []);                        /- anc (AEdge Node) -/
+                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                        | tail _ inc_cases => trivial; );
   /- Check Outgoing Edges -/--------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by intro out out_cases;
@@ -2405,17 +2409,17 @@ namespace COVERAGE.T3_Of_T2
                        cases out_cases with
                        | head _ => simp only [Vertex.mk.injEq, true_and];
                                    apply And.intro ( by exact Or.inl prop_hpt; );                                   /- := CENTER.isHypothesis = false ∨ CENTER.isCollapsed = true -/
-                                   apply And.intro ( by exact prop_out_nbr; );                                      /- := OUT.END.id > 0 -/
-                                   apply And.intro ( by apply Exists.intro past;                                    /- := check_numbers (past::pasts) ∧ OUT.END.past = (past::pasts) -/
+                                   apply And.intro ( by exact prop_out_nbr; );                                      /- := OUT.dest.id > 0 -/
+                                   apply And.intro ( by apply Exists.intro past;                                    /- := check_numbers (past::pasts) ∧ OUT.dest.past = (past::pasts) -/
                                                         apply Exists.intro pasts;
                                                         simp only [prop_pasts];
                                                         trivial; );
-                                   apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                    /- := OUT.COLOR ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
+                                   apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                    /- := OUT.color ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
                                    /- Match-Verification Loop: -/
                                    apply Exists.intro (color::colors);                                                    /- colors (Path Notation) -/
                                    apply Exists.intro (Vertex.mk inc_nbr (RULE.CENTER.level+1) consequent false false []);       /- inc (Incoming Node) -/
-                                   apply Exists.intro (Vertex.mk anc_nbr anc_lvl anc_fml false false []);                        /- anc (Ancestral Node) -/
-                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc inc (0::OUT.COLOR::colors) ∈ INDIRECT -/
+                                   apply Exists.intro (Vertex.mk anc_nbr anc_lvl anc_fml false false []);                        /- anc (AEdge Node) -/
+                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc inc (0::OUT.color::colors) ∈ INDIRECT -/
                        | tail _ out_cases => trivial; );
   /- Check Direct Paths -/----------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by intro dir dir_cases; trivial; );
@@ -2424,30 +2428,30 @@ namespace COVERAGE.T3_Of_T2
   simp only [type_indirect, type_indirect.check, and_assoc];
   cases ind_cases with
   | head _ => simp only [Vertex.mk.injEq, true_and];
-              apply And.intro ( by exact prop_anc_nbr; );                                         /- := IND.START.id > 0 -/
-              apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := IND.START.level ≤ RULE.CENTER.level - 1 -/
+              apply And.intro ( by exact prop_anc_nbr; );                                         /- := IND.orig.id > 0 -/
+              apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := IND.orig.level ≤ RULE.CENTER.level - 1 -/
                                    simp only [List.length];
                                    exact Nat.le_add_right anc_lvl (List.length colors + 1); );
-              apply And.intro ( by exact prop_inc_nbr; );                                         /- := IND.END.id > 0 -/
-              apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := IND.START.level + List.length (IND.COLORS) = RULE.CENTER.level + 1 -/
+              apply And.intro ( by exact prop_inc_nbr; );                                         /- := IND.dest.id > 0 -/
+              apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := IND.orig.level + List.length (IND.colors) = RULE.CENTER.level + 1 -/
                                    simp only [List.length];
                                    trivial; );
               apply Exists.intro RULE.CENTER.id;                                              /- color (Path Notation) -/
               apply Exists.intro (color::colors);                                               /- colors (Path Notation) -/
               apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbr prop_colors; );    /- := check_numbers (color::colors) -/
               apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                       /- := color ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
-              apply And.intro ( by trivial; );                                                    /- := IND.COLORS = (0::color::colors) -/
+              apply And.intro ( by trivial; );                                                    /- := IND.colors = (0::color::colors) -/
               /- Match-Verification Loop: -/
               exact And.intro ( by apply Exists.intro #inc_dep;                                                               /- dep_inc (Incoming Dependency) -/
-                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := edge IND.END RULE.CENTER 0 dep_inc ∈ RULE.INCOMING -/
-                                   intro inc inc_cases;                                                                       /- := ( INC.START = IND.END ) ↔ ( INC = edge IND.END RULE.CENTER 0 dep_inc ) -/
+                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );    /- := edge IND.dest RULE.CENTER 0 dep_inc ∈ RULE.INCOMING -/
+                                   intro inc inc_cases;                                                                       /- := ( INC.orig = IND.dest ) ↔ ( INC = edge IND.dest RULE.CENTER 0 dep_inc ) -/
                                    apply DEFINE.Def_Check_Path_Incoming inc_cases;
                                    simp only [DEFINE.check_path_incoming];
                                    /- Perfect Match! -/
                                    trivial; )
                               ( by apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml out_hpt true (past::pasts));  /- out (Outgoing Node) -/
                                    apply Exists.intro (inc_dep − [antecedent]);                                                 /- dep_out (Outgoing Dependency) -/
-                                   apply And.intro ( by simp only [Vertex.mk.injEq];                                          /- := ( colors = [] ) ↔ ( out = IND.START ) -/
+                                   apply And.intro ( by simp only [Vertex.mk.injEq];                                          /- := ( colors = [] ) ↔ ( out = IND.orig ) -/
                                                         simp only [reduceCtorEq];
                                                         simp only [false_iff, not_and];
                                                         intro _ prop_ctr_lvl;
@@ -2457,8 +2461,8 @@ namespace COVERAGE.T3_Of_T2
                                                         simp only [Nat.add_sub_cancel] at prop_ctr_lvl;
                                                         have lt_self := Nat.add_lt_add_left (Nat.zero_lt_succ (List.length colors)) anc_lvl;
                                                         simp only [prop_ctr_lvl, Nat.add_zero, Nat.lt_irrefl] at lt_self; );
-                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );      /- := Deduction.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
-                                   intro out out_cases;                                                                         /- := ( OUT.COLOR = color ) ↔ ( OUT = Deduction.mk RULE.CENTER out color dep_out ) -/
+                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );      /- := DEdge.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
+                                   intro out out_cases;                                                                         /- := ( OUT.color = color ) ↔ ( OUT = DEdge.mk RULE.CENTER out color dep_out ) -/
                                    apply DEFINE.Def_Check_Path_Outgoing out_cases;
                                    simp only [DEFINE.check_path_outgoing];
                                    /- Perfect Match! -/
@@ -2511,18 +2515,18 @@ namespace COVERAGE.T3_Of_T2
   apply And.intro ( by exact prop_lvl; );                   /- := RULE.CENTER.level > 0 -/
   apply And.intro ( by exact prop_col; );                   /- := RULE.CENTER.isCollapsed = false -/
   apply And.intro ( by exact prop_pst; );                   /- := RULE.CENTER.past = [] -/
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by rewrite [prop_hpt]; trivial; );          /- := ( RULE.INCOMING = [] ) ↔ ( RULE.CENTER.isHypothesis = true ) -/
   apply And.intro ( by simp only [List.length]; trivial; );     /- := List.length (RULE.INCOMING) ≤ 2 -/
   apply And.intro ( by simp only [List.cons.injEq];             /- := RULE.OUTGOING = [out] -/
                        simp only [exists_and_right];
                        simp only [exists_eq'];
                        trivial; );
-  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂;               /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
+  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂;               /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
                        simp only [out_mem₁, out_mem₂];
                        intros; trivial; );
-  /- Check Ancestral Paths -/
+  /- Check AEdge Paths -/
   apply And.intro ( by simp only [List.cons_ne_nil];            /- := ( RULE.CENTER.isHypothesis = false ) → ( RULE.DIRECT = [] ) -/
                        simp only [imp_false];
                        simp only [Bool.not_eq_false];
@@ -2532,9 +2536,9 @@ namespace COVERAGE.T3_Of_T2
                        simp only [exists_and_right];
                        simp only [exists_eq'];
                        simp only [and_true, or_true]; );
-  apply And.intro ( by intro ind₁ ind₂ ind_mem₁ ind_mem₂;               /- := ( ind₁.COLORS = ind₂.COLORS ) ↔ ( ind₁.START = ind₂.START ) -/
-                       apply DEFINE.Def_Check_Path_Starts ind_mem₁ ind_mem₂;
-                       simp only [DEFINE.check_path_starts]; );
+  apply And.intro ( by intro ind₁ ind₂ ind_mem₁ ind_mem₂;               /- := ( ind₁.colors = ind₂.colors ) ↔ ( ind₁.orig = ind₂.orig ) -/
+                       apply DEFINE.Def_Check_Path_Origs ind_mem₁ ind_mem₂;
+                       simp only [DEFINE.check_path_origs]; );
   apply And.intro ( by simp only [List.length]; );                      /- := List.length (RULE.INDIRECT) = List.length (RULE.INCOMING) -/
   /- Check Incoming Edges -/--------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by intro inc inc_cases; trivial; );
@@ -2545,41 +2549,41 @@ namespace COVERAGE.T3_Of_T2
                        cases out_cases with
                        | head _ => simp only [Vertex.mk.injEq, true_and];
                                    apply And.intro ( by exact prop_hpt; );                                          /- := CENTER.isHypothesis = true -/
-                                   apply And.intro ( by exact prop_out_nbr; );                                      /- := OUT.END.id > 0 -/
-                                   apply And.intro ( by apply Exists.intro past;                                    /- := check_numbers (past::pasts) ∧ OUT.END.past = (past::pasts) -/
+                                   apply And.intro ( by exact prop_out_nbr; );                                      /- := OUT.dest.id > 0 -/
+                                   apply And.intro ( by apply Exists.intro past;                                    /- := check_numbers (past::pasts) ∧ OUT.dest.past = (past::pasts) -/
                                                         apply Exists.intro pasts;
                                                         simp only [prop_pasts];
                                                         trivial; );
-                                   apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                    /- := OUT.COLOR ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
+                                   apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                    /- := OUT.color ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
                                    /- Match-Verification Loop: -/
                                    apply Exists.intro (color::colors);                                                    /- colors (Path Notation) -/
-                                   apply Exists.intro (Vertex.mk anc_nbr anc_lvl anc_fml false false []);                        /- anc (Ancestral Node) -/
-                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc CENTER (OUT.COLOR::colors) ∈ DIRECT -/
+                                   apply Exists.intro (Vertex.mk anc_nbr anc_lvl anc_fml false false []);                        /- anc (AEdge Node) -/
+                                   exact ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );            /- := path anc CENTER (OUT.color::colors) ∈ DIRECT -/
                        | tail _ out_cases => trivial; );
   /- Check Direct Paths -/----------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by intro dir dir_cases;
                        simp only [type_direct, type_direct.check, and_assoc];
                        cases dir_cases with
                        | head _ => simp only [Vertex.mk.injEq, true_and];
-                                   apply And.intro ( by exact prop_anc_nbr; );                                         /- := DIR.START.id > 0 -/
-                                   apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := DIR.START.level ≤ RULE.CENTER.level - 1 -/
+                                   apply And.intro ( by exact prop_anc_nbr; );                                         /- := DIR.orig.id > 0 -/
+                                   apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := DIR.orig.level ≤ RULE.CENTER.level - 1 -/
                                                         simp only [List.length];
                                                         exact Nat.le_add_right anc_lvl (List.length colors + 1); );
-                                   apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := DIR.START.level + List.length (DIR.COLORS) = RULE.CENTER.level + 1 -/
+                                   apply And.intro ( by rewrite [←prop_anc_lvl];                                       /- := DIR.orig.level + List.length (DIR.colors) = RULE.CENTER.level + 1 -/
                                                         simp only [List.length]; );
                                    apply Exists.intro RULE.CENTER.id;                                              /- color₁ (Path Notation) -/
                                    apply Exists.intro color;                                                          /- color₂ (Path Notation) -/
                                    apply Exists.intro colors;                                                         /- colors (Path Notation) -/
                                    apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbr prop_colors; );    /- := check_numbers (color::colors) -/
                                    apply And.intro ( by exact List.Mem.head RULE.CENTER.past; );                       /- := color ∈ (RULE.CENTER.id::RULE.CENTER.past) -/
-                                   apply And.intro ( by trivial; );                                                    /- := DIR.COLORS = (0::color::colors) -/
+                                   apply And.intro ( by trivial; );                                                    /- := DIR.colors = (0::color::colors) -/
                                    /- Match-Verification Loop: -/
                                    apply Exists.intro (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml out_hpt true (past::pasts));  /- out (Outgoing Node) -/
                                    apply Exists.intro ([RULE.CENTER.formula]);                                                  /- dep_out (Outgoing Dependency) -/
                                    apply And.intro ( by trivial; );                                                             /- := out.isCollapsed = true -/
                                    apply And.intro ( by exact prop_color; );                                                   /- := color₂ ∈ (out.id::out.past) -/
-                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );      /- := Deduction.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
-                                   intro out out_cases;                                                                         /- := ( OUT.COLOR = color ) ↔ ( OUT = Deduction.mk RULE.CENTER out color dep_out ) -/
+                                   apply And.intro ( by repeat ( first | exact List.Mem.head _ | apply List.Mem.tail ); );      /- := DEdge.mk RULE.CENTER out color dep_out ∈ RULE.OUTGOING -/
+                                   intro out out_cases;                                                                         /- := ( OUT.color = color ) ↔ ( OUT = DEdge.mk RULE.CENTER out color dep_out ) -/
                                    apply DEFINE.Def_Check_Path_Outgoing out_cases;
                                    simp only [DEFINE.check_path_outgoing];
                                    /- Perfect Match! -/
@@ -2618,7 +2622,7 @@ namespace COVERAGE.T1_Of_T1.NODES
   cases prop_typeᵤ with | intro prop_out_unitᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_out_colorsᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_dir_nilᵤ prop_typeᵤ =>
-  cases prop_typeᵤ with | intro prop_ind_startsᵤ prop_typeᵤ =>
+  cases prop_typeᵤ with | intro prop_ind_origsᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_ind_lenᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_ind_colorsᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_incomingᵤ prop_typeᵤ =>
@@ -2636,7 +2640,7 @@ namespace COVERAGE.T1_Of_T1.NODES
   cases prop_typeᵥ with | intro prop_out_unitᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_out_colorsᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_dir_nilᵥ prop_typeᵥ =>
-  cases prop_typeᵥ with | intro prop_ind_startsᵥ prop_typeᵥ =>
+  cases prop_typeᵥ with | intro prop_ind_origsᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_ind_lenᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_ind_colorsᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_incomingᵥ prop_typeᵥ =>
@@ -2656,7 +2660,7 @@ namespace COVERAGE.T1_Of_T1.NODES
                        apply And.intro ( by simp only [prop_pstᵤ];
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ; );
                        trivial; );
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by intro prop_inc_nil;                                        /- := ( RULE.INCOMING = [] ) → ( RULE.CENTER.isHypothesis = true ) -/
                        simp only [List.append_eq_nil_iff] at prop_inc_nil;
                        simp only [←List.length_eq_zero_iff] at prop_inc_nil prop_inc_nilᵥ;
@@ -2665,21 +2669,21 @@ namespace COVERAGE.T1_Of_T1.NODES
                        simp only [Bool.or_eq_true];
                        exact Or.inr (And.left prop_inc_nil); );
   apply And.intro ( by simp only [prop_out_unitᵥ];                                                                    /- := RULE.OUTGOING = (out::outs) -/
-                       apply Exists.intro ( Deduction.mk ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )                        /- RULEᵥ.OUTGOING -/
-                                                 ( outᵥ.END )
-                                                 ( outᵥ.COLOR )
-                                                 ( outᵥ.DEPENDENCY ) );
+                       apply Exists.intro ( DEdge.mk ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )                        /- RULEᵥ.OUTGOING -/
+                                                 ( outᵥ.dest )
+                                                 ( outᵥ.color )
+                                                 ( outᵥ.deps ) );
                        apply Exists.intro ( collapse.rewrite_outgoing ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )   /- RULEᵤ.OUTGOING -/
                                                                       ( RULEᵤ.OUTGOING ) );
                        simp only [collapse.rewrite_outgoing];
                        simp only [collapse.center];
                        trivial; );
-  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂ gt_zero₁₂;                          /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
+  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂ gt_zero₁₂;                          /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
                        rewrite [prop_out_unitᵥ] at out_mem₁ out_mem₂;
                        simp only [collapse.rewrite_outgoing] at out_mem₁ out_mem₂;
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at out_mem₁ out_mem₂;
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
-                       simp only [Deduction.mk.injEq'];
+                       simp only [DEdge.mk.injEq'];
                        --
                        simp only [type_outgoing₁] at prop_outgoingᵤ prop_outgoingᵥ;
                        rewrite [prop_out_unitᵥ] at prop_outgoingᵥ;
@@ -2690,14 +2694,14 @@ namespace COVERAGE.T1_Of_T1.NODES
                        | inl out_mem₁ᵥ => cases out_mem₂ with
                                           | inl out_mem₂ᵥ => rewrite [out_mem₁ᵥ, out_mem₂ᵥ]; simp only [true_and];
                                           | inr out_mem₂ᵤ => rewrite [out_mem₁ᵥ] at gt_zero₁₂ ⊢;                              /- := out₁ = outᵥ -/
-                                                             rewrite [REWRITE.Get_Start_RwOutgoing out_mem₂ᵤ];                /- := out₂.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                             rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₂ᵤ];                /- := out₂.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              --
                                                              have Out_Cases₂ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₂ᵤ;                 /- := out₂ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₂ᵤ with | intro Originalᵤ Out_Mem₂ᵤ =>
-                                                             have Out_Color₂ᵤ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.COLOR = 0 ∨ out₂.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                                             have Out_Color₂ᵤ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.color = 0 ∨ out₂.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                              --
                                                              simp only [true_and] at gt_zero₁₂ Out_Color₂ᵤ ⊢;
-                                                             have NE_Color : outᵥ.COLOR ≠ out₂.COLOR := by rewrite [ne_eq, ←imp_false];
+                                                             have NE_Color : outᵥ.color ≠ out₂.color := by rewrite [ne_eq, ←imp_false];
                                                                                                               intro EQ_Color;
                                                                                                               cases Out_Colorᵥ with
                                                                                                               | inl EQ_Zeroᵥ => apply absurd gt_zero₁₂; rewrite [←EQ_Color, EQ_Zeroᵥ]; trivial;
@@ -2711,15 +2715,15 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                                                                                                                                    ( by exact prop_ne_pst; );
                                                              simp only [NE_Color, false_and, and_false];
                        | inr out_mem₁ᵤ => cases out_mem₂ with
-                                          | inl out_mem₂ᵥ => rewrite [REWRITE.Get_Start_RwOutgoing out_mem₁ᵤ];                /- := out₁.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                          | inl out_mem₂ᵥ => rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₁ᵤ];                /- := out₁.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              rewrite [out_mem₂ᵥ] at gt_zero₁₂ ⊢;                              /- := out₂ = outᵥ -/
                                                              --
                                                              have Out_Cases₁ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₁ᵤ;                 /- := out₁ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₁ᵤ with | intro Originalᵤ Out_Mem₁ᵤ =>
-                                                             have Out_Color₁ᵤ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.COLOR = 0 ∨ out₁.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                                             have Out_Color₁ᵤ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.color = 0 ∨ out₁.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                              --
                                                              simp only [true_and] at gt_zero₁₂ Out_Color₁ᵤ ⊢;
-                                                             have NE_Color : out₁.COLOR ≠ outᵥ.COLOR := by rewrite [ne_eq, ←imp_false];
+                                                             have NE_Color : out₁.color ≠ outᵥ.color := by rewrite [ne_eq, ←imp_false];
                                                                                                               intro EQ_Color;
                                                                                                               cases Out_Colorᵥ with
                                                                                                               | inl EQ_Zeroᵥ => apply absurd gt_zero₁₂; rewrite [EQ_Color, EQ_Zeroᵥ]; trivial;
@@ -2732,29 +2736,29 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                                                                                                                    exact And.intro ( by exact Nat.ne_of_lt prop_lt_nbr; )
                                                                                                                                                                    ( by exact prop_ne_pst; );
                                                              simp only [NE_Color, false_and, and_false];
-                                          | inr out_mem₂ᵤ => rewrite [REWRITE.Get_Start_RwOutgoing out_mem₁ᵤ];              /- := out₁.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
-                                                             rewrite [REWRITE.Get_Start_RwOutgoing out_mem₂ᵤ];              /- := out₂.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                          | inr out_mem₂ᵤ => rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₁ᵤ];              /- := out₁.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                             rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₂ᵤ];              /- := out₂.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              simp only [true_and] at gt_zero₁₂ ⊢;
                                                              --
                                                              have Out_Cases₁ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₁ᵤ;               /- := out₁ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₁ᵤ with | intro Original₁ᵤ Out_Mem₁ᵤ =>
-                                                             have Out_Start₁ᵤ := COLLAPSE.Simp_Out_Start₁ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₁ᵤ := COLLAPSE.Simp_Out_Orig₁ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.orig = RULEᵤ.CENTER -/
                                                              have Out_Cases₂ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₂ᵤ;               /- := out₂ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₂ᵤ with | intro Original₂ᵤ Out_Mem₂ᵤ =>
-                                                             have Out_Start₂ᵤ := COLLAPSE.Simp_Out_Start₁ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₂ᵤ := COLLAPSE.Simp_Out_Orig₁ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.orig = RULEᵤ.CENTER -/
                                                              --
                                                              have Iff_Out_Colorᵤ := prop_out_colorsᵤ Out_Mem₁ᵤ Out_Mem₂ᵤ gt_zero₁₂;
-                                                             simp only [Deduction.mk.injEq] at Out_Start₁ᵤ Out_Start₂ᵤ Iff_Out_Colorᵤ;
-                                                             simp only [Out_Start₁ᵤ, Out_Start₂ᵤ, true_and] at Iff_Out_Colorᵤ;
+                                                             simp only [DEdge.mk.injEq] at Out_Orig₁ᵤ Out_Orig₂ᵤ Iff_Out_Colorᵤ;
+                                                             simp only [Out_Orig₁ᵤ, Out_Orig₂ᵤ, true_and] at Iff_Out_Colorᵤ;
                                                              exact Iff_Out_Colorᵤ; );
-  /- Check Ancestral Paths -/
+  /- Check AEdge Paths -/
   apply And.intro ( by rewrite [prop_dir_nilᵤ, prop_dir_nilᵥ];        /- := RULE.DIRECT = [] -/
                        simp only [collapse.rewrite_direct];
                        trivial; );
   apply And.intro ( by simp only [List.length_append];                /- := List.length (RULE.INDIRECT) = List.length (RULE.INCOMING) -/
                        simp only [REWRITE.Eq_Length_RwIncoming];
                        simp only [prop_ind_lenᵤ, prop_ind_lenᵥ]; );
-  apply And.intro ( by intro ind ind_cases;                           /- := ind.COLORS = [0, color] -/
+  apply And.intro ( by intro ind ind_cases;                           /- := ind.colors = [0, color] -/
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at ind_cases;
                        cases ind_cases with
                        | inl ind_casesᵥ => apply Exists.intro RULEᵥ.CENTER.id;
@@ -2772,13 +2776,13 @@ namespace COVERAGE.T1_Of_T1.NODES
                                            cases Inc_Caseᵥ with | intro Originalᵥ Inc_Memᵥ =>
                                            have Prop_Incomingᵥ := prop_incomingᵥ Inc_Memᵥ;                        /- := type_incoming.check inc RULEᵥ.CENTER -/
                                            simp only [type_incoming.check] at Prop_Incomingᵥ ⊢;
-                                           cases Prop_Incomingᵥ with | intro Prop_Startᵥ Prop_Incomingᵥ =>
-                                           cases Prop_Incomingᵥ with | intro Prop_Endᵥ Prop_Incomingᵥ =>
+                                           cases Prop_Incomingᵥ with | intro Prop_Origᵥ Prop_Incomingᵥ =>
+                                           cases Prop_Incomingᵥ with | intro Prop_Destᵥ Prop_Incomingᵥ =>
                                            cases Prop_Incomingᵥ with | intro Prop_Colorᵥ Prop_Inc_Indᵥ =>
                                            --
-                                           apply And.intro ( by rewrite [prop_eq_lvl];                            /- := Start Node -/
-                                                                exact Prop_Startᵥ; );
-                                           apply And.intro ( by exact REWRITE.Get_End_RwIncoming inc_casesᵥ; );   /- := End Node -/
+                                           apply And.intro ( by rewrite [prop_eq_lvl];                            /- := Orig Node -/
+                                                                exact Prop_Origᵥ; );
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwIncoming inc_casesᵥ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Colorᵥ; );                            /- := Colors -/
                                            /- := Check Incoming-Indirect Duo: -/
                                            cases Prop_Inc_Indᵥ with | intro Colorᵥ Prop_Inc_Indᵥ =>
@@ -2788,19 +2792,19 @@ namespace COVERAGE.T1_Of_T1.NODES
                                            apply Exists.intro Colorᵥ;
                                            apply Exists.intro Colorsᵥ;
                                            apply Exists.intro Ancᵥ;
-                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                                       apply Or.inl;
                                                       exact Prop_Inc_Indᵥ; );
                        | inr inc_casesᵤ => have Inc_Caseᵤ := REWRITE.Mem_Of_Mem_RwIncoming inc_casesᵤ;            /- := inc ∈ RULEᵤ.INCOMING -/
                                            cases Inc_Caseᵤ with | intro Originalᵤ Inc_Memᵤ =>
                                            have Prop_Incomingᵤ := prop_incomingᵤ Inc_Memᵤ;                        /- := type_incoming.check inc RULEᵤ.CENTER -/
                                            simp only [type_incoming.check] at Prop_Incomingᵤ ⊢;
-                                           cases Prop_Incomingᵤ with | intro Prop_Startᵤ Prop_Incomingᵤ =>
-                                           cases Prop_Incomingᵤ with | intro Prop_Endᵤ Prop_Incomingᵤ =>
+                                           cases Prop_Incomingᵤ with | intro Prop_Origᵤ Prop_Incomingᵤ =>
+                                           cases Prop_Incomingᵤ with | intro Prop_Destᵤ Prop_Incomingᵤ =>
                                            cases Prop_Incomingᵤ with | intro Prop_Colorᵤ Prop_Inc_Indᵤ =>
                                            --
-                                           apply And.intro ( by exact Prop_Startᵤ; );                             /- := Start Node -/
-                                           apply And.intro ( by exact REWRITE.Get_End_RwIncoming inc_casesᵤ; );   /- := End Node -/
+                                           apply And.intro ( by exact Prop_Origᵤ; );                             /- := Orig Node -/
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwIncoming inc_casesᵤ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Colorᵤ; );                            /- := Colors -/
                                            /- := Check Incoming-Indirect Duo: -/
                                            cases Prop_Inc_Indᵤ with | intro Colorᵤ Prop_Inc_Indᵤ =>
@@ -2810,7 +2814,7 @@ namespace COVERAGE.T1_Of_T1.NODES
                                            apply Exists.intro Colorᵤ;
                                            apply Exists.intro Colorsᵤ;
                                            apply Exists.intro Ancᵤ;
-                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                                       apply Or.inr;
                                                       exact Prop_Inc_Indᵤ; ); );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2826,27 +2830,27 @@ namespace COVERAGE.T1_Of_T1.NODES
                                            cases Prop_Outgoingᵥ with
                                            | inl Prop_Outgoingₕ₁ᵥ => simp only [type_outgoing₁.check_h₁] at Prop_Outgoingₕ₁ᵥ ⊢;
                                                                      cases Prop_Outgoingₕ₁ᵥ with | intro Prop_HPTₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
-                                                                     cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Startₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
-                                                                     cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Endₕ₁ᵥ Prop_Colorₕ₁ᵥ =>
+                                                                     cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Origₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
+                                                                     cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Destₕ₁ᵥ Prop_Colorₕ₁ᵥ =>
                                                                      --
                                                                      apply Or.inl;
                                                                      apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                           exact Or.inr Prop_HPTₕ₁ᵥ; );
-                                                                     apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );    /- := Start Node -/
-                                                                     apply And.intro ( by rewrite [prop_eq_lvl];                               /- := End Node -/
-                                                                                          exact Prop_Endₕ₁ᵥ; );
+                                                                     apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );    /- := Orig Node -/
+                                                                     apply And.intro ( by rewrite [prop_eq_lvl];                               /- := Dest Node -/
+                                                                                          exact Prop_Destₕ₁ᵥ; );
                                                                      exact Prop_Colorₕ₁ᵥ;                                                     /- := Colors -/
                                            | inr Prop_Outgoingᵢₑ₁ᵥ => simp only [type_outgoing₁.check_ie₁] at Prop_Outgoingᵢₑ₁ᵥ ⊢;
                                                                       cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_HPTᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
-                                                                      cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Startᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
-                                                                      cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Endᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
+                                                                      cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Origᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
+                                                                      cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Destᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
                                                                       cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Colorᵢₑ₁ᵥ Prop_Out_Indᵢₑ₁ᵥ =>
                                                                       --
                                                                       apply Or.inr;
                                                                       apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 1 Introduction & Elimination -/
-                                                                      apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                        /- := Start Node -/
-                                                                      apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := End Node -/
-                                                                                           exact Prop_Endᵢₑ₁ᵥ; );
+                                                                      apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                        /- := Orig Node -/
+                                                                      apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := Dest Node -/
+                                                                                           exact Prop_Destᵢₑ₁ᵥ; );
                                                                       apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵢₑ₁ᵥ;            /- := Colors -/
                                                                                            rewrite [Prop_Colorᵢₑ₁ᵥ];
                                                                                            exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -2855,7 +2859,7 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                                       cases Prop_Out_Indᵢₑ₁ᵥ with | intro Incᵢₑ₁ᵥ Prop_Out_Indᵢₑ₁ᵥ =>
                                                                       --
                                                                       apply Exists.intro Incᵢₑ₁ᵥ;
-                                                                      exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                                                      exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                                                                                   apply Or.inl;
                                                                                   exact Prop_Out_Indᵢₑ₁ᵥ; );
                        | inr out_casesᵤ => have Out_Caseᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_casesᵤ;          /- := out ∈ RULEᵤ.OUTGOING -/
@@ -2864,25 +2868,25 @@ namespace COVERAGE.T1_Of_T1.NODES
                                            cases Prop_Outgoingᵤ with
                                            | inl Prop_Outgoingₕ₁ᵤ => simp only [type_outgoing₁.check_h₁] at Prop_Outgoingₕ₁ᵤ ⊢;
                                                                      cases Prop_Outgoingₕ₁ᵤ with | intro Prop_HPTₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
-                                                                     cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Startₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
-                                                                     cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Endₕ₁ᵤ Prop_Colorₕ₁ᵤ =>
+                                                                     cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Origₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
+                                                                     cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Destₕ₁ᵤ Prop_Colorₕ₁ᵤ =>
                                                                      --
                                                                      apply Or.inl;
                                                                      apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                           exact Or.inl Prop_HPTₕ₁ᵤ; );
-                                                                     apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );    /- := Start Node -/
-                                                                     apply And.intro ( by exact Prop_Endₕ₁ᵤ; );                                /- := End Node -/
+                                                                     apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );    /- := Orig Node -/
+                                                                     apply And.intro ( by exact Prop_Destₕ₁ᵤ; );                                /- := Dest Node -/
                                                                      exact Prop_Colorₕ₁ᵤ;                                                     /- := Colors -/
                                            | inr Prop_Outgoingᵢₑ₁ᵤ => simp only [type_outgoing₁.check_ie₁] at Prop_Outgoingᵢₑ₁ᵤ ⊢;
                                                                       cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_HPTᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
-                                                                      cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Startᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
-                                                                      cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Endᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
+                                                                      cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Origᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
+                                                                      cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Destᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
                                                                       cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Colorᵢₑ₁ᵤ Prop_Out_Indᵢₑ₁ᵤ =>
                                                                       --
                                                                       apply Or.inr;
                                                                       apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 1 Introduction & Elimination -/
-                                                                      apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );                        /- := Start Node -/
-                                                                      apply And.intro ( by exact Prop_Endᵢₑ₁ᵤ; );                                                   /- := End Node -/
+                                                                      apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );                        /- := Orig Node -/
+                                                                      apply And.intro ( by exact Prop_Destᵢₑ₁ᵤ; );                                                   /- := Dest Node -/
                                                                       apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorᵢₑ₁ᵤ;                /- := Colors -/
                                                                                            cases Prop_Colorᵢₑ₁ᵤ with
                                                                                            | inl Prop_NBR_Colorᵢₑ₁ᵤ => rewrite [Prop_NBR_Colorᵢₑ₁ᵤ];
@@ -2893,7 +2897,7 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                                       cases Prop_Out_Indᵢₑ₁ᵤ with | intro Incᵢₑ₁ᵤ Prop_Out_Indᵢₑ₁ᵤ =>
                                                                       --
                                                                       apply Exists.intro Incᵢₑ₁ᵤ;
-                                                                      exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                                                      exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                                                                                   apply Or.inr;
                                                                                   exact Prop_Out_Indᵢₑ₁ᵤ; ); );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2905,8 +2909,8 @@ namespace COVERAGE.T1_Of_T1.NODES
   cases ind_cases with
   | inl ind_casesᵥ => have Prop_Indirectᵥ := prop_indirectᵥ ind_casesᵥ;
                       simp only [type_indirect.check] at Prop_Indirectᵥ ⊢;
-                      cases Prop_Indirectᵥ with | intro Prop_Startᵥ Prop_Indirectᵥ =>
-                      cases Prop_Indirectᵥ with | intro Prop_Endᵥ Prop_Indirectᵥ =>
+                      cases Prop_Indirectᵥ with | intro Prop_Origᵥ Prop_Indirectᵥ =>
+                      cases Prop_Indirectᵥ with | intro Prop_Destᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Prop_Levelᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Colorᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Colorsᵥ Prop_Indirectᵥ =>
@@ -2915,10 +2919,10 @@ namespace COVERAGE.T1_Of_T1.NODES
                       cases Prop_Indirectᵥ with | intro Prop_Colorsᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Prop_Ind_Incᵥ Prop_Ind_Outᵥ =>
                       --
-                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Start Node -/
-                                           exact Prop_Startᵥ; );
-                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := End Node -/
-                                           exact Prop_Endᵥ; );
+                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Orig Node -/
+                                           exact Prop_Origᵥ; );
+                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Dest Node -/
+                                           exact Prop_Destᵥ; );
                       apply And.intro ( by rewrite [prop_eq_lvl];         /- := Colors -/
                                            exact Prop_Levelᵥ; );
                       apply Exists.intro Colorᵥ;
@@ -2934,25 +2938,25 @@ namespace COVERAGE.T1_Of_T1.NODES
                       cases Prop_Ind_Incᵥ with | intro Prop_Ind_Incᵥ Prop_All_Ind_Incᵥ =>
                       --
                       apply And.intro ( by apply Exists.intro Dep_Incᵥ;
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.END CENTER 0 dep_inc ∈ INCOMING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.dest CENTER 0 dep_inc ∈ INCOMING -/
                                                                 apply Or.inl;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwIncoming_Of_Mem Prop_Ind_Incᵥ; );
-                                           intro all_incᵥ all_inc_casesᵥ;                                     /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
+                                           intro all_incᵥ all_inc_casesᵥ;                                     /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_inc_casesᵥ;
                                            cases all_inc_casesᵥ with
                                            | inl all_inc_casesᵥᵥ => have Ind_Inc_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵥᵥ;                      /- := all_inc ∈ RULEᵥ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵥᵥ with | intro Originalᵥ Ind_Inc_Memᵥᵥ =>
-                                                                    have Prop_All_Ind_Incᵥᵥ := Prop_All_Ind_Incᵥ Ind_Inc_Memᵥᵥ;                                 /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Ind_Incᵥᵥ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Inc_End (prop_incomingᵥ Ind_Inc_Memᵥᵥ)] at Prop_All_Ind_Incᵥᵥ;      /- := all_inc.END = RULEᵥ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_End_RwIncoming all_inc_casesᵥᵥ];                                      /- := all_inc.END = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Ind_Incᵥᵥ := Prop_All_Ind_Incᵥ Ind_Inc_Memᵥᵥ;                                 /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Ind_Incᵥᵥ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Inc_Dest (prop_incomingᵥ Ind_Inc_Memᵥᵥ)] at Prop_All_Ind_Incᵥᵥ;      /- := all_inc.dest = RULEᵥ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Dest_RwIncoming all_inc_casesᵥᵥ];                                      /- := all_inc.dest = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Ind_Incᵥᵥ ⊢;
                                                                     exact Prop_All_Ind_Incᵥᵥ;
                                            | inr all_inc_casesᵥᵤ => have Ind_Inc_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵥᵤ;                      /- := all_inc ∈ RULEᵤ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵥᵤ with | intro Originalᵤ Ind_Inc_Memᵥᵤ =>
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have Prop_Check_Incomingᵥᵤ := prop_check_incoming Ind_Inc_Memᵥᵤ Prop_Ind_Incᵥ;              /- := all_inc.START ≠ IND.END -/
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have Prop_Check_Incomingᵥᵤ := prop_check_incoming Ind_Inc_Memᵥᵤ Prop_Ind_Incᵥ;              /- := all_inc.orig ≠ IND.dest -/
                                                                     simp only [Prop_Check_Incomingᵥᵤ, false_and]; );
                       /- := Check Indirect-Outgoing Duo: -/
                       cases Prop_Ind_Outᵥ with | intro Outᵥ Prop_Ind_Outᵥ =>
@@ -2963,27 +2967,27 @@ namespace COVERAGE.T1_Of_T1.NODES
                       apply Exists.intro Outᵥ;
                       apply Exists.intro Dep_Outᵥ;
                       apply And.intro ( by exact Prop_Out_Colᵥ; );
-                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                            apply Or.inl;
                                            rewrite [←collapse.center];
                                            exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Ind_Outᵥ; );
-                      intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                      intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                       simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵥ;
                       cases all_out_casesᵥ with
                       | inl all_out_casesᵥᵥ => have Ind_Out_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                cases Ind_Out_Casesᵥᵥ with | intro Originalᵥ Ind_Out_Memᵥᵥ =>
-                                               have Prop_All_Ind_Outᵥᵥ := Prop_All_Ind_Outᵥ Ind_Out_Memᵥᵥ;                                 /- := all_out.COLOR = Color ↔ all_out = Deduction.mk CENTER out Color dep_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Ind_Outᵥᵥ ⊢;
-                                               rewrite [←COLLAPSE.Simp_Out_Start₁ (prop_outgoingᵥ Ind_Out_Memᵥᵥ)] at Prop_All_Ind_Outᵥᵥ;   /- := all_out.START = RULEᵥ.CENTER -/
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Ind_Outᵥᵥ := Prop_All_Ind_Outᵥ Ind_Out_Memᵥᵥ;                                 /- := all_out.color = Color ↔ all_out = DEdge.mk CENTER out Color dep_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Ind_Outᵥᵥ ⊢;
+                                               rewrite [←COLLAPSE.Simp_Out_Orig₁ (prop_outgoingᵥ Ind_Out_Memᵥᵥ)] at Prop_All_Ind_Outᵥᵥ;   /- := all_out.orig = RULEᵥ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Ind_Outᵥᵥ ⊢;
                                                exact Prop_All_Ind_Outᵥᵥ;
                       | inr all_out_casesᵥᵤ => have Ind_Out_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                cases Ind_Out_Casesᵥᵤ with | intro Originalᵤ Ind_Out_Memᵥᵤ =>
-                                               have Ind_Out_Colorᵥᵤ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵤ Ind_Out_Memᵥᵤ);          /- := all_out.COLOR = 0 ∨ all_out.COLOR ∈ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
+                                               have Ind_Out_Colorᵥᵤ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵤ Ind_Out_Memᵥᵤ);          /- := all_out.color = 0 ∨ all_out.color ∈ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
                                                simp only [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵥ;                                /- := Color = RULEᵥ.CENTER.id -/
-                                               rewrite [Deduction.mk.injEq];
-                                               have NE_Colorᵥ : all_outᵥ.COLOR ≠ Colorᵥ := by rewrite [ne_eq, ←imp_false];
+                                               rewrite [DEdge.mk.injEq];
+                                               have NE_Colorᵥ : all_outᵥ.color ≠ Colorᵥ := by rewrite [ne_eq, ←imp_false];
                                                                                                  intro EQ_Color;
                                                                                                  rewrite [EQ_Color, Prop_Colorᵥ] at Ind_Out_Colorᵥᵤ;
                                                                                                  cases Ind_Out_Colorᵥᵤ with
@@ -2996,8 +3000,8 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                simp only [NE_Colorᵥ, false_and, and_false];
   | inr ind_casesᵤ => have Prop_Indirectᵤ := prop_indirectᵤ ind_casesᵤ;
                       simp only [type_indirect.check] at Prop_Indirectᵤ ⊢;
-                      cases Prop_Indirectᵤ with | intro Prop_Startᵤ Prop_Indirectᵤ =>
-                      cases Prop_Indirectᵤ with | intro Prop_Endᵤ Prop_Indirectᵤ =>
+                      cases Prop_Indirectᵤ with | intro Prop_Origᵤ Prop_Indirectᵤ =>
+                      cases Prop_Indirectᵤ with | intro Prop_Destᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Prop_Levelᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Colorᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Colorsᵤ Prop_Indirectᵤ =>
@@ -3006,8 +3010,8 @@ namespace COVERAGE.T1_Of_T1.NODES
                       cases Prop_Indirectᵤ with | intro Prop_Colorsᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Prop_Ind_Incᵤ Prop_Ind_Outᵤ =>
                       --
-                      apply And.intro ( by exact Prop_Startᵤ; );           /- := Start Node -/
-                      apply And.intro ( by exact Prop_Endᵤ; );             /- := End Node -/
+                      apply And.intro ( by exact Prop_Origᵤ; );           /- := Orig Node -/
+                      apply And.intro ( by exact Prop_Destᵤ; );             /- := Dest Node -/
                       apply And.intro ( by exact Prop_Levelᵤ; );           /- := Colors -/
                       apply Exists.intro Colorᵤ;
                       apply Exists.intro Colorsᵤ;
@@ -3024,25 +3028,25 @@ namespace COVERAGE.T1_Of_T1.NODES
                       cases Prop_Ind_Incᵤ with | intro Prop_Ind_Incᵤ Prop_All_Ind_Incᵤ =>
                       --
                       apply And.intro ( by apply Exists.intro Dep_Incᵤ;
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.END CENTER 0 dep_inc ∈ INCOMING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.dest CENTER 0 dep_inc ∈ INCOMING -/
                                                                 apply Or.inr;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwIncoming_Of_Mem Prop_Ind_Incᵤ; );
-                                           intro all_incᵤ all_inc_casesᵤ;                                     /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
+                                           intro all_incᵤ all_inc_casesᵤ;                                     /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_inc_casesᵤ;
                                            cases all_inc_casesᵤ with
                                            | inl all_inc_casesᵤᵥ => have Ind_Inc_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵤᵥ;                      /- := all_inc ∈ RULEᵥ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵤᵥ with | intro Originalᵥ Ind_Inc_Memᵤᵥ =>
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have Prop_Check_Incomingᵤᵥ := prop_check_incoming Prop_Ind_Incᵤ Ind_Inc_Memᵤᵥ;              /- := IND.END ≠ all_inc.START -/
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have Prop_Check_Incomingᵤᵥ := prop_check_incoming Prop_Ind_Incᵤ Ind_Inc_Memᵤᵥ;              /- := IND.dest ≠ all_inc.orig -/
                                                                     rewrite [ne_comm] at Prop_Check_Incomingᵤᵥ;
                                                                     simp only [Prop_Check_Incomingᵤᵥ, false_and];
                                            | inr all_inc_casesᵤᵤ => have Ind_Inc_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵤᵤ;                      /- := all_inc ∈ RULEᵤ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵤᵤ with | intro Originalᵤ Ind_Inc_Memᵤᵤ =>
-                                                                    have Prop_All_Ind_Incᵤᵤ := Prop_All_Ind_Incᵤ Ind_Inc_Memᵤᵤ;                                 /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Ind_Incᵤᵤ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Inc_End (prop_incomingᵤ Ind_Inc_Memᵤᵤ)] at Prop_All_Ind_Incᵤᵤ;      /- := all_inc.END = RULEᵤ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_End_RwIncoming all_inc_casesᵤᵤ];                                      /- := all_inc.END = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Ind_Incᵤᵤ := Prop_All_Ind_Incᵤ Ind_Inc_Memᵤᵤ;                                 /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Ind_Incᵤᵤ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Inc_Dest (prop_incomingᵤ Ind_Inc_Memᵤᵤ)] at Prop_All_Ind_Incᵤᵤ;      /- := all_inc.dest = RULEᵤ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Dest_RwIncoming all_inc_casesᵤᵤ];                                      /- := all_inc.dest = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Ind_Incᵤᵤ ⊢;
                                                                     exact Prop_All_Ind_Incᵤᵤ; );
                       /- Check Outgoing-Indirect Duo: -/
@@ -3054,19 +3058,19 @@ namespace COVERAGE.T1_Of_T1.NODES
                       apply Exists.intro Outᵤ;
                       apply Exists.intro Dep_Outᵤ;
                       apply And.intro ( by exact Prop_Out_Colᵤ; );
-                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color dep_out ∈ OUTGOING -/
+                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color dep_out ∈ OUTGOING -/
                                            apply Or.inr;
                                            rewrite [←collapse.center];
                                            exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Ind_Outᵤ; );
-                      intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.COLOR = color ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                      intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.color = color ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                       simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵤ;
                       cases all_out_casesᵤ with
                       | inl all_out_casesᵤᵥ => have Ind_Out_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                cases Ind_Out_Casesᵤᵥ with | intro Originalᵥ Ind_Out_Memᵤᵥ =>
-                                               have Ind_Out_Colorᵤᵥ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵥ Ind_Out_Memᵤᵥ);          /- := all_out.COLOR = 0 ∨ all_out.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                               have Ind_Out_Colorᵤᵥ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵥ Ind_Out_Memᵤᵥ);          /- := all_out.color = 0 ∨ all_out.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                simp only [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Ind_Out_Colorᵤᵥ;
-                                               rewrite [Deduction.mk.injEq];
-                                               have NE_Colorᵤ : all_outᵤ.COLOR ≠ Colorᵤ := by rewrite [ne_eq, ←imp_false];
+                                               rewrite [DEdge.mk.injEq];
+                                               have NE_Colorᵤ : all_outᵤ.color ≠ Colorᵤ := by rewrite [ne_eq, ←imp_false];
                                                                                                  intro EQ_Color;
                                                                                                  apply absurd Prop_Colorᵤ;                /- := Color ∉ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
                                                                                                  cases Ind_Out_Colorᵤᵥ with
@@ -3080,10 +3084,10 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                simp only [NE_Colorᵤ, false_and, and_false];
                       | inr all_out_casesᵤᵤ => have Ind_Out_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                cases Ind_Out_Casesᵤᵤ with | intro Originalᵤ Ind_Out_Memᵤᵤ =>
-                                               have Prop_All_Ind_Outᵤᵤ := Prop_All_Ind_Outᵤ Ind_Out_Memᵤᵤ;                                 /- := all_out.COLOR = Color ↔ all_out = Deduction.mk CENTER out Color dep_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Ind_Outᵤᵤ ⊢;
-                                               rewrite [←COLLAPSE.Simp_Out_Start₁ (prop_outgoingᵤ Ind_Out_Memᵤᵤ)] at Prop_All_Ind_Outᵤᵤ;   /- := all_out.START = RULEᵤ.CENTER -/
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Ind_Outᵤᵤ := Prop_All_Ind_Outᵤ Ind_Out_Memᵤᵤ;                                 /- := all_out.color = Color ↔ all_out = DEdge.mk CENTER out Color dep_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Ind_Outᵤᵤ ⊢;
+                                               rewrite [←COLLAPSE.Simp_Out_Orig₁ (prop_outgoingᵤ Ind_Out_Memᵤᵤ)] at Prop_All_Ind_Outᵤᵤ;   /- := all_out.orig = RULEᵤ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Ind_Outᵤᵤ ⊢;
                                                exact Prop_All_Ind_Outᵤᵤ;
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3134,7 +3138,7 @@ namespace COVERAGE.T1_Of_T1.NODES
   cases prop_typeᵥ with | intro prop_out_unitᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_out_colorsᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_dir_nilᵥ prop_typeᵥ =>
-  cases prop_typeᵥ with | intro prop_ind_startsᵥ prop_typeᵥ =>
+  cases prop_typeᵥ with | intro prop_ind_origsᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_ind_lenᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_ind_colorsᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_incomingᵥ prop_typeᵥ =>
@@ -3154,7 +3158,7 @@ namespace COVERAGE.T1_Of_T1.NODES
                        apply And.intro ( by rewrite [prop_pstᵤ];
                                             exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ prop_check_pastᵤ; );
                        trivial; );
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by intro prop_inc_nil;                                        /- := ( RULE.INCOMING = [] ) → ( RULE.CENTER.isHypothesis = true ) -/
                        simp only [List.append_eq_nil_iff] at prop_inc_nil;
                        simp only [←List.length_eq_zero_iff] at prop_inc_nil prop_inc_nilᵥ;
@@ -3163,21 +3167,21 @@ namespace COVERAGE.T1_Of_T1.NODES
                        simp only [Bool.or_eq_true];
                        exact Or.inr (And.left prop_inc_nil); );
   apply And.intro ( by simp only [prop_out_unitᵥ];                                                                    /- := RULE.OUTGOING = (out::outs) -/
-                       apply Exists.intro ( Deduction.mk ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )                        /- RULEᵥ.OUTGOING -/
-                                                 ( outᵥ.END )
-                                                 ( outᵥ.COLOR )
-                                                 ( outᵥ.DEPENDENCY ) );
+                       apply Exists.intro ( DEdge.mk ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )                        /- RULEᵥ.OUTGOING -/
+                                                 ( outᵥ.dest )
+                                                 ( outᵥ.color )
+                                                 ( outᵥ.deps ) );
                        apply Exists.intro ( collapse.rewrite_outgoing ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )   /- RULEᵤ.OUTGOING -/
                                                                       ( RULEᵤ.OUTGOING ) );
                        simp only [collapse.rewrite_outgoing];
                        simp only [collapse.center];
                        trivial; );
-  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂ gt_zero₁₂;                          /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
+  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂ gt_zero₁₂;                          /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
                        rewrite [prop_out_unitᵥ] at out_mem₁ out_mem₂;
                        simp only [collapse.rewrite_outgoing] at out_mem₁ out_mem₂;
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at out_mem₁ out_mem₂;
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
-                       simp only [Deduction.mk.injEq'];
+                       simp only [DEdge.mk.injEq'];
                        --
                        simp only [type_outgoing₁] at prop_outgoingᵤ prop_outgoingᵥ;
                        rewrite [prop_out_unitᵥ] at prop_outgoingᵥ;
@@ -3188,14 +3192,14 @@ namespace COVERAGE.T1_Of_T1.NODES
                        | inl out_mem₁ᵥ => cases out_mem₂ with
                                           | inl out_mem₂ᵥ => rewrite [out_mem₁ᵥ, out_mem₂ᵥ]; simp only [true_and];
                                           | inr out_mem₂ᵤ => rewrite [out_mem₁ᵥ] at gt_zero₁₂ ⊢;                              /- := out₁ = outᵥ -/
-                                                             rewrite [REWRITE.Get_Start_RwOutgoing out_mem₂ᵤ];                /- := out₂.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                             rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₂ᵤ];                /- := out₂.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              --
                                                              have Out_Cases₂ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₂ᵤ;                 /- := out₂ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₂ᵤ with | intro Originalᵤ Out_Mem₂ᵤ =>
-                                                             have Out_Color₂ᵤ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.COLOR = 0 ∨ out₂.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                                             have Out_Color₂ᵤ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.color = 0 ∨ out₂.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                              --
                                                              simp only [true_and] at gt_zero₁₂ Out_Color₂ᵤ ⊢;
-                                                             have NE_Color : outᵥ.COLOR ≠ out₂.COLOR := by rewrite [ne_eq, ←imp_false];
+                                                             have NE_Color : outᵥ.color ≠ out₂.color := by rewrite [ne_eq, ←imp_false];
                                                                                                               intro EQ_Color;
                                                                                                               cases Out_Colorᵥ with
                                                                                                               | inl EQ_Zeroᵥ => apply absurd gt_zero₁₂; rewrite [←EQ_Color, EQ_Zeroᵥ]; trivial;
@@ -3209,15 +3213,15 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                                                                                                                                    ( by exact prop_ne_pst; );
                                                              simp only [NE_Color, false_and, and_false];
                        | inr out_mem₁ᵤ => cases out_mem₂ with
-                                          | inl out_mem₂ᵥ => rewrite [REWRITE.Get_Start_RwOutgoing out_mem₁ᵤ];                /- := out₁.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                          | inl out_mem₂ᵥ => rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₁ᵤ];                /- := out₁.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              rewrite [out_mem₂ᵥ] at gt_zero₁₂ ⊢;                              /- := out₂ = outᵥ -/
                                                              --
                                                              have Out_Cases₁ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₁ᵤ;                 /- := out₁ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₁ᵤ with | intro Originalᵤ Out_Mem₁ᵤ =>
-                                                             have Out_Color₁ᵤ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.COLOR = 0 ∨ out₁.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                                             have Out_Color₁ᵤ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.color = 0 ∨ out₁.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                              --
                                                              simp only [true_and] at gt_zero₁₂ Out_Color₁ᵤ ⊢;
-                                                             have NE_Color : out₁.COLOR ≠ outᵥ.COLOR := by rewrite [ne_eq, ←imp_false];
+                                                             have NE_Color : out₁.color ≠ outᵥ.color := by rewrite [ne_eq, ←imp_false];
                                                                                                               intro EQ_Color;
                                                                                                               cases Out_Colorᵥ with
                                                                                                               | inl EQ_Zeroᵥ => apply absurd gt_zero₁₂; rewrite [EQ_Color, EQ_Zeroᵥ]; trivial;
@@ -3230,20 +3234,20 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                                                                                                                    exact And.intro ( by exact Nat.ne_of_lt prop_lt_nbr; )
                                                                                                                                                                    ( by exact prop_ne_pst; );
                                                              simp only [NE_Color, false_and, and_false];
-                                          | inr out_mem₂ᵤ => rewrite [REWRITE.Get_Start_RwOutgoing out_mem₁ᵤ];              /- := out₁.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
-                                                             rewrite [REWRITE.Get_Start_RwOutgoing out_mem₂ᵤ];              /- := out₂.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                          | inr out_mem₂ᵤ => rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₁ᵤ];              /- := out₁.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                             rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₂ᵤ];              /- := out₂.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              simp only [true_and] at gt_zero₁₂ ⊢;
                                                              --
                                                              have Out_Cases₁ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₁ᵤ;               /- := out₁ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₁ᵤ with | intro Original₁ᵤ Out_Mem₁ᵤ =>
-                                                             have Out_Start₁ᵤ := COLLAPSE.Simp_Out_Start₁ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₁ᵤ := COLLAPSE.Simp_Out_Orig₁ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.orig = RULEᵤ.CENTER -/
                                                              have Out_Cases₂ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₂ᵤ;               /- := out₂ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₂ᵤ with | intro Original₂ᵤ Out_Mem₂ᵤ =>
-                                                             have Out_Start₂ᵤ := COLLAPSE.Simp_Out_Start₁ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₂ᵤ := COLLAPSE.Simp_Out_Orig₁ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.orig = RULEᵤ.CENTER -/
                                                              --
                                                              have Iff_Out_Colorᵤ := prop_out_colorsᵤ Out_Mem₁ᵤ Out_Mem₂ᵤ gt_zero₁₂;
-                                                             simp only [Deduction.mk.injEq] at Out_Start₁ᵤ Out_Start₂ᵤ Iff_Out_Colorᵤ;
-                                                             simp only [Out_Start₁ᵤ, Out_Start₂ᵤ, true_and] at Iff_Out_Colorᵤ;
+                                                             simp only [DEdge.mk.injEq] at Out_Orig₁ᵤ Out_Orig₂ᵤ Iff_Out_Colorᵤ;
+                                                             simp only [Out_Orig₁ᵤ, Out_Orig₂ᵤ, true_and] at Iff_Out_Colorᵤ;
                                                              exact Iff_Out_Colorᵤ; );
   apply And.intro ( by rewrite [prop_dir_nilᵤ, prop_dir_nilᵥ];        /- := RULE.DIRECT = [] -/
                        simp only [collapse.rewrite_direct];
@@ -3251,7 +3255,7 @@ namespace COVERAGE.T1_Of_T1.NODES
   apply And.intro ( by simp only [List.length_append];                /- := List.length (RULE.INDIRECT) = List.length (RULE.INCOMING) -/
                        simp only [REWRITE.Eq_Length_RwIncoming];
                        simp only [prop_ind_lenᵤ, prop_ind_lenᵥ]; );
-  apply And.intro ( by intro ind ind_cases;                           /- := ind.COLORS = [0, color] -/
+  apply And.intro ( by intro ind ind_cases;                           /- := ind.colors = [0, color] -/
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at ind_cases;
                        cases ind_cases with
                        | inl ind_casesᵥ => apply Exists.intro RULEᵥ.CENTER.id;
@@ -3268,13 +3272,13 @@ namespace COVERAGE.T1_Of_T1.NODES
                                            cases Inc_Caseᵥ with | intro Originalᵥ Inc_Memᵥ =>
                                            have Prop_Incomingᵥ := prop_incomingᵥ Inc_Memᵥ;                        /- := type_incoming.check inc RULEᵥ.CENTER -/
                                            simp only [type_incoming.check] at Prop_Incomingᵥ ⊢;
-                                           cases Prop_Incomingᵥ with | intro Prop_Startᵥ Prop_Incomingᵥ =>
-                                           cases Prop_Incomingᵥ with | intro Prop_Endᵥ Prop_Incomingᵥ =>
+                                           cases Prop_Incomingᵥ with | intro Prop_Origᵥ Prop_Incomingᵥ =>
+                                           cases Prop_Incomingᵥ with | intro Prop_Destᵥ Prop_Incomingᵥ =>
                                            cases Prop_Incomingᵥ with | intro Prop_Colorᵥ Prop_Inc_Indᵥ =>
                                            --
-                                           apply And.intro ( by rewrite [prop_eq_lvl];                            /- := Start Node -/
-                                                                exact Prop_Startᵥ; );
-                                           apply And.intro ( by exact REWRITE.Get_End_RwIncoming inc_casesᵥ; );   /- := End Node -/
+                                           apply And.intro ( by rewrite [prop_eq_lvl];                            /- := Orig Node -/
+                                                                exact Prop_Origᵥ; );
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwIncoming inc_casesᵥ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Colorᵥ; );                            /- := Colors -/
                                            /- := Check Incoming-Indirect Duo: -/
                                            cases Prop_Inc_Indᵥ with | intro Colorᵥ Prop_Inc_Indᵥ =>
@@ -3284,19 +3288,19 @@ namespace COVERAGE.T1_Of_T1.NODES
                                            apply Exists.intro Colorᵥ;
                                            apply Exists.intro Colorsᵥ;
                                            apply Exists.intro Ancᵥ;
-                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                                       apply Or.inl;
                                                       exact Prop_Inc_Indᵥ; );
                        | inr inc_casesᵤ => have Inc_Caseᵤ := REWRITE.Mem_Of_Mem_RwIncoming inc_casesᵤ;            /- := inc ∈ RULEᵤ.INCOMING -/
                                            cases Inc_Caseᵤ with | intro Originalᵤ Inc_Memᵤ =>
                                            have Prop_Incomingᵤ := prop_incomingᵤ Inc_Memᵤ;                        /- := type_incoming.check inc RULEᵤ.CENTER -/
                                            simp only [type_incoming.check] at Prop_Incomingᵤ ⊢;
-                                           cases Prop_Incomingᵤ with | intro Prop_Startᵤ Prop_Incomingᵤ =>
-                                           cases Prop_Incomingᵤ with | intro Prop_Endᵤ Prop_Incomingᵤ =>
+                                           cases Prop_Incomingᵤ with | intro Prop_Origᵤ Prop_Incomingᵤ =>
+                                           cases Prop_Incomingᵤ with | intro Prop_Destᵤ Prop_Incomingᵤ =>
                                            cases Prop_Incomingᵤ with | intro Prop_Colorᵤ Prop_Inc_Indᵤ =>
                                            --
-                                           apply And.intro ( by exact Prop_Startᵤ; );                             /- := Start Node -/
-                                           apply And.intro ( by exact REWRITE.Get_End_RwIncoming inc_casesᵤ; );   /- := End Node -/
+                                           apply And.intro ( by exact Prop_Origᵤ; );                             /- := Orig Node -/
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwIncoming inc_casesᵤ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Colorᵤ; );                            /- := Colors -/
                                            /- := Check Incoming-Indirect Duo: -/
                                            cases Prop_Inc_Indᵤ with | intro Colorᵤ Prop_Inc_Indᵤ =>
@@ -3306,7 +3310,7 @@ namespace COVERAGE.T1_Of_T1.NODES
                                            apply Exists.intro Colorᵤ;
                                            apply Exists.intro Colorsᵤ;
                                            apply Exists.intro Ancᵤ;
-                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                                       apply Or.inr;
                                                       exact Prop_Inc_Indᵤ; ); );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3322,27 +3326,27 @@ namespace COVERAGE.T1_Of_T1.NODES
                                            cases Prop_Outgoingᵥ with
                                            | inl Prop_Outgoingₕ₁ᵥ => simp only [type_outgoing₁.check_h₁] at Prop_Outgoingₕ₁ᵥ ⊢;
                                                                      cases Prop_Outgoingₕ₁ᵥ with | intro Prop_HPTₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
-                                                                     cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Startₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
-                                                                     cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Endₕ₁ᵥ Prop_Colorₕ₁ᵥ =>
+                                                                     cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Origₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
+                                                                     cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Destₕ₁ᵥ Prop_Colorₕ₁ᵥ =>
                                                                      --
                                                                      apply Or.inl;
                                                                      apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                           exact Or.inr Prop_HPTₕ₁ᵥ; );
-                                                                     apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );    /- := Start Node -/
-                                                                     apply And.intro ( by rewrite [prop_eq_lvl];                               /- := End Node -/
-                                                                                          exact Prop_Endₕ₁ᵥ; );
+                                                                     apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );    /- := Orig Node -/
+                                                                     apply And.intro ( by rewrite [prop_eq_lvl];                               /- := Dest Node -/
+                                                                                          exact Prop_Destₕ₁ᵥ; );
                                                                      exact Prop_Colorₕ₁ᵥ;                                                     /- := Colors -/
                                            | inr Prop_Outgoingᵢₑ₁ᵥ => simp only [type_outgoing₁.check_ie₁] at Prop_Outgoingᵢₑ₁ᵥ ⊢;
                                                                       cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_HPTᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
-                                                                      cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Startᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
-                                                                      cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Endᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
+                                                                      cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Origᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
+                                                                      cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Destᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
                                                                       cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Colorᵢₑ₁ᵥ Prop_Out_Indᵢₑ₁ᵥ =>
                                                                       --
                                                                       apply Or.inr;
                                                                       apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 1 Introduction & Elimination -/
-                                                                      apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                        /- := Start Node -/
-                                                                      apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := End Node -/
-                                                                                           exact Prop_Endᵢₑ₁ᵥ; );
+                                                                      apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                        /- := Orig Node -/
+                                                                      apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := Dest Node -/
+                                                                                           exact Prop_Destᵢₑ₁ᵥ; );
                                                                       apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵢₑ₁ᵥ;            /- := Colors -/
                                                                                            rewrite [Prop_Colorᵢₑ₁ᵥ];
                                                                                            exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -3351,7 +3355,7 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                                       cases Prop_Out_Indᵢₑ₁ᵥ with | intro Incᵢₑ₁ᵥ Prop_Out_Indᵢₑ₁ᵥ =>
                                                                       --
                                                                       apply Exists.intro Incᵢₑ₁ᵥ;
-                                                                      exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                                                      exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                                                                                   apply Or.inl;
                                                                                   exact Prop_Out_Indᵢₑ₁ᵥ; );
                        | inr out_casesᵤ => have Out_Caseᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_casesᵤ;          /- := out ∈ RULEᵤ.OUTGOING -/
@@ -3360,25 +3364,25 @@ namespace COVERAGE.T1_Of_T1.NODES
                                            cases Prop_Outgoingᵤ with
                                            | inl Prop_Outgoingₕ₁ᵤ => simp only [type_outgoing₁.check_h₁] at Prop_Outgoingₕ₁ᵤ ⊢;
                                                                      cases Prop_Outgoingₕ₁ᵤ with | intro Prop_HPTₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
-                                                                     cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Startₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
-                                                                     cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Endₕ₁ᵤ Prop_Colorₕ₁ᵤ =>
+                                                                     cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Origₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
+                                                                     cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Destₕ₁ᵤ Prop_Colorₕ₁ᵤ =>
                                                                      --
                                                                      apply Or.inl;
                                                                      apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                           exact Or.inl Prop_HPTₕ₁ᵤ; );
-                                                                     apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );    /- := Start Node -/
-                                                                     apply And.intro ( by exact Prop_Endₕ₁ᵤ; );                                /- := End Node -/
+                                                                     apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );    /- := Orig Node -/
+                                                                     apply And.intro ( by exact Prop_Destₕ₁ᵤ; );                                /- := Dest Node -/
                                                                      exact Prop_Colorₕ₁ᵤ;                                                     /- := Colors -/
                                            | inr Prop_Outgoingᵢₑ₁ᵤ => simp only [type_outgoing₁.check_ie₁] at Prop_Outgoingᵢₑ₁ᵤ ⊢;
                                                                       cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_HPTᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
-                                                                      cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Startᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
-                                                                      cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Endᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
+                                                                      cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Origᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
+                                                                      cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Destᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
                                                                       cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Colorᵢₑ₁ᵤ Prop_Out_Indᵢₑ₁ᵤ =>
                                                                       --
                                                                       apply Or.inr;
                                                                       apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 1 Introduction & Elimination -/
-                                                                      apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );                        /- := Start Node -/
-                                                                      apply And.intro ( by exact Prop_Endᵢₑ₁ᵤ; );                                                   /- := End Node -/
+                                                                      apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );                        /- := Orig Node -/
+                                                                      apply And.intro ( by exact Prop_Destᵢₑ₁ᵤ; );                                                   /- := Dest Node -/
                                                                       apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorᵢₑ₁ᵤ;                /- := Colors -/
                                                                                            cases Prop_Colorᵢₑ₁ᵤ with
                                                                                            | inl Prop_NBR_Colorᵢₑ₁ᵤ => rewrite [Prop_NBR_Colorᵢₑ₁ᵤ];
@@ -3389,7 +3393,7 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                                       cases Prop_Out_Indᵢₑ₁ᵤ with | intro Incᵢₑ₁ᵤ Prop_Out_Indᵢₑ₁ᵤ =>
                                                                       --
                                                                       apply Exists.intro Incᵢₑ₁ᵤ;
-                                                                      exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                                                      exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                                                                                   apply Or.inr;
                                                                                   exact Prop_Out_Indᵢₑ₁ᵤ; ); );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3401,8 +3405,8 @@ namespace COVERAGE.T1_Of_T1.NODES
   cases ind_cases with
   | inl ind_casesᵥ => have Prop_Indirectᵥ := prop_indirectᵥ ind_casesᵥ;
                       simp only [type_indirect.check] at Prop_Indirectᵥ ⊢;
-                      cases Prop_Indirectᵥ with | intro Prop_Startᵥ Prop_Indirectᵥ =>
-                      cases Prop_Indirectᵥ with | intro Prop_Endᵥ Prop_Indirectᵥ =>
+                      cases Prop_Indirectᵥ with | intro Prop_Origᵥ Prop_Indirectᵥ =>
+                      cases Prop_Indirectᵥ with | intro Prop_Destᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Prop_Levelᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Colorᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Colorsᵥ Prop_Indirectᵥ =>
@@ -3411,10 +3415,10 @@ namespace COVERAGE.T1_Of_T1.NODES
                       cases Prop_Indirectᵥ with | intro Prop_Colorsᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Prop_Ind_Incᵥ Prop_Ind_Outᵥ =>
                       --
-                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Start Node -/
-                                           exact Prop_Startᵥ; );
-                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := End Node -/
-                                           exact Prop_Endᵥ; );
+                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Orig Node -/
+                                           exact Prop_Origᵥ; );
+                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Dest Node -/
+                                           exact Prop_Destᵥ; );
                       apply And.intro ( by rewrite [prop_eq_lvl];         /- := Colors -/
                                            exact Prop_Levelᵥ; );
                       apply Exists.intro Colorᵥ;
@@ -3430,25 +3434,25 @@ namespace COVERAGE.T1_Of_T1.NODES
                       cases Prop_Ind_Incᵥ with | intro Prop_Ind_Incᵥ Prop_All_Ind_Incᵥ =>
                       --
                       apply And.intro ( by apply Exists.intro Dep_Incᵥ;
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.END CENTER 0 dep_inc ∈ INCOMING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.dest CENTER 0 dep_inc ∈ INCOMING -/
                                                                 apply Or.inl;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwIncoming_Of_Mem Prop_Ind_Incᵥ; );
-                                           intro all_incᵥ all_inc_casesᵥ;                                     /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
+                                           intro all_incᵥ all_inc_casesᵥ;                                     /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_inc_casesᵥ;
                                            cases all_inc_casesᵥ with
                                            | inl all_inc_casesᵥᵥ => have Ind_Inc_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵥᵥ;                      /- := all_inc ∈ RULEᵥ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵥᵥ with | intro Originalᵥ Ind_Inc_Memᵥᵥ =>
-                                                                    have Prop_All_Ind_Incᵥᵥ := Prop_All_Ind_Incᵥ Ind_Inc_Memᵥᵥ;                                 /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Ind_Incᵥᵥ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Inc_End (prop_incomingᵥ Ind_Inc_Memᵥᵥ)] at Prop_All_Ind_Incᵥᵥ;      /- := all_inc.END = RULEᵥ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_End_RwIncoming all_inc_casesᵥᵥ];                                      /- := all_inc.END = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Ind_Incᵥᵥ := Prop_All_Ind_Incᵥ Ind_Inc_Memᵥᵥ;                                 /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Ind_Incᵥᵥ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Inc_Dest (prop_incomingᵥ Ind_Inc_Memᵥᵥ)] at Prop_All_Ind_Incᵥᵥ;      /- := all_inc.dest = RULEᵥ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Dest_RwIncoming all_inc_casesᵥᵥ];                                      /- := all_inc.dest = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Ind_Incᵥᵥ ⊢;
                                                                     exact Prop_All_Ind_Incᵥᵥ;
                                            | inr all_inc_casesᵥᵤ => have Ind_Inc_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵥᵤ;                      /- := all_inc ∈ RULEᵤ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵥᵤ with | intro Originalᵤ Ind_Inc_Memᵥᵤ =>
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have Prop_Check_Incomingᵥᵤ := prop_check_incoming Ind_Inc_Memᵥᵤ Prop_Ind_Incᵥ;              /- := all_inc.START ≠ IND.END -/
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have Prop_Check_Incomingᵥᵤ := prop_check_incoming Ind_Inc_Memᵥᵤ Prop_Ind_Incᵥ;              /- := all_inc.orig ≠ IND.dest -/
                                                                     simp only [Prop_Check_Incomingᵥᵤ, false_and]; );
                       /- := Check Indirect-Outgoing Duo: -/
                       cases Prop_Ind_Outᵥ with | intro Outᵥ Prop_Ind_Outᵥ =>
@@ -3459,27 +3463,27 @@ namespace COVERAGE.T1_Of_T1.NODES
                       apply Exists.intro Outᵥ;
                       apply Exists.intro Dep_Outᵥ;
                       apply And.intro ( by exact Prop_Out_Colᵥ; );
-                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                            apply Or.inl;
                                            rewrite [←collapse.center];
                                            exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Ind_Outᵥ; );
-                      intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                      intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                       simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵥ;
                       cases all_out_casesᵥ with
                       | inl all_out_casesᵥᵥ => have Ind_Out_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                cases Ind_Out_Casesᵥᵥ with | intro Originalᵥ Ind_Out_Memᵥᵥ =>
-                                               have Prop_All_Ind_Outᵥᵥ := Prop_All_Ind_Outᵥ Ind_Out_Memᵥᵥ;                                 /- := all_out.COLOR = Color ↔ all_out = Deduction.mk CENTER out Color dep_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Ind_Outᵥᵥ ⊢;
-                                               rewrite [←COLLAPSE.Simp_Out_Start₁ (prop_outgoingᵥ Ind_Out_Memᵥᵥ)] at Prop_All_Ind_Outᵥᵥ;   /- := all_out.START = RULEᵥ.CENTER -/
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Ind_Outᵥᵥ := Prop_All_Ind_Outᵥ Ind_Out_Memᵥᵥ;                                 /- := all_out.color = Color ↔ all_out = DEdge.mk CENTER out Color dep_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Ind_Outᵥᵥ ⊢;
+                                               rewrite [←COLLAPSE.Simp_Out_Orig₁ (prop_outgoingᵥ Ind_Out_Memᵥᵥ)] at Prop_All_Ind_Outᵥᵥ;   /- := all_out.orig = RULEᵥ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Ind_Outᵥᵥ ⊢;
                                                exact Prop_All_Ind_Outᵥᵥ;
                       | inr all_out_casesᵥᵤ => have Ind_Out_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                cases Ind_Out_Casesᵥᵤ with | intro Originalᵤ Ind_Out_Memᵥᵤ =>
-                                               have Ind_Out_Colorᵥᵤ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵤ Ind_Out_Memᵥᵤ);          /- := all_out.COLOR = 0 ∨ all_out.COLOR ∈ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
+                                               have Ind_Out_Colorᵥᵤ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵤ Ind_Out_Memᵥᵤ);          /- := all_out.color = 0 ∨ all_out.color ∈ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
                                                simp only [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵥ;                                /- := Color = RULEᵥ.CENTER.id -/
-                                               rewrite [Deduction.mk.injEq];
-                                               have NE_Colorᵥ : all_outᵥ.COLOR ≠ Colorᵥ := by rewrite [ne_eq, ←imp_false];
+                                               rewrite [DEdge.mk.injEq];
+                                               have NE_Colorᵥ : all_outᵥ.color ≠ Colorᵥ := by rewrite [ne_eq, ←imp_false];
                                                                                                  intro EQ_Color;
                                                                                                  rewrite [EQ_Color, Prop_Colorᵥ] at Ind_Out_Colorᵥᵤ;
                                                                                                  cases Ind_Out_Colorᵥᵤ with
@@ -3492,8 +3496,8 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                simp only [NE_Colorᵥ, false_and, and_false];
   | inr ind_casesᵤ => have Prop_Indirectᵤ := prop_indirectᵤ ind_casesᵤ;
                       simp only [type_indirect.check] at Prop_Indirectᵤ ⊢;
-                      cases Prop_Indirectᵤ with | intro Prop_Startᵤ Prop_Indirectᵤ =>
-                      cases Prop_Indirectᵤ with | intro Prop_Endᵤ Prop_Indirectᵤ =>
+                      cases Prop_Indirectᵤ with | intro Prop_Origᵤ Prop_Indirectᵤ =>
+                      cases Prop_Indirectᵤ with | intro Prop_Destᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Prop_Levelᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Colorᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Colorsᵤ Prop_Indirectᵤ =>
@@ -3502,8 +3506,8 @@ namespace COVERAGE.T1_Of_T1.NODES
                       cases Prop_Indirectᵤ with | intro Prop_Colorsᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Prop_Ind_Incᵤ Prop_Ind_Outᵤ =>
                       --
-                      apply And.intro ( by exact Prop_Startᵤ; );           /- := Start Node -/
-                      apply And.intro ( by exact Prop_Endᵤ; );             /- := End Node -/
+                      apply And.intro ( by exact Prop_Origᵤ; );           /- := Orig Node -/
+                      apply And.intro ( by exact Prop_Destᵤ; );             /- := Dest Node -/
                       apply And.intro ( by exact Prop_Levelᵤ; );           /- := Colors -/
                       apply Exists.intro Colorᵤ;
                       apply Exists.intro Colorsᵤ;
@@ -3520,25 +3524,25 @@ namespace COVERAGE.T1_Of_T1.NODES
                       cases Prop_Ind_Incᵤ with | intro Prop_Ind_Incᵤ Prop_All_Ind_Incᵤ =>
                       --
                       apply And.intro ( by apply Exists.intro Dep_Incᵤ;
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.END CENTER 0 dep_inc ∈ INCOMING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.dest CENTER 0 dep_inc ∈ INCOMING -/
                                                                 apply Or.inr;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwIncoming_Of_Mem Prop_Ind_Incᵤ; );
-                                           intro all_incᵤ all_inc_casesᵤ;                                     /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
+                                           intro all_incᵤ all_inc_casesᵤ;                                     /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_inc_casesᵤ;
                                            cases all_inc_casesᵤ with
                                            | inl all_inc_casesᵤᵥ => have Ind_Inc_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵤᵥ;                      /- := all_inc ∈ RULEᵥ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵤᵥ with | intro Originalᵥ Ind_Inc_Memᵤᵥ =>
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have Prop_Check_Incomingᵤᵥ := prop_check_incoming Prop_Ind_Incᵤ Ind_Inc_Memᵤᵥ;              /- := IND.END ≠ all_inc.START -/
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have Prop_Check_Incomingᵤᵥ := prop_check_incoming Prop_Ind_Incᵤ Ind_Inc_Memᵤᵥ;              /- := IND.dest ≠ all_inc.orig -/
                                                                     rewrite [ne_comm] at Prop_Check_Incomingᵤᵥ;
                                                                     simp only [Prop_Check_Incomingᵤᵥ, false_and];
                                            | inr all_inc_casesᵤᵤ => have Ind_Inc_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵤᵤ;                      /- := all_inc ∈ RULEᵤ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵤᵤ with | intro Originalᵤ Ind_Inc_Memᵤᵤ =>
-                                                                    have Prop_All_Ind_Incᵤᵤ := Prop_All_Ind_Incᵤ Ind_Inc_Memᵤᵤ;                                 /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Ind_Incᵤᵤ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Inc_End (prop_incomingᵤ Ind_Inc_Memᵤᵤ)] at Prop_All_Ind_Incᵤᵤ;      /- := all_inc.END = RULEᵤ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_End_RwIncoming all_inc_casesᵤᵤ];                                      /- := all_inc.END = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Ind_Incᵤᵤ := Prop_All_Ind_Incᵤ Ind_Inc_Memᵤᵤ;                                 /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Ind_Incᵤᵤ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Inc_Dest (prop_incomingᵤ Ind_Inc_Memᵤᵤ)] at Prop_All_Ind_Incᵤᵤ;      /- := all_inc.dest = RULEᵤ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Dest_RwIncoming all_inc_casesᵤᵤ];                                      /- := all_inc.dest = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Ind_Incᵤᵤ ⊢;
                                                                     exact Prop_All_Ind_Incᵤᵤ; );
                       /- Check Outgoing-Indirect Duo: -/
@@ -3550,19 +3554,19 @@ namespace COVERAGE.T1_Of_T1.NODES
                       apply Exists.intro Outᵤ;
                       apply Exists.intro Dep_Outᵤ;
                       apply And.intro ( by exact Prop_Out_Colᵤ; );
-                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color dep_out ∈ OUTGOING -/
+                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color dep_out ∈ OUTGOING -/
                                            apply Or.inr;
                                            rewrite [←collapse.center];
                                            exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Ind_Outᵤ; );
-                      intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.COLOR = color ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                      intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.color = color ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                       simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵤ;
                       cases all_out_casesᵤ with
                       | inl all_out_casesᵤᵥ => have Ind_Out_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                cases Ind_Out_Casesᵤᵥ with | intro Originalᵥ Ind_Out_Memᵤᵥ =>
-                                               have Ind_Out_Colorᵤᵥ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵥ Ind_Out_Memᵤᵥ);          /- := all_out.COLOR = 0 ∨ all_out.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                               have Ind_Out_Colorᵤᵥ := COLLAPSE.Simp_Out_Color₁ (prop_outgoingᵥ Ind_Out_Memᵤᵥ);          /- := all_out.color = 0 ∨ all_out.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                simp only [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Ind_Out_Colorᵤᵥ;
-                                               rewrite [Deduction.mk.injEq];
-                                               have NE_Colorᵤ : all_outᵤ.COLOR ≠ Colorᵤ := by rewrite [ne_eq, ←imp_false];
+                                               rewrite [DEdge.mk.injEq];
+                                               have NE_Colorᵤ : all_outᵤ.color ≠ Colorᵤ := by rewrite [ne_eq, ←imp_false];
                                                                                                  intro EQ_Color;
                                                                                                  apply absurd Prop_Colorᵤ;              /- := Color ∉ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
                                                                                                  cases Ind_Out_Colorᵤᵥ with
@@ -3582,10 +3586,10 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                simp only [NE_Colorᵤ, false_and, and_false];
                       | inr all_out_casesᵤᵤ => have Ind_Out_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                cases Ind_Out_Casesᵤᵤ with | intro Originalᵤ Ind_Out_Memᵤᵤ =>
-                                               have Prop_All_Ind_Outᵤᵤ := Prop_All_Ind_Outᵤ Ind_Out_Memᵤᵤ;                                 /- := all_out.COLOR = Color ↔ all_out = Deduction.mk CENTER out Color dep_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Ind_Outᵤᵤ ⊢;
-                                               rewrite [←COLLAPSE.Simp_Out_Start₁ (prop_outgoingᵤ Ind_Out_Memᵤᵤ)] at Prop_All_Ind_Outᵤᵤ;   /- := all_out.START = RULEᵤ.CENTER -/
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Ind_Outᵤᵤ := Prop_All_Ind_Outᵤ Ind_Out_Memᵤᵤ;                                 /- := all_out.color = Color ↔ all_out = DEdge.mk CENTER out Color dep_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Ind_Outᵤᵤ ⊢;
+                                               rewrite [←COLLAPSE.Simp_Out_Orig₁ (prop_outgoingᵤ Ind_Out_Memᵤᵤ)] at Prop_All_Ind_Outᵤᵤ;   /- := all_out.orig = RULEᵤ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Ind_Outᵤᵤ ⊢;
                                                exact Prop_All_Ind_Outᵤᵤ;
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3621,7 +3625,7 @@ namespace COVERAGE.T3_Of_T3.NODES
   cases prop_typeᵤ with | intro prop_dir_nilᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_dir_consᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_dir_unitᵤ prop_typeᵤ =>
-  cases prop_typeᵤ with | intro prop_ind_startsᵤ prop_typeᵤ =>
+  cases prop_typeᵤ with | intro prop_ind_origsᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_ind_lenᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_incomingᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_outgoingᵤ prop_typeᵤ =>
@@ -3641,7 +3645,7 @@ namespace COVERAGE.T3_Of_T3.NODES
   cases prop_typeᵥ with | intro prop_dir_nilᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_dir_consᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_dir_unitᵥ prop_typeᵥ =>
-  cases prop_typeᵥ with | intro prop_ind_startsᵥ prop_typeᵥ =>
+  cases prop_typeᵥ with | intro prop_ind_origsᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_ind_lenᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_incomingᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_outgoingᵥ prop_typeᵥ =>
@@ -3661,7 +3665,7 @@ namespace COVERAGE.T3_Of_T3.NODES
                        apply And.intro ( by simp only [prop_pstᵤ];
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ; );
                        trivial; );
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by intro prop_inc_nil;                                        /- := ( RULE.INCOMING = [] ) → ( RULE.CENTER.isHypothesis = true ) -/
                        simp only [List.append_eq_nil_iff] at prop_inc_nil;
                        simp only [←List.length_eq_zero_iff] at prop_inc_nil prop_inc_nilᵥ;
@@ -3670,21 +3674,21 @@ namespace COVERAGE.T3_Of_T3.NODES
                        simp only [Bool.or_eq_true];
                        exact Or.inr (And.left prop_inc_nil); );
   apply And.intro ( by simp only [prop_out_unitᵥ];                                                                    /- := RULE.OUTGOING = (out::outs) -/
-                       apply Exists.intro ( Deduction.mk ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )                        /- RULEᵥ.OUTGOING -/
-                                                 ( outᵥ.END )
-                                                 ( outᵥ.COLOR )
-                                                 ( outᵥ.DEPENDENCY ) );
+                       apply Exists.intro ( DEdge.mk ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )                        /- RULEᵥ.OUTGOING -/
+                                                 ( outᵥ.dest )
+                                                 ( outᵥ.color )
+                                                 ( outᵥ.deps ) );
                        apply Exists.intro ( collapse.rewrite_outgoing ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )   /- RULEᵤ.OUTGOING -/
                                                                       ( RULEᵤ.OUTGOING ) );
                        simp only [collapse.rewrite_outgoing];
                        simp only [collapse.center];
                        trivial; );
-  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂ gt_zero₁₂;                          /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
+  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂ gt_zero₁₂;                          /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
                        rewrite [prop_out_unitᵥ] at out_mem₁ out_mem₂;
                        simp only [collapse.rewrite_outgoing] at out_mem₁ out_mem₂;
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at out_mem₁ out_mem₂;
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
-                       simp only [Deduction.mk.injEq'];
+                       simp only [DEdge.mk.injEq'];
                        --
                        simp only [type_outgoing₃] at prop_outgoingᵤ prop_outgoingᵥ;
                        rewrite [prop_out_unitᵥ] at prop_outgoingᵥ;
@@ -3695,14 +3699,14 @@ namespace COVERAGE.T3_Of_T3.NODES
                        | inl out_mem₁ᵥ => cases out_mem₂ with
                                           | inl out_mem₂ᵥ => rewrite [out_mem₁ᵥ, out_mem₂ᵥ]; simp only [true_and];
                                           | inr out_mem₂ᵤ => rewrite [out_mem₁ᵥ] at gt_zero₁₂ ⊢;                              /- := out₁ = outᵥ -/
-                                                             rewrite [REWRITE.Get_Start_RwOutgoing out_mem₂ᵤ];                /- := out₂.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                             rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₂ᵤ];                /- := out₂.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              --
                                                              have Out_Cases₂ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₂ᵤ;                 /- := out₂ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₂ᵤ with | intro Originalᵤ Out_Mem₂ᵤ =>
-                                                             have Out_Color₂ᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.COLOR = 0 ∨ out₂.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                                             have Out_Color₂ᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.color = 0 ∨ out₂.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                              --
                                                              simp only [true_and] at gt_zero₁₂ Out_Color₂ᵤ ⊢;
-                                                             have NE_Color : outᵥ.COLOR ≠ out₂.COLOR := by rewrite [ne_eq, ←imp_false];
+                                                             have NE_Color : outᵥ.color ≠ out₂.color := by rewrite [ne_eq, ←imp_false];
                                                                                                               intro EQ_Color;
                                                                                                               cases Out_Colorᵥ with
                                                                                                               | inl EQ_Zeroᵥ => apply absurd gt_zero₁₂; rewrite [←EQ_Color, EQ_Zeroᵥ]; trivial;
@@ -3716,15 +3720,15 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                                                                                    ( by exact prop_ne_pst; );
                                                              simp only [NE_Color, false_and, and_false];
                        | inr out_mem₁ᵤ => cases out_mem₂ with
-                                          | inl out_mem₂ᵥ => rewrite [REWRITE.Get_Start_RwOutgoing out_mem₁ᵤ];                /- := out₁.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                          | inl out_mem₂ᵥ => rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₁ᵤ];                /- := out₁.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              rewrite [out_mem₂ᵥ] at gt_zero₁₂ ⊢;                              /- := out₂ = outᵥ -/
                                                              --
                                                              have Out_Cases₁ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₁ᵤ;                 /- := out₁ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₁ᵤ with | intro Originalᵤ Out_Mem₁ᵤ =>
-                                                             have Out_Color₁ᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.COLOR = 0 ∨ out₁.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                                             have Out_Color₁ᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.color = 0 ∨ out₁.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                              --
                                                              simp only [true_and] at gt_zero₁₂ Out_Color₁ᵤ ⊢;
-                                                             have NE_Color : out₁.COLOR ≠ outᵥ.COLOR := by rewrite [ne_eq, ←imp_false];
+                                                             have NE_Color : out₁.color ≠ outᵥ.color := by rewrite [ne_eq, ←imp_false];
                                                                                                               intro EQ_Color;
                                                                                                               cases Out_Colorᵥ with
                                                                                                               | inl EQ_Zeroᵥ => apply absurd gt_zero₁₂; rewrite [EQ_Color, EQ_Zeroᵥ]; trivial;
@@ -3737,20 +3741,20 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                                                                    exact And.intro ( by exact Nat.ne_of_lt prop_lt_nbr; )
                                                                                                                                                                    ( by exact prop_ne_pst; );
                                                              simp only [NE_Color, false_and, and_false];
-                                          | inr out_mem₂ᵤ => rewrite [REWRITE.Get_Start_RwOutgoing out_mem₁ᵤ];              /- := out₁.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
-                                                             rewrite [REWRITE.Get_Start_RwOutgoing out_mem₂ᵤ];              /- := out₂.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                          | inr out_mem₂ᵤ => rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₁ᵤ];              /- := out₁.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                             rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₂ᵤ];              /- := out₂.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              simp only [true_and] at gt_zero₁₂ ⊢;
                                                              --
                                                              have Out_Cases₁ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₁ᵤ;               /- := out₁ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₁ᵤ with | intro Original₁ᵤ Out_Mem₁ᵤ =>
-                                                             have Out_Start₁ᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₁ᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.orig = RULEᵤ.CENTER -/
                                                              have Out_Cases₂ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₂ᵤ;               /- := out₂ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₂ᵤ with | intro Original₂ᵤ Out_Mem₂ᵤ =>
-                                                             have Out_Start₂ᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₂ᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.orig = RULEᵤ.CENTER -/
                                                              --
                                                              have Iff_Out_Colorᵤ := prop_out_colorsᵤ Out_Mem₁ᵤ Out_Mem₂ᵤ gt_zero₁₂;
-                                                             simp only [Deduction.mk.injEq] at Out_Start₁ᵤ Out_Start₂ᵤ Iff_Out_Colorᵤ;
-                                                             simp only [Out_Start₁ᵤ, Out_Start₂ᵤ, true_and] at Iff_Out_Colorᵤ;
+                                                             simp only [DEdge.mk.injEq] at Out_Orig₁ᵤ Out_Orig₂ᵤ Iff_Out_Colorᵤ;
+                                                             simp only [Out_Orig₁ᵤ, Out_Orig₂ᵤ, true_and] at Iff_Out_Colorᵤ;
                                                              exact Iff_Out_Colorᵤ; );
   apply And.intro ( by intro case_hpt;                                /- := ( RULE.CENTER.isHypothesis = false ) → ( RULE.DIRECT = [] ) -/
                        rewrite [Bool.or_eq_false_iff] at case_hpt;
@@ -3777,13 +3781,13 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            cases Inc_Caseᵥ with | intro Originalᵥ Inc_Memᵥ =>
                                            have Prop_Incomingᵥ := prop_incomingᵥ Inc_Memᵥ;                        /- := type_incoming.check inc RULEᵥ.CENTER -/
                                            simp only [type_incoming.check] at Prop_Incomingᵥ ⊢;
-                                           cases Prop_Incomingᵥ with | intro Prop_Startᵥ Prop_Incomingᵥ =>
-                                           cases Prop_Incomingᵥ with | intro Prop_Endᵥ Prop_Incomingᵥ =>
+                                           cases Prop_Incomingᵥ with | intro Prop_Origᵥ Prop_Incomingᵥ =>
+                                           cases Prop_Incomingᵥ with | intro Prop_Destᵥ Prop_Incomingᵥ =>
                                            cases Prop_Incomingᵥ with | intro Prop_Colorᵥ Prop_Inc_Indᵥ =>
                                            --
-                                           apply And.intro ( by rewrite [prop_eq_lvl];                            /- := Start Node -/
-                                                                exact Prop_Startᵥ; );
-                                           apply And.intro ( by exact REWRITE.Get_End_RwIncoming inc_casesᵥ; );   /- := End Node -/
+                                           apply And.intro ( by rewrite [prop_eq_lvl];                            /- := Orig Node -/
+                                                                exact Prop_Origᵥ; );
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwIncoming inc_casesᵥ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Colorᵥ; );                            /- := Colors -/
                                            /- := Check Incoming-Indirect Duo: -/
                                            cases Prop_Inc_Indᵥ with | intro Colorᵥ Prop_Inc_Indᵥ =>
@@ -3793,19 +3797,19 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            apply Exists.intro Colorᵥ;
                                            apply Exists.intro Colorsᵥ;
                                            apply Exists.intro Ancᵥ;
-                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                                       apply Or.inl;
                                                       exact Prop_Inc_Indᵥ; );
                        | inr inc_casesᵤ => have Inc_Caseᵤ := REWRITE.Mem_Of_Mem_RwIncoming inc_casesᵤ;            /- := inc ∈ RULEᵤ.INCOMING -/
                                            cases Inc_Caseᵤ with | intro Originalᵤ Inc_Memᵤ =>
                                            have Prop_Incomingᵤ := prop_incomingᵤ Inc_Memᵤ;                        /- := type_incoming.check inc RULEᵤ.CENTER -/
                                            simp only [type_incoming.check] at Prop_Incomingᵤ ⊢;
-                                           cases Prop_Incomingᵤ with | intro Prop_Startᵤ Prop_Incomingᵤ =>
-                                           cases Prop_Incomingᵤ with | intro Prop_Endᵤ Prop_Incomingᵤ =>
+                                           cases Prop_Incomingᵤ with | intro Prop_Origᵤ Prop_Incomingᵤ =>
+                                           cases Prop_Incomingᵤ with | intro Prop_Destᵤ Prop_Incomingᵤ =>
                                            cases Prop_Incomingᵤ with | intro Prop_Colorᵤ Prop_Inc_Indᵤ =>
                                            --
-                                           apply And.intro ( by exact Prop_Startᵤ; );                             /- := Start Node -/
-                                           apply And.intro ( by exact REWRITE.Get_End_RwIncoming inc_casesᵤ; );   /- := End Node -/
+                                           apply And.intro ( by exact Prop_Origᵤ; );                             /- := Orig Node -/
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwIncoming inc_casesᵤ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Colorᵤ; );                            /- := Colors -/
                                            /- := Check Incoming-Indirect Duo: -/
                                            cases Prop_Inc_Indᵤ with | intro Colorᵤ Prop_Inc_Indᵤ =>
@@ -3815,7 +3819,7 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            apply Exists.intro Colorᵤ;
                                            apply Exists.intro Colorsᵤ;
                                            apply Exists.intro Ancᵤ;
-                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                                       apply Or.inr;
                                                       exact Prop_Inc_Indᵤ; ); );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3832,27 +3836,27 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            | inl Prop_Outgoing₁ᵥ => cases Prop_Outgoing₁ᵥ with
                                                                     | inl Prop_Outgoingₕ₁ᵥ => simp only [type_outgoing₁.check_h₁] at Prop_Outgoingₕ₁ᵥ ⊢;
                                                                                               cases Prop_Outgoingₕ₁ᵥ with | intro Prop_HPTₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Startₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Endₕ₁ᵥ Prop_Colorₕ₁ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Origₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Destₕ₁ᵥ Prop_Colorₕ₁ᵥ =>
                                                                                               --
                                                                                               apply Or.inl; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                                                    exact Or.inr Prop_HPTₕ₁ᵥ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );    /- := Start Node -/
-                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                               /- := End Node -/
-                                                                                                                   exact Prop_Endₕ₁ᵥ; );
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );    /- := Orig Node -/
+                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                               /- := Dest Node -/
+                                                                                                                   exact Prop_Destₕ₁ᵥ; );
                                                                                               exact Prop_Colorₕ₁ᵥ;                                                     /- := Colors -/
                                                                     | inr Prop_Outgoingᵢₑ₁ᵥ => simp only [type_outgoing₁.check_ie₁] at Prop_Outgoingᵢₑ₁ᵥ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_HPTᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Startᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Endᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Origᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Destᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
                                                                                                cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Colorᵢₑ₁ᵥ Prop_Out_Indᵢₑ₁ᵥ =>
                                                                                                --
                                                                                                apply Or.inl; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 1 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                        /- := Start Node -/
-                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := End Node -/
-                                                                                                                    exact Prop_Endᵢₑ₁ᵥ; );
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                        /- := Orig Node -/
+                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := Dest Node -/
+                                                                                                                    exact Prop_Destᵢₑ₁ᵥ; );
                                                                                                apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵢₑ₁ᵥ;            /- := Colors -/
                                                                                                                     rewrite [Prop_Colorᵢₑ₁ᵥ];
                                                                                                                     exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -3861,22 +3865,22 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                cases Prop_Out_Indᵢₑ₁ᵥ with | intro Incᵢₑ₁ᵥ Prop_Out_Indᵢₑ₁ᵥ =>
                                                                                                --
                                                                                                apply Exists.intro Incᵢₑ₁ᵥ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                                                                                                            apply Or.inl;
                                                                                                            exact Prop_Out_Indᵢₑ₁ᵥ; );
                                            | inr Prop_Outgoing₃ᵥ => cases Prop_Outgoing₃ᵥ with
                                                                     | inl Prop_Outgoingₕ₃ᵥ => simp only [type_outgoing₃.check_h₃] at Prop_Outgoingₕ₃ᵥ ⊢;
                                                                                               cases Prop_Outgoingₕ₃ᵥ with | intro Prop_HPTₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Startₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Endₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Origₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Destₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
                                                                                               cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Colorₕ₃ᵥ Prop_Out_Dirₕ₃ᵥ =>
                                                                                               --
                                                                                               apply Or.inr; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                                            /- := Type 3 Hypothesis -/
                                                                                                                    exact Or.inr Prop_HPTₕ₃ᵥ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                         /- := Start Node -/
-                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                                                    /- := End Node -/
-                                                                                                                   exact Prop_Endₕ₃ᵥ; );
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                         /- := Orig Node -/
+                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                                                    /- := Dest Node -/
+                                                                                                                   exact Prop_Destₕ₃ᵥ; );
                                                                                               apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorₕ₃ᵥ;              /- := Colors -/
                                                                                                                    rewrite [Prop_Colorₕ₃ᵥ];
                                                                                                                    exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -3887,20 +3891,20 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                               --
                                                                                               apply Exists.intro Colorsₕ₃ᵥ;
                                                                                               apply Exists.intro Ancₕ₃ᵥ;
-                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.COLOR::colors) ∈ DIRECT -/
+                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.color::colors) ∈ DIRECT -/
                                                                                                          apply Or.inl;
                                                                                                          exact REWRITE.Mem_RwDirect_Of_Mem Prop_Out_Dirₕ₃ᵥ; );
                                                                     | inr Prop_Outgoingᵢₑ₃ᵥ => simp only [type_outgoing₃.check_ie₃] at Prop_Outgoingᵢₑ₃ᵥ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_HPTᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Startᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Endᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Origᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Destᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
                                                                                                cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Colorᵢₑ₃ᵥ Prop_Out_Indᵢₑ₃ᵥ =>
                                                                                                --
                                                                                                apply Or.inr; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 3 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                        /- := Start Node -/
-                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := End Node -/
-                                                                                                                    exact Prop_Endᵢₑ₃ᵥ; );
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                        /- := Orig Node -/
+                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := Dest Node -/
+                                                                                                                    exact Prop_Destᵢₑ₃ᵥ; );
                                                                                                apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵢₑ₃ᵥ;            /- := Colors -/
                                                                                                                     rewrite [Prop_Colorᵢₑ₃ᵥ];
                                                                                                                     exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -3913,7 +3917,7 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                apply Exists.intro Colorsᵢₑ₃ᵥ;
                                                                                                apply Exists.intro Incᵢₑ₃ᵥ;
                                                                                                apply Exists.intro Ancᵢₑ₃ᵥ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.COLOR::colors) ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.color::colors) ∈ INDIRECT -/
                                                                                                           apply Or.inl;
                                                                                                           exact Prop_Out_Indᵢₑ₃ᵥ; );
                        | inr out_casesᵤ => have Out_Caseᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_casesᵤ;          /- := out ∈ RULEᵤ.OUTGOING -/
@@ -3923,25 +3927,25 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            | inl Prop_Outgoing₁ᵤ => cases Prop_Outgoing₁ᵤ with
                                                                     | inl Prop_Outgoingₕ₁ᵤ => simp only [type_outgoing₁.check_h₁] at Prop_Outgoingₕ₁ᵤ ⊢;
                                                                                               cases Prop_Outgoingₕ₁ᵤ with | intro Prop_HPTₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Startₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Endₕ₁ᵤ Prop_Colorₕ₁ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Origₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Destₕ₁ᵤ Prop_Colorₕ₁ᵤ =>
                                                                                               --
                                                                                               apply Or.inl; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                                                    exact Or.inl Prop_HPTₕ₁ᵤ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );    /- := Start Node -/
-                                                                                              apply And.intro ( by exact Prop_Endₕ₁ᵤ; );                                /- := End Node -/
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );    /- := Orig Node -/
+                                                                                              apply And.intro ( by exact Prop_Destₕ₁ᵤ; );                                /- := Dest Node -/
                                                                                               exact Prop_Colorₕ₁ᵤ;                                                     /- := Colors -/
                                                                     | inr Prop_Outgoingᵢₑ₁ᵤ => simp only [type_outgoing₁.check_ie₁] at Prop_Outgoingᵢₑ₁ᵤ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_HPTᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Startᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Endᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Origᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Destᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
                                                                                                cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Colorᵢₑ₁ᵤ Prop_Out_Indᵢₑ₁ᵤ =>
                                                                                                --
                                                                                                apply Or.inl; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 1 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );                        /- := Start Node -/
-                                                                                               apply And.intro ( by exact Prop_Endᵢₑ₁ᵤ; );                                                   /- := End Node -/
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );                        /- := Orig Node -/
+                                                                                               apply And.intro ( by exact Prop_Destᵢₑ₁ᵤ; );                                                   /- := Dest Node -/
                                                                                                apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorᵢₑ₁ᵤ;                /- := Colors -/
                                                                                                                     cases Prop_Colorᵢₑ₁ᵤ with
                                                                                                                     | inl Prop_NBR_Colorᵢₑ₁ᵤ => rewrite [Prop_NBR_Colorᵢₑ₁ᵤ];
@@ -3952,21 +3956,21 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                cases Prop_Out_Indᵢₑ₁ᵤ with | intro Incᵢₑ₁ᵤ Prop_Out_Indᵢₑ₁ᵤ =>
                                                                                                --
                                                                                                apply Exists.intro Incᵢₑ₁ᵤ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                                                                                                            apply Or.inr;
                                                                                                            exact Prop_Out_Indᵢₑ₁ᵤ; );
                                            | inr Prop_Outgoing₃ᵤ => cases Prop_Outgoing₃ᵤ with
                                                                     | inl Prop_Outgoingₕ₃ᵤ => simp only [type_outgoing₃.check_h₃] at Prop_Outgoingₕ₃ᵤ ⊢;
                                                                                               cases Prop_Outgoingₕ₃ᵤ with | intro Prop_HPTₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Startₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Endₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Origₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Destₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
                                                                                               cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Colorₕ₃ᵤ Prop_Out_Dirₕ₃ᵤ =>
                                                                                               --
                                                                                               apply Or.inr; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                                                    exact Or.inl Prop_HPTₕ₃ᵤ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );    /- := Start Node -/
-                                                                                              apply And.intro ( by exact Prop_Endₕ₃ᵤ; );                                /- := End Node -/
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );    /- := Orig Node -/
+                                                                                              apply And.intro ( by exact Prop_Destₕ₃ᵤ; );                                /- := Dest Node -/
                                                                                               apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorₕ₃ᵤ;                  /- := Colors -/
                                                                                                                    cases Prop_Colorₕ₃ᵤ with
                                                                                                                    | inl Prop_NBR_Colorᵢₑ₃ᵤ => rewrite [Prop_NBR_Colorᵢₑ₃ᵤ];
@@ -3979,19 +3983,19 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                               --
                                                                                               apply Exists.intro Colorsₕ₃ᵤ;
                                                                                               apply Exists.intro Ancₕ₃ᵤ;
-                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.COLOR::colors) ∈ DIRECT -/
+                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.color::colors) ∈ DIRECT -/
                                                                                                          apply Or.inr;
                                                                                                          exact REWRITE.Mem_RwDirect_Of_Mem Prop_Out_Dirₕ₃ᵤ; );
                                                                     | inr Prop_Outgoingᵢₑ₃ᵤ => simp only [type_outgoing₃.check_ie₃] at Prop_Outgoingᵢₑ₃ᵤ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_HPTᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Startᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Endᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Origᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Destᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
                                                                                                cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Colorᵢₑ₃ᵤ Prop_Out_Indᵢₑ₃ᵤ =>
                                                                                                --
                                                                                                apply Or.inr; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                            /- := Type 1 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );   /- := Start Node -/
-                                                                                               apply And.intro ( by exact Prop_Endᵢₑ₃ᵤ; );                              /- := End Node -/
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );   /- := Orig Node -/
+                                                                                               apply And.intro ( by exact Prop_Destᵢₑ₃ᵤ; );                              /- := Dest Node -/
                                                                                                apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorᵢₑ₃ᵤ;                /- := Colors -/
                                                                                                                     cases Prop_Colorᵢₑ₃ᵤ with
                                                                                                                     | inl Prop_NBR_Colorᵢₑ₃ᵤ => rewrite [Prop_NBR_Colorᵢₑ₃ᵤ];
@@ -4006,7 +4010,7 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                apply Exists.intro Colorsᵢₑ₃ᵤ;
                                                                                                apply Exists.intro Incᵢₑ₃ᵤ;
                                                                                                apply Exists.intro Ancᵢₑ₃ᵤ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.COLOR::colors) ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.color::colors) ∈ INDIRECT -/
                                                                                                           apply Or.inr;
                                                                                                           exact Prop_Out_Indᵢₑ₃ᵤ; ); );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -4020,8 +4024,8 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            cases Dir_Casesᵥ with | intro Originalᵥ Dir_Memᵥ =>
                                            have Prop_Directᵥ := prop_directᵥ Dir_Memᵥ;
                                            simp only [type_direct.check] at Prop_Directᵥ ⊢;
-                                           cases Prop_Directᵥ with | intro Prop_Startᵥ Prop_Directᵥ =>
-                                           cases Prop_Directᵥ with | intro Prop_Endᵥ Prop_Directᵥ =>
+                                           cases Prop_Directᵥ with | intro Prop_Origᵥ Prop_Directᵥ =>
+                                           cases Prop_Directᵥ with | intro Prop_Destᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Prop_Levelᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Color₁ᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Color₂ᵥ Prop_Directᵥ =>
@@ -4030,9 +4034,9 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            cases Prop_Directᵥ with | intro Prop_Color₁ᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Prop_Colorsᵥ Prop_Dir_Outᵥ =>
                                            --
-                                           apply And.intro ( by rewrite [prop_eq_lvl];                          /- := Start Node -/
-                                                                exact Prop_Startᵥ; );
-                                           apply And.intro ( by exact REWRITE.Get_End_RwDirect dir_casesᵥ; );   /- := End Node -/
+                                           apply And.intro ( by rewrite [prop_eq_lvl];                          /- := Orig Node -/
+                                                                exact Prop_Origᵥ; );
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwDirect dir_casesᵥ; );   /- := Dest Node -/
                                            apply And.intro ( by rewrite [prop_eq_lvl];                          /- := Colors -/
                                                                 exact Prop_Levelᵥ; );
                                            apply Exists.intro Color₁ᵥ;
@@ -4055,27 +4059,27 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            apply Exists.intro Dep_Outᵥ;
                                            apply And.intro ( by exact Prop_Out_Colᵥ; );
                                            apply And.intro ( by exact Prop_Color₂ᵥ; );
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                                                 apply Or.inl;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Dir_Outᵥ; );
-                                           intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                                           intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵥ;
                                            cases all_out_casesᵥ with
                                            | inl all_out_casesᵥᵥ => have Dir_Out_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵥᵥ with | intro Originalᵥ Dir_Out_Memᵥᵥ =>
-                                                                    have Prop_All_Dir_Outᵥᵥ := Prop_All_Dir_Outᵥ Dir_Out_Memᵥᵥ;                                 /- := all_out.COLOR = Color₁ ↔ all_out = Deduction.mk CENTER out Color₁ dep_out -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Dir_Outᵥᵥ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵥ Dir_Out_Memᵥᵥ)] at Prop_All_Dir_Outᵥᵥ;   /- := all_out.START = RULEᵥ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Dir_Outᵥᵥ := Prop_All_Dir_Outᵥ Dir_Out_Memᵥᵥ;                                 /- := all_out.color = Color₁ ↔ all_out = DEdge.mk CENTER out Color₁ dep_out -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Dir_Outᵥᵥ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵥ Dir_Out_Memᵥᵥ)] at Prop_All_Dir_Outᵥᵥ;   /- := all_out.orig = RULEᵥ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Dir_Outᵥᵥ ⊢;
                                                                     exact Prop_All_Dir_Outᵥᵥ;
                                            | inr all_out_casesᵥᵤ => have Dir_Out_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵥᵤ with | intro Originalᵤ Dir_Out_Memᵥᵤ =>
-                                                                    have Dir_Out_Colorᵥᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Dir_Out_Memᵥᵤ);          /- := all_out.COLOR = 0 ∨ all_out.COLOR ∈ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
+                                                                    have Dir_Out_Colorᵥᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Dir_Out_Memᵥᵤ);          /- := all_out.color = 0 ∨ all_out.color ∈ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
                                                                     simp only [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Color₁ᵥ;                               /- := Color₁ = RULEᵥ.CENTER.id -/
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have NE_Colorᵥ : all_outᵥ.COLOR ≠ Color₁ᵥ := by rewrite [ne_eq, ←imp_false];
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have NE_Colorᵥ : all_outᵥ.color ≠ Color₁ᵥ := by rewrite [ne_eq, ←imp_false];
                                                                                                                        intro EQ_Color;
                                                                                                                        rewrite [EQ_Color, Prop_Color₁ᵥ] at Dir_Out_Colorᵥᵤ;
                                                                                                                        cases Dir_Out_Colorᵥᵤ with
@@ -4090,8 +4094,8 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            cases Dir_Casesᵤ with | intro Originalᵤ Dir_Memᵤ =>
                                            have Prop_Directᵤ := prop_directᵤ Dir_Memᵤ;
                                            simp only [type_direct.check] at Prop_Directᵤ ⊢;
-                                           cases Prop_Directᵤ with | intro Prop_Startᵤ Prop_Directᵤ =>
-                                           cases Prop_Directᵤ with | intro Prop_Endᵤ Prop_Directᵤ =>
+                                           cases Prop_Directᵤ with | intro Prop_Origᵤ Prop_Directᵤ =>
+                                           cases Prop_Directᵤ with | intro Prop_Destᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Prop_Levelᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Color₁ᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Color₂ᵤ Prop_Directᵤ =>
@@ -4100,8 +4104,8 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            cases Prop_Directᵤ with | intro Prop_Color₁ᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Prop_Colorsᵤ Prop_Dir_Outᵤ =>
                                            --
-                                           apply And.intro ( by exact Prop_Startᵤ; );                           /- := Start Node -/
-                                           apply And.intro ( by exact REWRITE.Get_End_RwDirect dir_casesᵤ; );   /- := End Node -/
+                                           apply And.intro ( by exact Prop_Origᵤ; );                           /- := Orig Node -/
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwDirect dir_casesᵤ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Levelᵤ; );                           /- := Colors -/
                                            apply Exists.intro Color₁ᵤ;
                                            apply Exists.intro Color₂ᵤ;
@@ -4125,19 +4129,19 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            apply Exists.intro Dep_Outᵤ;
                                            apply And.intro ( by exact Prop_Out_Colᵤ; );
                                            apply And.intro ( by exact Prop_Color₂ᵤ; );
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                                                 apply Or.inr;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Dir_Outᵤ; );
-                                           intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                                           intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵤ;
                                            cases all_out_casesᵤ with
                                            | inl all_out_casesᵤᵥ => have Dir_Out_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵤᵥ with | intro Originalᵥ Dir_Out_Memᵤᵥ =>
-                                                                    have Dir_Out_Colorᵤᵥ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵥ Dir_Out_Memᵤᵥ);          /- := all_out.COLOR = 0 ∨ all_out.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                                                    have Dir_Out_Colorᵤᵥ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵥ Dir_Out_Memᵤᵥ);          /- := all_out.color = 0 ∨ all_out.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                                     simp only [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Dir_Out_Colorᵤᵥ;
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have NE_Colorᵤ : all_outᵤ.COLOR ≠ Color₁ᵤ := by rewrite [ne_eq, ←imp_false];
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have NE_Colorᵤ : all_outᵤ.color ≠ Color₁ᵤ := by rewrite [ne_eq, ←imp_false];
                                                                                                                        intro EQ_Color;
                                                                                                                        apply absurd Prop_Color₁ᵤ;              /- := Color₁ ∉ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
                                                                                                                        cases Dir_Out_Colorᵤᵥ with
@@ -4151,10 +4155,10 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                     simp only [NE_Colorᵤ, false_and, and_false];
                                            | inr all_out_casesᵤᵤ => have Dir_Out_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵤᵤ with | intro Originalᵤ Dir_Out_Memᵤᵤ =>
-                                                                    have Prop_All_Dir_Outᵤᵤ := Prop_All_Dir_Outᵤ Dir_Out_Memᵤᵤ;                                 /- := all_out.COLOR = Color₁ ↔ all_out = Deduction.mk CENTER out Color₁ dep_out -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Dir_Outᵤᵤ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Dir_Out_Memᵤᵤ)] at Prop_All_Dir_Outᵤᵤ;   /- := all_out.START = RULEᵤ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Dir_Outᵤᵤ := Prop_All_Dir_Outᵤ Dir_Out_Memᵤᵤ;                                 /- := all_out.color = Color₁ ↔ all_out = DEdge.mk CENTER out Color₁ dep_out -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Dir_Outᵤᵤ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Dir_Out_Memᵤᵤ)] at Prop_All_Dir_Outᵤᵤ;   /- := all_out.orig = RULEᵤ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Dir_Outᵤᵤ ⊢;
                                                                     exact Prop_All_Dir_Outᵤᵤ; );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -4166,8 +4170,8 @@ namespace COVERAGE.T3_Of_T3.NODES
   cases ind_cases with
   | inl ind_casesᵥ => have Prop_Indirectᵥ := prop_indirectᵥ ind_casesᵥ;
                       simp only [type_indirect.check] at Prop_Indirectᵥ ⊢;
-                      cases Prop_Indirectᵥ with | intro Prop_Startᵥ Prop_Indirectᵥ =>
-                      cases Prop_Indirectᵥ with | intro Prop_Endᵥ Prop_Indirectᵥ =>
+                      cases Prop_Indirectᵥ with | intro Prop_Origᵥ Prop_Indirectᵥ =>
+                      cases Prop_Indirectᵥ with | intro Prop_Destᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Prop_Levelᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Colorᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Colorsᵥ Prop_Indirectᵥ =>
@@ -4176,10 +4180,10 @@ namespace COVERAGE.T3_Of_T3.NODES
                       cases Prop_Indirectᵥ with | intro Prop_Colorsᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Prop_Ind_Incᵥ Prop_Ind_Outᵥ =>
                       --
-                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Start Node -/
-                                           exact Prop_Startᵥ; );
-                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := End Node -/
-                                           exact Prop_Endᵥ; );
+                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Orig Node -/
+                                           exact Prop_Origᵥ; );
+                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Dest Node -/
+                                           exact Prop_Destᵥ; );
                       apply And.intro ( by rewrite [prop_eq_lvl];         /- := Colors -/
                                            exact Prop_Levelᵥ; );
                       apply Exists.intro Colorᵥ;
@@ -4195,25 +4199,25 @@ namespace COVERAGE.T3_Of_T3.NODES
                       cases Prop_Ind_Incᵥ with | intro Prop_Ind_Incᵥ Prop_All_Ind_Incᵥ =>
                       --
                       apply And.intro ( by apply Exists.intro Dep_Incᵥ;
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.END CENTER 0 dep_inc ∈ INCOMING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.dest CENTER 0 dep_inc ∈ INCOMING -/
                                                                 apply Or.inl;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwIncoming_Of_Mem Prop_Ind_Incᵥ; );
-                                           intro all_incᵥ all_inc_casesᵥ;                                     /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
+                                           intro all_incᵥ all_inc_casesᵥ;                                     /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_inc_casesᵥ;
                                            cases all_inc_casesᵥ with
                                            | inl all_inc_casesᵥᵥ => have Ind_Inc_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵥᵥ;                      /- := all_inc ∈ RULEᵥ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵥᵥ with | intro Originalᵥ Ind_Inc_Memᵥᵥ =>
-                                                                    have Prop_All_Ind_Incᵥᵥ := Prop_All_Ind_Incᵥ Ind_Inc_Memᵥᵥ;                                 /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Ind_Incᵥᵥ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Inc_End (prop_incomingᵥ Ind_Inc_Memᵥᵥ)] at Prop_All_Ind_Incᵥᵥ;      /- := all_inc.END = RULEᵥ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_End_RwIncoming all_inc_casesᵥᵥ];                                      /- := all_inc.END = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Ind_Incᵥᵥ := Prop_All_Ind_Incᵥ Ind_Inc_Memᵥᵥ;                                 /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Ind_Incᵥᵥ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Inc_Dest (prop_incomingᵥ Ind_Inc_Memᵥᵥ)] at Prop_All_Ind_Incᵥᵥ;      /- := all_inc.dest = RULEᵥ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Dest_RwIncoming all_inc_casesᵥᵥ];                                      /- := all_inc.dest = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Ind_Incᵥᵥ ⊢;
                                                                     exact Prop_All_Ind_Incᵥᵥ;
                                            | inr all_inc_casesᵥᵤ => have Ind_Inc_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵥᵤ;                      /- := all_inc ∈ RULEᵤ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵥᵤ with | intro Originalᵤ Ind_Inc_Memᵥᵤ =>
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have Prop_Check_Incomingᵥᵤ := prop_check_incoming Ind_Inc_Memᵥᵤ Prop_Ind_Incᵥ;              /- := all_inc.START ≠ IND.END -/
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have Prop_Check_Incomingᵥᵤ := prop_check_incoming Ind_Inc_Memᵥᵤ Prop_Ind_Incᵥ;              /- := all_inc.orig ≠ IND.dest -/
                                                                     simp only [Prop_Check_Incomingᵥᵤ, false_and]; );
                       /- := Check Indirect-Outgoing Duo: -/
                       cases Prop_Ind_Outᵥ with | intro Outᵥ Prop_Ind_Outᵥ =>
@@ -4224,27 +4228,27 @@ namespace COVERAGE.T3_Of_T3.NODES
                       apply Exists.intro Outᵥ;
                       apply Exists.intro Dep_Outᵥ;
                       apply And.intro ( by exact Prop_Out_Colᵥ; );
-                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                            apply Or.inl;
                                            rewrite [←collapse.center];
                                            exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Ind_Outᵥ; );
-                      intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                      intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                       simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵥ;
                       cases all_out_casesᵥ with
                       | inl all_out_casesᵥᵥ => have Ind_Out_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                cases Ind_Out_Casesᵥᵥ with | intro Originalᵥ Ind_Out_Memᵥᵥ =>
-                                               have Prop_All_Ind_Outᵥᵥ := Prop_All_Ind_Outᵥ Ind_Out_Memᵥᵥ;                                 /- := all_out.COLOR = Color ↔ all_out = Deduction.mk CENTER out Color dep_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Ind_Outᵥᵥ ⊢;
-                                               rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵥ Ind_Out_Memᵥᵥ)] at Prop_All_Ind_Outᵥᵥ;   /- := all_out.START = RULEᵥ.CENTER -/
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Ind_Outᵥᵥ := Prop_All_Ind_Outᵥ Ind_Out_Memᵥᵥ;                                 /- := all_out.color = Color ↔ all_out = DEdge.mk CENTER out Color dep_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Ind_Outᵥᵥ ⊢;
+                                               rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵥ Ind_Out_Memᵥᵥ)] at Prop_All_Ind_Outᵥᵥ;   /- := all_out.orig = RULEᵥ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Ind_Outᵥᵥ ⊢;
                                                exact Prop_All_Ind_Outᵥᵥ;
                       | inr all_out_casesᵥᵤ => have Ind_Out_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                cases Ind_Out_Casesᵥᵤ with | intro Originalᵤ Ind_Out_Memᵥᵤ =>
-                                               have Ind_Out_Colorᵥᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Ind_Out_Memᵥᵤ);          /- := all_out.COLOR = 0 ∨ all_out.COLOR ∈ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
+                                               have Ind_Out_Colorᵥᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Ind_Out_Memᵥᵤ);          /- := all_out.color = 0 ∨ all_out.color ∈ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
                                                simp only [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵥ;                                /- := Color = RULEᵥ.CENTER.id -/
-                                               rewrite [Deduction.mk.injEq];
-                                               have NE_Colorᵥ : all_outᵥ.COLOR ≠ Colorᵥ := by rewrite [ne_eq, ←imp_false];
+                                               rewrite [DEdge.mk.injEq];
+                                               have NE_Colorᵥ : all_outᵥ.color ≠ Colorᵥ := by rewrite [ne_eq, ←imp_false];
                                                                                                  intro EQ_Color;
                                                                                                  rewrite [EQ_Color, Prop_Colorᵥ] at Ind_Out_Colorᵥᵤ;
                                                                                                  cases Ind_Out_Colorᵥᵤ with
@@ -4257,8 +4261,8 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                simp only [NE_Colorᵥ, false_and, and_false];
   | inr ind_casesᵤ => have Prop_Indirectᵤ := prop_indirectᵤ ind_casesᵤ;
                       simp only [type_indirect.check] at Prop_Indirectᵤ ⊢;
-                      cases Prop_Indirectᵤ with | intro Prop_Startᵤ Prop_Indirectᵤ =>
-                      cases Prop_Indirectᵤ with | intro Prop_Endᵤ Prop_Indirectᵤ =>
+                      cases Prop_Indirectᵤ with | intro Prop_Origᵤ Prop_Indirectᵤ =>
+                      cases Prop_Indirectᵤ with | intro Prop_Destᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Prop_Levelᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Colorᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Colorsᵤ Prop_Indirectᵤ =>
@@ -4267,8 +4271,8 @@ namespace COVERAGE.T3_Of_T3.NODES
                       cases Prop_Indirectᵤ with | intro Prop_Colorsᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Prop_Ind_Incᵤ Prop_Ind_Outᵤ =>
                       --
-                      apply And.intro ( by exact Prop_Startᵤ; );           /- := Start Node -/
-                      apply And.intro ( by exact Prop_Endᵤ; );             /- := End Node -/
+                      apply And.intro ( by exact Prop_Origᵤ; );           /- := Orig Node -/
+                      apply And.intro ( by exact Prop_Destᵤ; );             /- := Dest Node -/
                       apply And.intro ( by exact Prop_Levelᵤ; );           /- := Colors -/
                       apply Exists.intro Colorᵤ;
                       apply Exists.intro Colorsᵤ;
@@ -4285,25 +4289,25 @@ namespace COVERAGE.T3_Of_T3.NODES
                       cases Prop_Ind_Incᵤ with | intro Prop_Ind_Incᵤ Prop_All_Ind_Incᵤ =>
                       --
                       apply And.intro ( by apply Exists.intro Dep_Incᵤ;
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.END CENTER 0 dep_inc ∈ INCOMING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.dest CENTER 0 dep_inc ∈ INCOMING -/
                                                                 apply Or.inr;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwIncoming_Of_Mem Prop_Ind_Incᵤ; );
-                                           intro all_incᵤ all_inc_casesᵤ;                                     /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
+                                           intro all_incᵤ all_inc_casesᵤ;                                     /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_inc_casesᵤ;
                                            cases all_inc_casesᵤ with
                                            | inl all_inc_casesᵤᵥ => have Ind_Inc_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵤᵥ;                      /- := all_inc ∈ RULEᵥ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵤᵥ with | intro Originalᵥ Ind_Inc_Memᵤᵥ =>
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have Prop_Check_Incomingᵤᵥ := prop_check_incoming Prop_Ind_Incᵤ Ind_Inc_Memᵤᵥ;              /- := IND.END ≠ all_inc.START -/
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have Prop_Check_Incomingᵤᵥ := prop_check_incoming Prop_Ind_Incᵤ Ind_Inc_Memᵤᵥ;              /- := IND.dest ≠ all_inc.orig -/
                                                                     rewrite [ne_comm] at Prop_Check_Incomingᵤᵥ;
                                                                     simp only [Prop_Check_Incomingᵤᵥ, false_and];
                                            | inr all_inc_casesᵤᵤ => have Ind_Inc_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵤᵤ;                      /- := all_inc ∈ RULEᵤ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵤᵤ with | intro Originalᵤ Ind_Inc_Memᵤᵤ =>
-                                                                    have Prop_All_Ind_Incᵤᵤ := Prop_All_Ind_Incᵤ Ind_Inc_Memᵤᵤ;                                 /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Ind_Incᵤᵤ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Inc_End (prop_incomingᵤ Ind_Inc_Memᵤᵤ)] at Prop_All_Ind_Incᵤᵤ;      /- := all_inc.END = RULEᵤ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_End_RwIncoming all_inc_casesᵤᵤ];                                      /- := all_inc.END = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Ind_Incᵤᵤ := Prop_All_Ind_Incᵤ Ind_Inc_Memᵤᵤ;                                 /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Ind_Incᵤᵤ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Inc_Dest (prop_incomingᵤ Ind_Inc_Memᵤᵤ)] at Prop_All_Ind_Incᵤᵤ;      /- := all_inc.dest = RULEᵤ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Dest_RwIncoming all_inc_casesᵤᵤ];                                      /- := all_inc.dest = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Ind_Incᵤᵤ ⊢;
                                                                     exact Prop_All_Ind_Incᵤᵤ; );
                       /- Check Outgoing-Indirect Duo: -/
@@ -4315,19 +4319,19 @@ namespace COVERAGE.T3_Of_T3.NODES
                       apply Exists.intro Outᵤ;
                       apply Exists.intro Dep_Outᵤ;
                       apply And.intro ( by exact Prop_Out_Colᵤ; );
-                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color dep_out ∈ OUTGOING -/
+                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color dep_out ∈ OUTGOING -/
                                            apply Or.inr;
                                            rewrite [←collapse.center];
                                            exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Ind_Outᵤ; );
-                      intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.COLOR = color ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                      intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.color = color ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                       simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵤ;
                       cases all_out_casesᵤ with
                       | inl all_out_casesᵤᵥ => have Ind_Out_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                cases Ind_Out_Casesᵤᵥ with | intro Originalᵥ Ind_Out_Memᵤᵥ =>
-                                               have Ind_Out_Colorᵤᵥ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵥ Ind_Out_Memᵤᵥ);          /- := all_out.COLOR = 0 ∨ all_out.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                               have Ind_Out_Colorᵤᵥ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵥ Ind_Out_Memᵤᵥ);          /- := all_out.color = 0 ∨ all_out.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                simp only [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Ind_Out_Colorᵤᵥ;
-                                               rewrite [Deduction.mk.injEq];
-                                               have NE_Colorᵤ : all_outᵤ.COLOR ≠ Colorᵤ := by rewrite [ne_eq, ←imp_false];
+                                               rewrite [DEdge.mk.injEq];
+                                               have NE_Colorᵤ : all_outᵤ.color ≠ Colorᵤ := by rewrite [ne_eq, ←imp_false];
                                                                                                  intro EQ_Color;
                                                                                                  apply absurd Prop_Colorᵤ;                /- := Color ∉ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
                                                                                                  cases Ind_Out_Colorᵤᵥ with
@@ -4341,10 +4345,10 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                simp only [NE_Colorᵤ, false_and, and_false];
                       | inr all_out_casesᵤᵤ => have Ind_Out_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                cases Ind_Out_Casesᵤᵤ with | intro Originalᵤ Ind_Out_Memᵤᵤ =>
-                                               have Prop_All_Ind_Outᵤᵤ := Prop_All_Ind_Outᵤ Ind_Out_Memᵤᵤ;                                 /- := all_out.COLOR = Color ↔ all_out = Deduction.mk CENTER out Color dep_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Ind_Outᵤᵤ ⊢;
-                                               rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Ind_Out_Memᵤᵤ)] at Prop_All_Ind_Outᵤᵤ;   /- := all_out.START = RULEᵤ.CENTER -/
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Ind_Outᵤᵤ := Prop_All_Ind_Outᵤ Ind_Out_Memᵤᵤ;                                 /- := all_out.color = Color ↔ all_out = DEdge.mk CENTER out Color dep_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Ind_Outᵤᵤ ⊢;
+                                               rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Ind_Out_Memᵤᵤ)] at Prop_All_Ind_Outᵤᵤ;   /- := all_out.orig = RULEᵤ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Ind_Outᵤᵤ ⊢;
                                                exact Prop_All_Ind_Outᵤᵤ;
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -4398,7 +4402,7 @@ namespace COVERAGE.T3_Of_T3.NODES
   cases prop_typeᵥ with | intro prop_dir_nilᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_dir_consᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_dir_unitᵥ prop_typeᵥ =>
-  cases prop_typeᵥ with | intro prop_ind_startsᵥ prop_typeᵥ =>
+  cases prop_typeᵥ with | intro prop_ind_origsᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_ind_lenᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_incomingᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_outgoingᵥ prop_typeᵥ =>
@@ -4418,7 +4422,7 @@ namespace COVERAGE.T3_Of_T3.NODES
                        apply And.intro ( by rewrite [prop_pstᵤ];
                                             exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ prop_check_pastᵤ; );
                        trivial; );
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by intro prop_inc_nil;                                        /- := ( RULE.INCOMING = [] ) → ( RULE.CENTER.isHypothesis = true ) -/
                        simp only [List.append_eq_nil_iff] at prop_inc_nil;
                        simp only [←List.length_eq_zero_iff] at prop_inc_nil prop_inc_nilᵥ;
@@ -4427,21 +4431,21 @@ namespace COVERAGE.T3_Of_T3.NODES
                        simp only [Bool.or_eq_true];
                        exact Or.inr (And.left prop_inc_nil); );
   apply And.intro ( by simp only [prop_out_unitᵥ];                                                                    /- := RULE.OUTGOING = (out::outs) -/
-                       apply Exists.intro ( Deduction.mk ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )                        /- RULEᵥ.OUTGOING -/
-                                                 ( outᵥ.END )
-                                                 ( outᵥ.COLOR )
-                                                 ( outᵥ.DEPENDENCY ) );
+                       apply Exists.intro ( DEdge.mk ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )                        /- RULEᵥ.OUTGOING -/
+                                                 ( outᵥ.dest )
+                                                 ( outᵥ.color )
+                                                 ( outᵥ.deps ) );
                        apply Exists.intro ( collapse.rewrite_outgoing ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )   /- RULEᵤ.OUTGOING -/
                                                                       ( RULEᵤ.OUTGOING ) );
                        simp only [collapse.rewrite_outgoing];
                        simp only [collapse.center];
                        trivial; );
-  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂ gt_zero₁₂;                          /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
+  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂ gt_zero₁₂;                          /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
                        rewrite [prop_out_unitᵥ] at out_mem₁ out_mem₂;
                        simp only [collapse.rewrite_outgoing] at out_mem₁ out_mem₂;
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at out_mem₁ out_mem₂;
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
-                       simp only [Deduction.mk.injEq'];
+                       simp only [DEdge.mk.injEq'];
                        --
                        simp only [type_outgoing₃] at prop_outgoingᵤ prop_outgoingᵥ;
                        rewrite [prop_out_unitᵥ] at prop_outgoingᵥ;
@@ -4452,14 +4456,14 @@ namespace COVERAGE.T3_Of_T3.NODES
                        | inl out_mem₁ᵥ => cases out_mem₂ with
                                           | inl out_mem₂ᵥ => rewrite [out_mem₁ᵥ, out_mem₂ᵥ]; simp only [true_and];
                                           | inr out_mem₂ᵤ => rewrite [out_mem₁ᵥ] at gt_zero₁₂ ⊢;                              /- := out₁ = outᵥ -/
-                                                             rewrite [REWRITE.Get_Start_RwOutgoing out_mem₂ᵤ];                /- := out₂.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                             rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₂ᵤ];                /- := out₂.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              --
                                                              have Out_Cases₂ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₂ᵤ;                 /- := out₂ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₂ᵤ with | intro Originalᵤ Out_Mem₂ᵤ =>
-                                                             have Out_Color₂ᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.COLOR = 0 ∨ out₂.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                                             have Out_Color₂ᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.color = 0 ∨ out₂.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                              --
                                                              simp only [true_and] at gt_zero₁₂ Out_Color₂ᵤ ⊢;
-                                                             have NE_Color : outᵥ.COLOR ≠ out₂.COLOR := by rewrite [ne_eq, ←imp_false];
+                                                             have NE_Color : outᵥ.color ≠ out₂.color := by rewrite [ne_eq, ←imp_false];
                                                                                                               intro EQ_Color;
                                                                                                               cases Out_Colorᵥ with
                                                                                                               | inl EQ_Zeroᵥ => apply absurd gt_zero₁₂; rewrite [←EQ_Color, EQ_Zeroᵥ]; trivial;
@@ -4473,15 +4477,15 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                                                                                    ( by exact prop_ne_pst; );
                                                              simp only [NE_Color, false_and, and_false];
                        | inr out_mem₁ᵤ => cases out_mem₂ with
-                                          | inl out_mem₂ᵥ => rewrite [REWRITE.Get_Start_RwOutgoing out_mem₁ᵤ];                /- := out₁.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                          | inl out_mem₂ᵥ => rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₁ᵤ];                /- := out₁.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              rewrite [out_mem₂ᵥ] at gt_zero₁₂ ⊢;                              /- := out₂ = outᵥ -/
                                                              --
                                                              have Out_Cases₁ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₁ᵤ;                 /- := out₁ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₁ᵤ with | intro Originalᵤ Out_Mem₁ᵤ =>
-                                                             have Out_Color₁ᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.COLOR = 0 ∨ out₁.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                                             have Out_Color₁ᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.color = 0 ∨ out₁.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                              --
                                                              simp only [true_and] at gt_zero₁₂ Out_Color₁ᵤ ⊢;
-                                                             have NE_Color : out₁.COLOR ≠ outᵥ.COLOR := by rewrite [ne_eq, ←imp_false];
+                                                             have NE_Color : out₁.color ≠ outᵥ.color := by rewrite [ne_eq, ←imp_false];
                                                                                                               intro EQ_Color;
                                                                                                               cases Out_Colorᵥ with
                                                                                                               | inl EQ_Zeroᵥ => apply absurd gt_zero₁₂; rewrite [EQ_Color, EQ_Zeroᵥ]; trivial;
@@ -4494,20 +4498,20 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                                                                    exact And.intro ( by exact Nat.ne_of_lt prop_lt_nbr; )
                                                                                                                                                                    ( by exact prop_ne_pst; );
                                                              simp only [NE_Color, false_and, and_false];
-                                          | inr out_mem₂ᵤ => rewrite [REWRITE.Get_Start_RwOutgoing out_mem₁ᵤ];              /- := out₁.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
-                                                             rewrite [REWRITE.Get_Start_RwOutgoing out_mem₂ᵤ];              /- := out₂.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                          | inr out_mem₂ᵤ => rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₁ᵤ];              /- := out₁.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                             rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₂ᵤ];              /- := out₂.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              simp only [true_and] at gt_zero₁₂ ⊢;
                                                              --
                                                              have Out_Cases₁ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₁ᵤ;               /- := out₁ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₁ᵤ with | intro Original₁ᵤ Out_Mem₁ᵤ =>
-                                                             have Out_Start₁ᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₁ᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.orig = RULEᵤ.CENTER -/
                                                              have Out_Cases₂ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₂ᵤ;               /- := out₂ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₂ᵤ with | intro Original₂ᵤ Out_Mem₂ᵤ =>
-                                                             have Out_Start₂ᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₂ᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.orig = RULEᵤ.CENTER -/
                                                              --
                                                              have Iff_Out_Colorᵤ := prop_out_colorsᵤ Out_Mem₁ᵤ Out_Mem₂ᵤ gt_zero₁₂;
-                                                             simp only [Deduction.mk.injEq] at Out_Start₁ᵤ Out_Start₂ᵤ Iff_Out_Colorᵤ;
-                                                             simp only [Out_Start₁ᵤ, Out_Start₂ᵤ, true_and] at Iff_Out_Colorᵤ;
+                                                             simp only [DEdge.mk.injEq] at Out_Orig₁ᵤ Out_Orig₂ᵤ Iff_Out_Colorᵤ;
+                                                             simp only [Out_Orig₁ᵤ, Out_Orig₂ᵤ, true_and] at Iff_Out_Colorᵤ;
                                                              exact Iff_Out_Colorᵤ; );
   apply And.intro ( by intro case_hpt;                                /- := ( RULE.CENTER.isHypothesis = false ) → ( RULE.DIRECT = [] ) -/
                        rewrite [Bool.or_eq_false_iff] at case_hpt;
@@ -4534,13 +4538,13 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            cases Inc_Caseᵥ with | intro Originalᵥ Inc_Memᵥ =>
                                            have Prop_Incomingᵥ := prop_incomingᵥ Inc_Memᵥ;                        /- := type_incoming.check inc RULEᵥ.CENTER -/
                                            simp only [type_incoming.check] at Prop_Incomingᵥ ⊢;
-                                           cases Prop_Incomingᵥ with | intro Prop_Startᵥ Prop_Incomingᵥ =>
-                                           cases Prop_Incomingᵥ with | intro Prop_Endᵥ Prop_Incomingᵥ =>
+                                           cases Prop_Incomingᵥ with | intro Prop_Origᵥ Prop_Incomingᵥ =>
+                                           cases Prop_Incomingᵥ with | intro Prop_Destᵥ Prop_Incomingᵥ =>
                                            cases Prop_Incomingᵥ with | intro Prop_Colorᵥ Prop_Inc_Indᵥ =>
                                            --
-                                           apply And.intro ( by rewrite [prop_eq_lvl];                            /- := Start Node -/
-                                                                exact Prop_Startᵥ; );
-                                           apply And.intro ( by exact REWRITE.Get_End_RwIncoming inc_casesᵥ; );   /- := End Node -/
+                                           apply And.intro ( by rewrite [prop_eq_lvl];                            /- := Orig Node -/
+                                                                exact Prop_Origᵥ; );
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwIncoming inc_casesᵥ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Colorᵥ; );                            /- := Colors -/
                                            /- := Check Incoming-Indirect Duo: -/
                                            cases Prop_Inc_Indᵥ with | intro Colorᵥ Prop_Inc_Indᵥ =>
@@ -4550,19 +4554,19 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            apply Exists.intro Colorᵥ;
                                            apply Exists.intro Colorsᵥ;
                                            apply Exists.intro Ancᵥ;
-                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                                       apply Or.inl;
                                                       exact Prop_Inc_Indᵥ; );
                        | inr inc_casesᵤ => have Inc_Caseᵤ := REWRITE.Mem_Of_Mem_RwIncoming inc_casesᵤ;            /- := inc ∈ RULEᵤ.INCOMING -/
                                            cases Inc_Caseᵤ with | intro Originalᵤ Inc_Memᵤ =>
                                            have Prop_Incomingᵤ := prop_incomingᵤ Inc_Memᵤ;                        /- := type_incoming.check inc RULEᵤ.CENTER -/
                                            simp only [type_incoming.check] at Prop_Incomingᵤ ⊢;
-                                           cases Prop_Incomingᵤ with | intro Prop_Startᵤ Prop_Incomingᵤ =>
-                                           cases Prop_Incomingᵤ with | intro Prop_Endᵤ Prop_Incomingᵤ =>
+                                           cases Prop_Incomingᵤ with | intro Prop_Origᵤ Prop_Incomingᵤ =>
+                                           cases Prop_Incomingᵤ with | intro Prop_Destᵤ Prop_Incomingᵤ =>
                                            cases Prop_Incomingᵤ with | intro Prop_Colorᵤ Prop_Inc_Indᵤ =>
                                            --
-                                           apply And.intro ( by exact Prop_Startᵤ; );                             /- := Start Node -/
-                                           apply And.intro ( by exact REWRITE.Get_End_RwIncoming inc_casesᵤ; );   /- := End Node -/
+                                           apply And.intro ( by exact Prop_Origᵤ; );                             /- := Orig Node -/
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwIncoming inc_casesᵤ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Colorᵤ; );                            /- := Colors -/
                                            /- := Check Incoming-Indirect Duo: -/
                                            cases Prop_Inc_Indᵤ with | intro Colorᵤ Prop_Inc_Indᵤ =>
@@ -4572,7 +4576,7 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            apply Exists.intro Colorᵤ;
                                            apply Exists.intro Colorsᵤ;
                                            apply Exists.intro Ancᵤ;
-                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                                       apply Or.inr;
                                                       exact Prop_Inc_Indᵤ; ); );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -4589,27 +4593,27 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            | inl Prop_Outgoing₁ᵥ => cases Prop_Outgoing₁ᵥ with
                                                                     | inl Prop_Outgoingₕ₁ᵥ => simp only [type_outgoing₁.check_h₁] at Prop_Outgoingₕ₁ᵥ ⊢;
                                                                                               cases Prop_Outgoingₕ₁ᵥ with | intro Prop_HPTₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Startₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Endₕ₁ᵥ Prop_Colorₕ₁ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Origₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Destₕ₁ᵥ Prop_Colorₕ₁ᵥ =>
                                                                                               --
                                                                                               apply Or.inl; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                                                    exact Or.inr Prop_HPTₕ₁ᵥ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );    /- := Start Node -/
-                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                               /- := End Node -/
-                                                                                                                   exact Prop_Endₕ₁ᵥ; );
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );    /- := Orig Node -/
+                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                               /- := Dest Node -/
+                                                                                                                   exact Prop_Destₕ₁ᵥ; );
                                                                                               exact Prop_Colorₕ₁ᵥ;                                                     /- := Colors -/
                                                                     | inr Prop_Outgoingᵢₑ₁ᵥ => simp only [type_outgoing₁.check_ie₁] at Prop_Outgoingᵢₑ₁ᵥ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_HPTᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Startᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Endᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Origᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Destᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
                                                                                                cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Colorᵢₑ₁ᵥ Prop_Out_Indᵢₑ₁ᵥ =>
                                                                                                --
                                                                                                apply Or.inl; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 1 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                        /- := Start Node -/
-                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := End Node -/
-                                                                                                                    exact Prop_Endᵢₑ₁ᵥ; );
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                        /- := Orig Node -/
+                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := Dest Node -/
+                                                                                                                    exact Prop_Destᵢₑ₁ᵥ; );
                                                                                                apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵢₑ₁ᵥ;            /- := Colors -/
                                                                                                                     rewrite [Prop_Colorᵢₑ₁ᵥ];
                                                                                                                     exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -4618,22 +4622,22 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                cases Prop_Out_Indᵢₑ₁ᵥ with | intro Incᵢₑ₁ᵥ Prop_Out_Indᵢₑ₁ᵥ =>
                                                                                                --
                                                                                                apply Exists.intro Incᵢₑ₁ᵥ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                                                                                                            apply Or.inl;
                                                                                                            exact Prop_Out_Indᵢₑ₁ᵥ; );
                                            | inr Prop_Outgoing₃ᵥ => cases Prop_Outgoing₃ᵥ with
                                                                     | inl Prop_Outgoingₕ₃ᵥ => simp only [type_outgoing₃.check_h₃] at Prop_Outgoingₕ₃ᵥ ⊢;
                                                                                               cases Prop_Outgoingₕ₃ᵥ with | intro Prop_HPTₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Startₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Endₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Origₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Destₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
                                                                                               cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Colorₕ₃ᵥ Prop_Out_Dirₕ₃ᵥ =>
                                                                                               --
                                                                                               apply Or.inr; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                                            /- := Type 3 Hypothesis -/
                                                                                                                    exact Or.inr Prop_HPTₕ₃ᵥ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                         /- := Start Node -/
-                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                                                    /- := End Node -/
-                                                                                                                   exact Prop_Endₕ₃ᵥ; );
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                         /- := Orig Node -/
+                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                                                    /- := Dest Node -/
+                                                                                                                   exact Prop_Destₕ₃ᵥ; );
                                                                                               apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorₕ₃ᵥ;              /- := Colors -/
                                                                                                                    rewrite [Prop_Colorₕ₃ᵥ];
                                                                                                                    exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -4644,20 +4648,20 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                               --
                                                                                               apply Exists.intro Colorsₕ₃ᵥ;
                                                                                               apply Exists.intro Ancₕ₃ᵥ;
-                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.COLOR::colors) ∈ DIRECT -/
+                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.color::colors) ∈ DIRECT -/
                                                                                                          apply Or.inl;
                                                                                                          exact REWRITE.Mem_RwDirect_Of_Mem Prop_Out_Dirₕ₃ᵥ; );
                                                                     | inr Prop_Outgoingᵢₑ₃ᵥ => simp only [type_outgoing₃.check_ie₃] at Prop_Outgoingᵢₑ₃ᵥ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_HPTᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Startᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Endᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Origᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Destᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
                                                                                                cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Colorᵢₑ₃ᵥ Prop_Out_Indᵢₑ₃ᵥ =>
                                                                                                --
                                                                                                apply Or.inr; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 3 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                        /- := Start Node -/
-                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := End Node -/
-                                                                                                                    exact Prop_Endᵢₑ₃ᵥ; );
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                        /- := Orig Node -/
+                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := Dest Node -/
+                                                                                                                    exact Prop_Destᵢₑ₃ᵥ; );
                                                                                                apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵢₑ₃ᵥ;            /- := Colors -/
                                                                                                                     rewrite [Prop_Colorᵢₑ₃ᵥ];
                                                                                                                     exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -4670,7 +4674,7 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                apply Exists.intro Colorsᵢₑ₃ᵥ;
                                                                                                apply Exists.intro Incᵢₑ₃ᵥ;
                                                                                                apply Exists.intro Ancᵢₑ₃ᵥ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.COLOR::colors) ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.color::colors) ∈ INDIRECT -/
                                                                                                           apply Or.inl;
                                                                                                           exact Prop_Out_Indᵢₑ₃ᵥ; );
                        | inr out_casesᵤ => have Out_Caseᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_casesᵤ;          /- := out ∈ RULEᵤ.OUTGOING -/
@@ -4680,25 +4684,25 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            | inl Prop_Outgoing₁ᵤ => cases Prop_Outgoing₁ᵤ with
                                                                     | inl Prop_Outgoingₕ₁ᵤ => simp only [type_outgoing₁.check_h₁] at Prop_Outgoingₕ₁ᵤ ⊢;
                                                                                               cases Prop_Outgoingₕ₁ᵤ with | intro Prop_HPTₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Startₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Endₕ₁ᵤ Prop_Colorₕ₁ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Origₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Destₕ₁ᵤ Prop_Colorₕ₁ᵤ =>
                                                                                               --
                                                                                               apply Or.inl; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                                                    exact Or.inl Prop_HPTₕ₁ᵤ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );    /- := Start Node -/
-                                                                                              apply And.intro ( by exact Prop_Endₕ₁ᵤ; );                                /- := End Node -/
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );    /- := Orig Node -/
+                                                                                              apply And.intro ( by exact Prop_Destₕ₁ᵤ; );                                /- := Dest Node -/
                                                                                               exact Prop_Colorₕ₁ᵤ;                                                     /- := Colors -/
                                                                     | inr Prop_Outgoingᵢₑ₁ᵤ => simp only [type_outgoing₁.check_ie₁] at Prop_Outgoingᵢₑ₁ᵤ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_HPTᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Startᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Endᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Origᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Destᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
                                                                                                cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Colorᵢₑ₁ᵤ Prop_Out_Indᵢₑ₁ᵤ =>
                                                                                                --
                                                                                                apply Or.inl; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 1 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );                        /- := Start Node -/
-                                                                                               apply And.intro ( by exact Prop_Endᵢₑ₁ᵤ; );                                                   /- := End Node -/
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );                        /- := Orig Node -/
+                                                                                               apply And.intro ( by exact Prop_Destᵢₑ₁ᵤ; );                                                   /- := Dest Node -/
                                                                                                apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorᵢₑ₁ᵤ;                /- := Colors -/
                                                                                                                     cases Prop_Colorᵢₑ₁ᵤ with
                                                                                                                     | inl Prop_NBR_Colorᵢₑ₁ᵤ => rewrite [Prop_NBR_Colorᵢₑ₁ᵤ];
@@ -4709,21 +4713,21 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                cases Prop_Out_Indᵢₑ₁ᵤ with | intro Incᵢₑ₁ᵤ Prop_Out_Indᵢₑ₁ᵤ =>
                                                                                                --
                                                                                                apply Exists.intro Incᵢₑ₁ᵤ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                                                                                                            apply Or.inr;
                                                                                                            exact Prop_Out_Indᵢₑ₁ᵤ; );
                                            | inr Prop_Outgoing₃ᵤ => cases Prop_Outgoing₃ᵤ with
                                                                     | inl Prop_Outgoingₕ₃ᵤ => simp only [type_outgoing₃.check_h₃] at Prop_Outgoingₕ₃ᵤ ⊢;
                                                                                               cases Prop_Outgoingₕ₃ᵤ with | intro Prop_HPTₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Startₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Endₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Origₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Destₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
                                                                                               cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Colorₕ₃ᵤ Prop_Out_Dirₕ₃ᵤ =>
                                                                                               --
                                                                                               apply Or.inr; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                                                    exact Or.inl Prop_HPTₕ₃ᵤ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );    /- := Start Node -/
-                                                                                              apply And.intro ( by exact Prop_Endₕ₃ᵤ; );                                /- := End Node -/
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );    /- := Orig Node -/
+                                                                                              apply And.intro ( by exact Prop_Destₕ₃ᵤ; );                                /- := Dest Node -/
                                                                                               apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorₕ₃ᵤ;                  /- := Colors -/
                                                                                                                    cases Prop_Colorₕ₃ᵤ with
                                                                                                                    | inl Prop_NBR_Colorᵢₑ₃ᵤ => rewrite [Prop_NBR_Colorᵢₑ₃ᵤ];
@@ -4736,19 +4740,19 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                               --
                                                                                               apply Exists.intro Colorsₕ₃ᵤ;
                                                                                               apply Exists.intro Ancₕ₃ᵤ;
-                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.COLOR::colors) ∈ DIRECT -/
+                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.color::colors) ∈ DIRECT -/
                                                                                                          apply Or.inr;
                                                                                                          exact REWRITE.Mem_RwDirect_Of_Mem Prop_Out_Dirₕ₃ᵤ; );
                                                                     | inr Prop_Outgoingᵢₑ₃ᵤ => simp only [type_outgoing₃.check_ie₃] at Prop_Outgoingᵢₑ₃ᵤ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_HPTᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Startᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Endᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Origᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Destᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
                                                                                                cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Colorᵢₑ₃ᵤ Prop_Out_Indᵢₑ₃ᵤ =>
                                                                                                --
                                                                                                apply Or.inr; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                            /- := Type 1 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );   /- := Start Node -/
-                                                                                               apply And.intro ( by exact Prop_Endᵢₑ₃ᵤ; );                              /- := End Node -/
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );   /- := Orig Node -/
+                                                                                               apply And.intro ( by exact Prop_Destᵢₑ₃ᵤ; );                              /- := Dest Node -/
                                                                                                apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorᵢₑ₃ᵤ;                /- := Colors -/
                                                                                                                     cases Prop_Colorᵢₑ₃ᵤ with
                                                                                                                     | inl Prop_NBR_Colorᵢₑ₃ᵤ => rewrite [Prop_NBR_Colorᵢₑ₃ᵤ];
@@ -4763,7 +4767,7 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                apply Exists.intro Colorsᵢₑ₃ᵤ;
                                                                                                apply Exists.intro Incᵢₑ₃ᵤ;
                                                                                                apply Exists.intro Ancᵢₑ₃ᵤ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.COLOR::colors) ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.color::colors) ∈ INDIRECT -/
                                                                                                           apply Or.inr;
                                                                                                           exact Prop_Out_Indᵢₑ₃ᵤ; ); );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -4777,8 +4781,8 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            cases Dir_Casesᵥ with | intro Originalᵥ Dir_Memᵥ =>
                                            have Prop_Directᵥ := prop_directᵥ Dir_Memᵥ;
                                            simp only [type_direct.check] at Prop_Directᵥ ⊢;
-                                           cases Prop_Directᵥ with | intro Prop_Startᵥ Prop_Directᵥ =>
-                                           cases Prop_Directᵥ with | intro Prop_Endᵥ Prop_Directᵥ =>
+                                           cases Prop_Directᵥ with | intro Prop_Origᵥ Prop_Directᵥ =>
+                                           cases Prop_Directᵥ with | intro Prop_Destᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Prop_Levelᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Color₁ᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Color₂ᵥ Prop_Directᵥ =>
@@ -4787,9 +4791,9 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            cases Prop_Directᵥ with | intro Prop_Color₁ᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Prop_Colorsᵥ Prop_Dir_Outᵥ =>
                                            --
-                                           apply And.intro ( by rewrite [prop_eq_lvl];                          /- := Start Node -/
-                                                                exact Prop_Startᵥ; );
-                                           apply And.intro ( by exact REWRITE.Get_End_RwDirect dir_casesᵥ; );   /- := End Node -/
+                                           apply And.intro ( by rewrite [prop_eq_lvl];                          /- := Orig Node -/
+                                                                exact Prop_Origᵥ; );
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwDirect dir_casesᵥ; );   /- := Dest Node -/
                                            apply And.intro ( by rewrite [prop_eq_lvl];                          /- := Colors -/
                                                                 exact Prop_Levelᵥ; );
                                            apply Exists.intro Color₁ᵥ;
@@ -4812,27 +4816,27 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            apply Exists.intro Dep_Outᵥ;
                                            apply And.intro ( by exact Prop_Out_Colᵥ; );
                                            apply And.intro ( by exact Prop_Color₂ᵥ; );
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                                                 apply Or.inl;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Dir_Outᵥ; );
-                                           intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                                           intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵥ;
                                            cases all_out_casesᵥ with
                                            | inl all_out_casesᵥᵥ => have Dir_Out_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵥᵥ with | intro Originalᵥ Dir_Out_Memᵥᵥ =>
-                                                                    have Prop_All_Dir_Outᵥᵥ := Prop_All_Dir_Outᵥ Dir_Out_Memᵥᵥ;                                 /- := all_out.COLOR = Color₁ ↔ all_out = Deduction.mk CENTER out Color₁ dep_out -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Dir_Outᵥᵥ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵥ Dir_Out_Memᵥᵥ)] at Prop_All_Dir_Outᵥᵥ;   /- := all_out.START = RULEᵥ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Dir_Outᵥᵥ := Prop_All_Dir_Outᵥ Dir_Out_Memᵥᵥ;                                 /- := all_out.color = Color₁ ↔ all_out = DEdge.mk CENTER out Color₁ dep_out -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Dir_Outᵥᵥ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵥ Dir_Out_Memᵥᵥ)] at Prop_All_Dir_Outᵥᵥ;   /- := all_out.orig = RULEᵥ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Dir_Outᵥᵥ ⊢;
                                                                     exact Prop_All_Dir_Outᵥᵥ;
                                            | inr all_out_casesᵥᵤ => have Dir_Out_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵥᵤ with | intro Originalᵤ Dir_Out_Memᵥᵤ =>
-                                                                    have Dir_Out_Colorᵥᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Dir_Out_Memᵥᵤ);          /- := all_out.COLOR = 0 ∨ all_out.COLOR ∈ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
+                                                                    have Dir_Out_Colorᵥᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Dir_Out_Memᵥᵤ);          /- := all_out.color = 0 ∨ all_out.color ∈ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
                                                                     simp only [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Color₁ᵥ;                               /- := Color₁ = RULEᵥ.CENTER.id -/
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have NE_Colorᵥ : all_outᵥ.COLOR ≠ Color₁ᵥ := by rewrite [ne_eq, ←imp_false];
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have NE_Colorᵥ : all_outᵥ.color ≠ Color₁ᵥ := by rewrite [ne_eq, ←imp_false];
                                                                                                                        intro EQ_Color;
                                                                                                                        rewrite [EQ_Color, Prop_Color₁ᵥ] at Dir_Out_Colorᵥᵤ;
                                                                                                                        cases Dir_Out_Colorᵥᵤ with
@@ -4847,8 +4851,8 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            cases Dir_Casesᵤ with | intro Originalᵤ Dir_Memᵤ =>
                                            have Prop_Directᵤ := prop_directᵤ Dir_Memᵤ;
                                            simp only [type_direct.check] at Prop_Directᵤ ⊢;
-                                           cases Prop_Directᵤ with | intro Prop_Startᵤ Prop_Directᵤ =>
-                                           cases Prop_Directᵤ with | intro Prop_Endᵤ Prop_Directᵤ =>
+                                           cases Prop_Directᵤ with | intro Prop_Origᵤ Prop_Directᵤ =>
+                                           cases Prop_Directᵤ with | intro Prop_Destᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Prop_Levelᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Color₁ᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Color₂ᵤ Prop_Directᵤ =>
@@ -4857,8 +4861,8 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            cases Prop_Directᵤ with | intro Prop_Color₁ᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Prop_Colorsᵤ Prop_Dir_Outᵤ =>
                                            --
-                                           apply And.intro ( by exact Prop_Startᵤ; );                           /- := Start Node -/
-                                           apply And.intro ( by exact REWRITE.Get_End_RwDirect dir_casesᵤ; );   /- := End Node -/
+                                           apply And.intro ( by exact Prop_Origᵤ; );                           /- := Orig Node -/
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwDirect dir_casesᵤ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Levelᵤ; );                           /- := Colors -/
                                            apply Exists.intro Color₁ᵤ;
                                            apply Exists.intro Color₂ᵤ;
@@ -4882,19 +4886,19 @@ namespace COVERAGE.T3_Of_T3.NODES
                                            apply Exists.intro Dep_Outᵤ;
                                            apply And.intro ( by exact Prop_Out_Colᵤ; );
                                            apply And.intro ( by exact Prop_Color₂ᵤ; );
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                                                 apply Or.inr;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Dir_Outᵤ; );
-                                           intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                                           intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵤ;
                                            cases all_out_casesᵤ with
                                            | inl all_out_casesᵤᵥ => have Dir_Out_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵤᵥ with | intro Originalᵥ Dir_Out_Memᵤᵥ =>
-                                                                    have Dir_Out_Colorᵤᵥ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵥ Dir_Out_Memᵤᵥ);          /- := all_out.COLOR = 0 ∨ all_out.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                                                    have Dir_Out_Colorᵤᵥ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵥ Dir_Out_Memᵤᵥ);          /- := all_out.color = 0 ∨ all_out.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                                     simp only [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Dir_Out_Colorᵤᵥ;
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have NE_Colorᵤ : all_outᵤ.COLOR ≠ Color₁ᵤ := by rewrite [ne_eq, ←imp_false];
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have NE_Colorᵤ : all_outᵤ.color ≠ Color₁ᵤ := by rewrite [ne_eq, ←imp_false];
                                                                                                                        intro EQ_Color;
                                                                                                                        apply absurd Prop_Color₁ᵤ;              /- := Color₁ ∉ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
                                                                                                                        cases Dir_Out_Colorᵤᵥ with
@@ -4914,10 +4918,10 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                     simp only [NE_Colorᵤ, false_and, and_false];
                                            | inr all_out_casesᵤᵤ => have Dir_Out_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵤᵤ with | intro Originalᵤ Dir_Out_Memᵤᵤ =>
-                                                                    have Prop_All_Dir_Outᵤᵤ := Prop_All_Dir_Outᵤ Dir_Out_Memᵤᵤ;                                 /- := all_out.COLOR = Color₁ ↔ all_out = Deduction.mk CENTER out Color₁ dep_out -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Dir_Outᵤᵤ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Dir_Out_Memᵤᵤ)] at Prop_All_Dir_Outᵤᵤ;   /- := all_out.START = RULEᵤ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Dir_Outᵤᵤ := Prop_All_Dir_Outᵤ Dir_Out_Memᵤᵤ;                                 /- := all_out.color = Color₁ ↔ all_out = DEdge.mk CENTER out Color₁ dep_out -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Dir_Outᵤᵤ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Dir_Out_Memᵤᵤ)] at Prop_All_Dir_Outᵤᵤ;   /- := all_out.orig = RULEᵤ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Dir_Outᵤᵤ ⊢;
                                                                     exact Prop_All_Dir_Outᵤᵤ; );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -4929,8 +4933,8 @@ namespace COVERAGE.T3_Of_T3.NODES
   cases ind_cases with
   | inl ind_casesᵥ => have Prop_Indirectᵥ := prop_indirectᵥ ind_casesᵥ;
                       simp only [type_indirect.check] at Prop_Indirectᵥ ⊢;
-                      cases Prop_Indirectᵥ with | intro Prop_Startᵥ Prop_Indirectᵥ =>
-                      cases Prop_Indirectᵥ with | intro Prop_Endᵥ Prop_Indirectᵥ =>
+                      cases Prop_Indirectᵥ with | intro Prop_Origᵥ Prop_Indirectᵥ =>
+                      cases Prop_Indirectᵥ with | intro Prop_Destᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Prop_Levelᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Colorᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Colorsᵥ Prop_Indirectᵥ =>
@@ -4939,10 +4943,10 @@ namespace COVERAGE.T3_Of_T3.NODES
                       cases Prop_Indirectᵥ with | intro Prop_Colorsᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Prop_Ind_Incᵥ Prop_Ind_Outᵥ =>
                       --
-                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Start Node -/
-                                           exact Prop_Startᵥ; );
-                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := End Node -/
-                                           exact Prop_Endᵥ; );
+                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Orig Node -/
+                                           exact Prop_Origᵥ; );
+                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Dest Node -/
+                                           exact Prop_Destᵥ; );
                       apply And.intro ( by rewrite [prop_eq_lvl];         /- := Colors -/
                                            exact Prop_Levelᵥ; );
                       apply Exists.intro Colorᵥ;
@@ -4958,25 +4962,25 @@ namespace COVERAGE.T3_Of_T3.NODES
                       cases Prop_Ind_Incᵥ with | intro Prop_Ind_Incᵥ Prop_All_Ind_Incᵥ =>
                       --
                       apply And.intro ( by apply Exists.intro Dep_Incᵥ;
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.END CENTER 0 dep_inc ∈ INCOMING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.dest CENTER 0 dep_inc ∈ INCOMING -/
                                                                 apply Or.inl;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwIncoming_Of_Mem Prop_Ind_Incᵥ; );
-                                           intro all_incᵥ all_inc_casesᵥ;                                     /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
+                                           intro all_incᵥ all_inc_casesᵥ;                                     /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_inc_casesᵥ;
                                            cases all_inc_casesᵥ with
                                            | inl all_inc_casesᵥᵥ => have Ind_Inc_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵥᵥ;                      /- := all_inc ∈ RULEᵥ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵥᵥ with | intro Originalᵥ Ind_Inc_Memᵥᵥ =>
-                                                                    have Prop_All_Ind_Incᵥᵥ := Prop_All_Ind_Incᵥ Ind_Inc_Memᵥᵥ;                                 /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Ind_Incᵥᵥ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Inc_End (prop_incomingᵥ Ind_Inc_Memᵥᵥ)] at Prop_All_Ind_Incᵥᵥ;      /- := all_inc.END = RULEᵥ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_End_RwIncoming all_inc_casesᵥᵥ];                                      /- := all_inc.END = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Ind_Incᵥᵥ := Prop_All_Ind_Incᵥ Ind_Inc_Memᵥᵥ;                                 /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Ind_Incᵥᵥ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Inc_Dest (prop_incomingᵥ Ind_Inc_Memᵥᵥ)] at Prop_All_Ind_Incᵥᵥ;      /- := all_inc.dest = RULEᵥ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Dest_RwIncoming all_inc_casesᵥᵥ];                                      /- := all_inc.dest = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Ind_Incᵥᵥ ⊢;
                                                                     exact Prop_All_Ind_Incᵥᵥ;
                                            | inr all_inc_casesᵥᵤ => have Ind_Inc_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵥᵤ;                      /- := all_inc ∈ RULEᵤ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵥᵤ with | intro Originalᵤ Ind_Inc_Memᵥᵤ =>
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have Prop_Check_Incomingᵥᵤ := prop_check_incoming Ind_Inc_Memᵥᵤ Prop_Ind_Incᵥ;              /- := all_inc.START ≠ IND.END -/
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have Prop_Check_Incomingᵥᵤ := prop_check_incoming Ind_Inc_Memᵥᵤ Prop_Ind_Incᵥ;              /- := all_inc.orig ≠ IND.dest -/
                                                                     simp only [Prop_Check_Incomingᵥᵤ, false_and]; );
                       /- := Check Indirect-Outgoing Duo: -/
                       cases Prop_Ind_Outᵥ with | intro Outᵥ Prop_Ind_Outᵥ =>
@@ -4987,27 +4991,27 @@ namespace COVERAGE.T3_Of_T3.NODES
                       apply Exists.intro Outᵥ;
                       apply Exists.intro Dep_Outᵥ;
                       apply And.intro ( by exact Prop_Out_Colᵥ; );
-                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                            apply Or.inl;
                                            rewrite [←collapse.center];
                                            exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Ind_Outᵥ; );
-                      intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                      intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                       simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵥ;
                       cases all_out_casesᵥ with
                       | inl all_out_casesᵥᵥ => have Ind_Out_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                cases Ind_Out_Casesᵥᵥ with | intro Originalᵥ Ind_Out_Memᵥᵥ =>
-                                               have Prop_All_Ind_Outᵥᵥ := Prop_All_Ind_Outᵥ Ind_Out_Memᵥᵥ;                                 /- := all_out.COLOR = Color ↔ all_out = Deduction.mk CENTER out Color dep_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Ind_Outᵥᵥ ⊢;
-                                               rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵥ Ind_Out_Memᵥᵥ)] at Prop_All_Ind_Outᵥᵥ;   /- := all_out.START = RULEᵥ.CENTER -/
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Ind_Outᵥᵥ := Prop_All_Ind_Outᵥ Ind_Out_Memᵥᵥ;                                 /- := all_out.color = Color ↔ all_out = DEdge.mk CENTER out Color dep_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Ind_Outᵥᵥ ⊢;
+                                               rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵥ Ind_Out_Memᵥᵥ)] at Prop_All_Ind_Outᵥᵥ;   /- := all_out.orig = RULEᵥ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Ind_Outᵥᵥ ⊢;
                                                exact Prop_All_Ind_Outᵥᵥ;
                       | inr all_out_casesᵥᵤ => have Ind_Out_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                cases Ind_Out_Casesᵥᵤ with | intro Originalᵤ Ind_Out_Memᵥᵤ =>
-                                               have Ind_Out_Colorᵥᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Ind_Out_Memᵥᵤ);          /- := all_out.COLOR = 0 ∨ all_out.COLOR ∈ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
+                                               have Ind_Out_Colorᵥᵤ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵤ Ind_Out_Memᵥᵤ);          /- := all_out.color = 0 ∨ all_out.color ∈ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
                                                simp only [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵥ;                                /- := Color = RULEᵥ.CENTER.id -/
-                                               rewrite [Deduction.mk.injEq];
-                                               have NE_Colorᵥ : all_outᵥ.COLOR ≠ Colorᵥ := by rewrite [ne_eq, ←imp_false];
+                                               rewrite [DEdge.mk.injEq];
+                                               have NE_Colorᵥ : all_outᵥ.color ≠ Colorᵥ := by rewrite [ne_eq, ←imp_false];
                                                                                                  intro EQ_Color;
                                                                                                  rewrite [EQ_Color, Prop_Colorᵥ] at Ind_Out_Colorᵥᵤ;
                                                                                                  cases Ind_Out_Colorᵥᵤ with
@@ -5020,8 +5024,8 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                simp only [NE_Colorᵥ, false_and, and_false];
   | inr ind_casesᵤ => have Prop_Indirectᵤ := prop_indirectᵤ ind_casesᵤ;
                       simp only [type_indirect.check] at Prop_Indirectᵤ ⊢;
-                      cases Prop_Indirectᵤ with | intro Prop_Startᵤ Prop_Indirectᵤ =>
-                      cases Prop_Indirectᵤ with | intro Prop_Endᵤ Prop_Indirectᵤ =>
+                      cases Prop_Indirectᵤ with | intro Prop_Origᵤ Prop_Indirectᵤ =>
+                      cases Prop_Indirectᵤ with | intro Prop_Destᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Prop_Levelᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Colorᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Colorsᵤ Prop_Indirectᵤ =>
@@ -5030,8 +5034,8 @@ namespace COVERAGE.T3_Of_T3.NODES
                       cases Prop_Indirectᵤ with | intro Prop_Colorsᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Prop_Ind_Incᵤ Prop_Ind_Outᵤ =>
                       --
-                      apply And.intro ( by exact Prop_Startᵤ; );           /- := Start Node -/
-                      apply And.intro ( by exact Prop_Endᵤ; );             /- := End Node -/
+                      apply And.intro ( by exact Prop_Origᵤ; );           /- := Orig Node -/
+                      apply And.intro ( by exact Prop_Destᵤ; );             /- := Dest Node -/
                       apply And.intro ( by exact Prop_Levelᵤ; );           /- := Colors -/
                       apply Exists.intro Colorᵤ;
                       apply Exists.intro Colorsᵤ;
@@ -5048,25 +5052,25 @@ namespace COVERAGE.T3_Of_T3.NODES
                       cases Prop_Ind_Incᵤ with | intro Prop_Ind_Incᵤ Prop_All_Ind_Incᵤ =>
                       --
                       apply And.intro ( by apply Exists.intro Dep_Incᵤ;
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.END CENTER 0 dep_inc ∈ INCOMING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.dest CENTER 0 dep_inc ∈ INCOMING -/
                                                                 apply Or.inr;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwIncoming_Of_Mem Prop_Ind_Incᵤ; );
-                                           intro all_incᵤ all_inc_casesᵤ;                                     /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
+                                           intro all_incᵤ all_inc_casesᵤ;                                     /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_inc_casesᵤ;
                                            cases all_inc_casesᵤ with
                                            | inl all_inc_casesᵤᵥ => have Ind_Inc_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵤᵥ;                      /- := all_inc ∈ RULEᵥ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵤᵥ with | intro Originalᵥ Ind_Inc_Memᵤᵥ =>
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have Prop_Check_Incomingᵤᵥ := prop_check_incoming Prop_Ind_Incᵤ Ind_Inc_Memᵤᵥ;              /- := IND.END ≠ all_inc.START -/
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have Prop_Check_Incomingᵤᵥ := prop_check_incoming Prop_Ind_Incᵤ Ind_Inc_Memᵤᵥ;              /- := IND.dest ≠ all_inc.orig -/
                                                                     rewrite [ne_comm] at Prop_Check_Incomingᵤᵥ;
                                                                     simp only [Prop_Check_Incomingᵤᵥ, false_and];
                                            | inr all_inc_casesᵤᵤ => have Ind_Inc_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵤᵤ;                      /- := all_inc ∈ RULEᵤ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵤᵤ with | intro Originalᵤ Ind_Inc_Memᵤᵤ =>
-                                                                    have Prop_All_Ind_Incᵤᵤ := Prop_All_Ind_Incᵤ Ind_Inc_Memᵤᵤ;                                 /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Ind_Incᵤᵤ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Inc_End (prop_incomingᵤ Ind_Inc_Memᵤᵤ)] at Prop_All_Ind_Incᵤᵤ;      /- := all_inc.END = RULEᵤ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_End_RwIncoming all_inc_casesᵤᵤ];                                      /- := all_inc.END = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Ind_Incᵤᵤ := Prop_All_Ind_Incᵤ Ind_Inc_Memᵤᵤ;                                 /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Ind_Incᵤᵤ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Inc_Dest (prop_incomingᵤ Ind_Inc_Memᵤᵤ)] at Prop_All_Ind_Incᵤᵤ;      /- := all_inc.dest = RULEᵤ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Dest_RwIncoming all_inc_casesᵤᵤ];                                      /- := all_inc.dest = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Ind_Incᵤᵤ ⊢;
                                                                     exact Prop_All_Ind_Incᵤᵤ; );
                       /- Check Outgoing-Indirect Duo: -/
@@ -5078,19 +5082,19 @@ namespace COVERAGE.T3_Of_T3.NODES
                       apply Exists.intro Outᵤ;
                       apply Exists.intro Dep_Outᵤ;
                       apply And.intro ( by exact Prop_Out_Colᵤ; );
-                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color dep_out ∈ OUTGOING -/
+                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color dep_out ∈ OUTGOING -/
                                            apply Or.inr;
                                            rewrite [←collapse.center];
                                            exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Ind_Outᵤ; );
-                      intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.COLOR = color ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                      intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.color = color ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                       simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵤ;
                       cases all_out_casesᵤ with
                       | inl all_out_casesᵤᵥ => have Ind_Out_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                cases Ind_Out_Casesᵤᵥ with | intro Originalᵥ Ind_Out_Memᵤᵥ =>
-                                               have Ind_Out_Colorᵤᵥ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵥ Ind_Out_Memᵤᵥ);          /- := all_out.COLOR = 0 ∨ all_out.COLOR ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
+                                               have Ind_Out_Colorᵤᵥ := COLLAPSE.Simp_Out_Color₃ (prop_outgoingᵥ Ind_Out_Memᵤᵥ);          /- := all_out.color = 0 ∨ all_out.color ∈ RULEᵥ.CENTER.id :: RULEᵥ.CENTER.past -/
                                                simp only [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Ind_Out_Colorᵤᵥ;
-                                               rewrite [Deduction.mk.injEq];
-                                               have NE_Colorᵤ : all_outᵤ.COLOR ≠ Colorᵤ := by rewrite [ne_eq, ←imp_false];
+                                               rewrite [DEdge.mk.injEq];
+                                               have NE_Colorᵤ : all_outᵤ.color ≠ Colorᵤ := by rewrite [ne_eq, ←imp_false];
                                                                                                  intro EQ_Color;
                                                                                                  apply absurd Prop_Colorᵤ;              /- := Color ∉ RULEᵤ.CENTER.id :: RULEᵤ.CENTER.past -/
                                                                                                  cases Ind_Out_Colorᵤᵥ with
@@ -5110,10 +5114,10 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                simp only [NE_Colorᵤ, false_and, and_false];
                       | inr all_out_casesᵤᵤ => have Ind_Out_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                cases Ind_Out_Casesᵤᵤ with | intro Originalᵤ Ind_Out_Memᵤᵤ =>
-                                               have Prop_All_Ind_Outᵤᵤ := Prop_All_Ind_Outᵤ Ind_Out_Memᵤᵤ;                                 /- := all_out.COLOR = Color ↔ all_out = Deduction.mk CENTER out Color dep_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Ind_Outᵤᵤ ⊢;
-                                               rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Ind_Out_Memᵤᵤ)] at Prop_All_Ind_Outᵤᵤ;   /- := all_out.START = RULEᵤ.CENTER -/
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Ind_Outᵤᵤ := Prop_All_Ind_Outᵤ Ind_Out_Memᵤᵤ;                                 /- := all_out.color = Color ↔ all_out = DEdge.mk CENTER out Color dep_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Ind_Outᵤᵤ ⊢;
+                                               rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Ind_Out_Memᵤᵤ)] at Prop_All_Ind_Outᵤᵤ;   /- := all_out.orig = RULEᵤ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Ind_Outᵤᵤ ⊢;
                                                exact Prop_All_Ind_Outᵤᵤ;
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -5154,7 +5158,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
   cases prop_typeᵤ with | intro prop_dir_nilᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_dir_consᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_dir_unitᵤ prop_typeᵤ =>
-  cases prop_typeᵤ with | intro prop_ind_startsᵤ prop_typeᵤ =>
+  cases prop_typeᵤ with | intro prop_ind_origsᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_ind_lenᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_incomingᵤ prop_typeᵤ =>
   cases prop_typeᵤ with | intro prop_outgoingᵤ prop_typeᵤ =>
@@ -5174,7 +5178,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
   cases prop_typeᵥ with | intro prop_dir_nilᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_dir_consᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_dir_unitᵥ prop_typeᵥ =>
-  cases prop_typeᵥ with | intro prop_ind_startsᵥ prop_typeᵥ =>
+  cases prop_typeᵥ with | intro prop_ind_origsᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_ind_lenᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_incomingᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_outgoingᵥ prop_typeᵥ =>
@@ -5200,7 +5204,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
                        apply And.intro ( by simp only [prop_pstᵤ];
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ; );
                        trivial; );
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by intro prop_inc_nil;                                        /- := ( RULE.INCOMING = [] ) → ( RULE.CENTER.isHypothesis = true ) -/
                        simp only [List.append_eq_nil_iff] at prop_inc_nil;
                        simp only [←List.length_eq_zero_iff] at prop_inc_nil prop_inc_nilᵥ;
@@ -5209,65 +5213,65 @@ namespace COVERAGE.T3_Of_T3.EDGES
                        simp only [Bool.or_eq_true];
                        exact Or.inr (And.left prop_inc_nil); );
   apply And.intro ( by simp only [prop_out_unitᵥ];                                                                    /- := RULE.OUTGOING = (out::outs) -/
-                       apply Exists.intro ( Deduction.mk ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )                        /- RULEᵥ.OUTGOING -/
-                                                 ( outᵥ.END )
-                                                 ( outᵥ.COLOR )
-                                                 ( outᵥ.DEPENDENCY ) );
+                       apply Exists.intro ( DEdge.mk ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )                        /- RULEᵥ.OUTGOING -/
+                                                 ( outᵥ.dest )
+                                                 ( outᵥ.color )
+                                                 ( outᵥ.deps ) );
                        apply Exists.intro ( collapse.rewrite_outgoing ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )   /- RULEᵤ.OUTGOING -/
                                                                       ( RULEᵤ.OUTGOING ) );
                        simp only [collapse.rewrite_outgoing];
                        simp only [collapse.center];
                        trivial; );
-  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂ gt_zero₁₂;                          /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
+  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂ gt_zero₁₂;                          /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
                        rewrite [prop_out_unitᵥ] at out_mem₁ out_mem₂;
                        simp only [collapse.rewrite_outgoing] at out_mem₁ out_mem₂;
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at out_mem₁ out_mem₂;
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
-                       simp only [Deduction.mk.injEq'];
+                       simp only [DEdge.mk.injEq'];
                        --
                        simp only [type_outgoing₃] at prop_outgoingᵤ;
-                       have Eq_Out_Colorᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ eq_out_memᵤ);
+                       have Eq_Out_Colorᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ eq_out_memᵤ);
                        --
                        cases out_mem₁ with
                        | inl out_mem₁ᵥ => cases out_mem₂ with
                                           | inl out_mem₂ᵥ => rewrite [out_mem₁ᵥ, out_mem₂ᵥ]; simp only [true_and];
-                                          | inr out_mem₂ᵤ => rewrite [out_mem₁ᵥ, REWRITE.Get_Start_RwOutgoing out_mem₂ᵤ];                 /- := out₁ = outᵥ, out₂.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                          | inr out_mem₂ᵤ => rewrite [out_mem₁ᵥ, REWRITE.Get_Orig_RwOutgoing out_mem₂ᵤ];                 /- := out₁ = outᵥ, out₂.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              simp only [prop_eq_out_end, prop_eq_out_color, prop_eq_out_dependency, true_and];
                                                              --
                                                              have Out_Cases₂ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₂ᵤ;                 /- := out₂ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₂ᵤ with | intro Originalᵤ Out_Mem₂ᵤ =>
-                                                             have Out_Start₂ᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Out_Mem₂ᵤ);     /- := out₂.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₂ᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Out_Mem₂ᵤ);     /- := out₂.orig = RULEᵤ.CENTER -/
                                                              --
                                                              have Iff_Out_Colorᵤ := prop_out_colorsᵤ eq_out_memᵤ Out_Mem₂ᵤ (Or.inl eq_out_colorᵤ);
-                                                             simp only [Deduction.mk.injEq'] at Out_Start₂ᵤ Iff_Out_Colorᵤ;
-                                                             simp only [Eq_Out_Colorᵤ, Out_Start₂ᵤ, true_and] at Iff_Out_Colorᵤ;
+                                                             simp only [DEdge.mk.injEq'] at Out_Orig₂ᵤ Iff_Out_Colorᵤ;
+                                                             simp only [Eq_Out_Colorᵤ, Out_Orig₂ᵤ, true_and] at Iff_Out_Colorᵤ;
                                                              exact Iff_Out_Colorᵤ;
                        | inr out_mem₁ᵤ => cases out_mem₂ with
-                                          | inl out_mem₂ᵥ => rewrite [REWRITE.Get_Start_RwOutgoing out_mem₁ᵤ, out_mem₂ᵥ];                 /- := out₁.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER, out₂ = outᵥ -/
+                                          | inl out_mem₂ᵥ => rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₁ᵤ, out_mem₂ᵥ];                 /- := out₁.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER, out₂ = outᵥ -/
                                                              simp only [prop_eq_out_end, prop_eq_out_color, prop_eq_out_dependency, true_and];
                                                              --
                                                              have Out_Cases₁ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₁ᵤ;                 /- := out₁ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₁ᵤ with | intro Originalᵤ Out_Mem₁ᵤ =>
-                                                             have Out_Start₁ᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Out_Mem₁ᵤ);     /- := out₁.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₁ᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Out_Mem₁ᵤ);     /- := out₁.orig = RULEᵤ.CENTER -/
                                                              --
                                                              have Iff_Out_Colorᵤ := prop_out_colorsᵤ Out_Mem₁ᵤ eq_out_memᵤ (Or.inr eq_out_colorᵤ);
-                                                             simp only [Deduction.mk.injEq'] at Out_Start₁ᵤ Iff_Out_Colorᵤ;
-                                                             simp only [Out_Start₁ᵤ, Eq_Out_Colorᵤ, true_and] at Iff_Out_Colorᵤ;
+                                                             simp only [DEdge.mk.injEq'] at Out_Orig₁ᵤ Iff_Out_Colorᵤ;
+                                                             simp only [Out_Orig₁ᵤ, Eq_Out_Colorᵤ, true_and] at Iff_Out_Colorᵤ;
                                                              exact Iff_Out_Colorᵤ;
-                                          | inr out_mem₂ᵤ => rewrite [REWRITE.Get_Start_RwOutgoing out_mem₁ᵤ];              /- := out₁.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
-                                                             rewrite [REWRITE.Get_Start_RwOutgoing out_mem₂ᵤ];              /- := out₂.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                          | inr out_mem₂ᵤ => rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₁ᵤ];              /- := out₁.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                             rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₂ᵤ];              /- := out₂.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              simp only [true_and];
                                                              --
                                                              have Out_Cases₁ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₁ᵤ;               /- := out₁ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₁ᵤ with | intro Original₁ᵤ Out_Mem₁ᵤ =>
-                                                             have Out_Start₁ᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₁ᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.orig = RULEᵤ.CENTER -/
                                                              have Out_Cases₂ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₂ᵤ;               /- := out₂ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₂ᵤ with | intro Original₂ᵤ Out_Mem₂ᵤ =>
-                                                             have Out_Start₂ᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₂ᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.orig = RULEᵤ.CENTER -/
                                                              --
                                                              have Iff_Out_Colorᵤ := prop_out_colorsᵤ Out_Mem₁ᵤ Out_Mem₂ᵤ gt_zero₁₂;
-                                                             simp only [Deduction.mk.injEq] at Out_Start₁ᵤ Out_Start₂ᵤ Iff_Out_Colorᵤ;
-                                                             simp only [Out_Start₁ᵤ, Out_Start₂ᵤ, true_and] at Iff_Out_Colorᵤ;
+                                                             simp only [DEdge.mk.injEq] at Out_Orig₁ᵤ Out_Orig₂ᵤ Iff_Out_Colorᵤ;
+                                                             simp only [Out_Orig₁ᵤ, Out_Orig₂ᵤ, true_and] at Iff_Out_Colorᵤ;
                                                              exact Iff_Out_Colorᵤ; );
   apply And.intro ( by intro case_hpt;                                /- := ( RULE.CENTER.isHypothesis = false ) → ( RULE.DIRECT = [] ) -/
                        rewrite [Bool.or_eq_false_iff] at case_hpt;
@@ -5294,13 +5298,13 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            cases Inc_Caseᵥ with | intro Originalᵥ Inc_Memᵥ =>
                                            have Prop_Incomingᵥ := prop_incomingᵥ Inc_Memᵥ;                        /- := type_incoming.check inc RULEᵥ.CENTER -/
                                            simp only [type_incoming.check] at Prop_Incomingᵥ ⊢;
-                                           cases Prop_Incomingᵥ with | intro Prop_Startᵥ Prop_Incomingᵥ =>
-                                           cases Prop_Incomingᵥ with | intro Prop_Endᵥ Prop_Incomingᵥ =>
+                                           cases Prop_Incomingᵥ with | intro Prop_Origᵥ Prop_Incomingᵥ =>
+                                           cases Prop_Incomingᵥ with | intro Prop_Destᵥ Prop_Incomingᵥ =>
                                            cases Prop_Incomingᵥ with | intro Prop_Colorᵥ Prop_Inc_Indᵥ =>
                                            --
-                                           apply And.intro ( by rewrite [prop_eq_lvl];                            /- := Start Node -/
-                                                                exact Prop_Startᵥ; );
-                                           apply And.intro ( by exact REWRITE.Get_End_RwIncoming inc_casesᵥ; );   /- := End Node -/
+                                           apply And.intro ( by rewrite [prop_eq_lvl];                            /- := Orig Node -/
+                                                                exact Prop_Origᵥ; );
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwIncoming inc_casesᵥ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Colorᵥ; );                            /- := Colors -/
                                            /- := Check Incoming-Indirect Duo: -/
                                            cases Prop_Inc_Indᵥ with | intro Colorᵥ Prop_Inc_Indᵥ =>
@@ -5310,19 +5314,19 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            apply Exists.intro Colorᵥ;
                                            apply Exists.intro Colorsᵥ;
                                            apply Exists.intro Ancᵥ;
-                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                                       apply Or.inl;
                                                       exact Prop_Inc_Indᵥ; );
                        | inr inc_casesᵤ => have Inc_Caseᵤ := REWRITE.Mem_Of_Mem_RwIncoming inc_casesᵤ;            /- := inc ∈ RULEᵤ.INCOMING -/
                                            cases Inc_Caseᵤ with | intro Originalᵤ Inc_Memᵤ =>
                                            have Prop_Incomingᵤ := prop_incomingᵤ Inc_Memᵤ;                        /- := type_incoming.check inc RULEᵤ.CENTER -/
                                            simp only [type_incoming.check] at Prop_Incomingᵤ ⊢;
-                                           cases Prop_Incomingᵤ with | intro Prop_Startᵤ Prop_Incomingᵤ =>
-                                           cases Prop_Incomingᵤ with | intro Prop_Endᵤ Prop_Incomingᵤ =>
+                                           cases Prop_Incomingᵤ with | intro Prop_Origᵤ Prop_Incomingᵤ =>
+                                           cases Prop_Incomingᵤ with | intro Prop_Destᵤ Prop_Incomingᵤ =>
                                            cases Prop_Incomingᵤ with | intro Prop_Colorᵤ Prop_Inc_Indᵤ =>
                                            --
-                                           apply And.intro ( by exact Prop_Startᵤ; );                             /- := Start Node -/
-                                           apply And.intro ( by exact REWRITE.Get_End_RwIncoming inc_casesᵤ; );   /- := End Node -/
+                                           apply And.intro ( by exact Prop_Origᵤ; );                             /- := Orig Node -/
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwIncoming inc_casesᵤ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Colorᵤ; );                            /- := Colors -/
                                            /- := Check Incoming-Indirect Duo: -/
                                            cases Prop_Inc_Indᵤ with | intro Colorᵤ Prop_Inc_Indᵤ =>
@@ -5332,7 +5336,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            apply Exists.intro Colorᵤ;
                                            apply Exists.intro Colorsᵤ;
                                            apply Exists.intro Ancᵤ;
-                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                                       apply Or.inr;
                                                       exact Prop_Inc_Indᵤ; ); );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -5349,27 +5353,27 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            | inl Prop_Outgoing₁ᵥ => cases Prop_Outgoing₁ᵥ with
                                                                     | inl Prop_Outgoingₕ₁ᵥ => simp only [type_outgoing₁.check_h₁] at Prop_Outgoingₕ₁ᵥ ⊢;
                                                                                               cases Prop_Outgoingₕ₁ᵥ with | intro Prop_HPTₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Startₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Endₕ₁ᵥ Prop_Colorₕ₁ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Origₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Destₕ₁ᵥ Prop_Colorₕ₁ᵥ =>
                                                                                               --
                                                                                               apply Or.inl; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                                                    exact Or.inr Prop_HPTₕ₁ᵥ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );    /- := Start Node -/
-                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                               /- := End Node -/
-                                                                                                                   exact Prop_Endₕ₁ᵥ; );
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );    /- := Orig Node -/
+                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                               /- := Dest Node -/
+                                                                                                                   exact Prop_Destₕ₁ᵥ; );
                                                                                               exact Prop_Colorₕ₁ᵥ;                                                     /- := Colors -/
                                                                     | inr Prop_Outgoingᵢₑ₁ᵥ => simp only [type_outgoing₁.check_ie₁] at Prop_Outgoingᵢₑ₁ᵥ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_HPTᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Startᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Endᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Origᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Destᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
                                                                                                cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Colorᵢₑ₁ᵥ Prop_Out_Indᵢₑ₁ᵥ =>
                                                                                                --
                                                                                                apply Or.inl; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 1 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                        /- := Start Node -/
-                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := End Node -/
-                                                                                                                    exact Prop_Endᵢₑ₁ᵥ; );
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                        /- := Orig Node -/
+                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := Dest Node -/
+                                                                                                                    exact Prop_Destᵢₑ₁ᵥ; );
                                                                                                apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵢₑ₁ᵥ;            /- := Colors -/
                                                                                                                     rewrite [Prop_Colorᵢₑ₁ᵥ];
                                                                                                                     exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -5378,22 +5382,22 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                                cases Prop_Out_Indᵢₑ₁ᵥ with | intro Incᵢₑ₁ᵥ Prop_Out_Indᵢₑ₁ᵥ =>
                                                                                                --
                                                                                                apply Exists.intro Incᵢₑ₁ᵥ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                                                                                                            apply Or.inl;
                                                                                                            exact Prop_Out_Indᵢₑ₁ᵥ; );
                                            | inr Prop_Outgoing₃ᵥ => cases Prop_Outgoing₃ᵥ with
                                                                     | inl Prop_Outgoingₕ₃ᵥ => simp only [type_outgoing₃.check_h₃] at Prop_Outgoingₕ₃ᵥ ⊢;
                                                                                               cases Prop_Outgoingₕ₃ᵥ with | intro Prop_HPTₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Startₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Endₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Origₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Destₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
                                                                                               cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Colorₕ₃ᵥ Prop_Out_Dirₕ₃ᵥ =>
                                                                                               --
                                                                                               apply Or.inr; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                                            /- := Type 3 Hypothesis -/
                                                                                                                    exact Or.inr Prop_HPTₕ₃ᵥ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                         /- := Start Node -/
-                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                                                    /- := End Node -/
-                                                                                                                   exact Prop_Endₕ₃ᵥ; );
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                         /- := Orig Node -/
+                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                                                    /- := Dest Node -/
+                                                                                                                   exact Prop_Destₕ₃ᵥ; );
                                                                                               apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorₕ₃ᵥ;              /- := Colors -/
                                                                                                                    rewrite [Prop_Colorₕ₃ᵥ];
                                                                                                                    exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -5404,20 +5408,20 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                               --
                                                                                               apply Exists.intro Colorsₕ₃ᵥ;
                                                                                               apply Exists.intro Ancₕ₃ᵥ;
-                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.COLOR::colors) ∈ DIRECT -/
+                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.color::colors) ∈ DIRECT -/
                                                                                                          apply Or.inl;
                                                                                                          exact REWRITE.Mem_RwDirect_Of_Mem Prop_Out_Dirₕ₃ᵥ; );
                                                                     | inr Prop_Outgoingᵢₑ₃ᵥ => simp only [type_outgoing₃.check_ie₃] at Prop_Outgoingᵢₑ₃ᵥ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_HPTᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Startᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Endᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Origᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Destᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
                                                                                                cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Colorᵢₑ₃ᵥ Prop_Out_Indᵢₑ₃ᵥ =>
                                                                                                --
                                                                                                apply Or.inr; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 3 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                        /- := Start Node -/
-                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := End Node -/
-                                                                                                                    exact Prop_Endᵢₑ₃ᵥ; );
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                        /- := Orig Node -/
+                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := Dest Node -/
+                                                                                                                    exact Prop_Destᵢₑ₃ᵥ; );
                                                                                                apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵢₑ₃ᵥ;            /- := Colors -/
                                                                                                                     rewrite [Prop_Colorᵢₑ₃ᵥ];
                                                                                                                     exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -5430,7 +5434,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                                apply Exists.intro Colorsᵢₑ₃ᵥ;
                                                                                                apply Exists.intro Incᵢₑ₃ᵥ;
                                                                                                apply Exists.intro Ancᵢₑ₃ᵥ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.COLOR::colors) ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.color::colors) ∈ INDIRECT -/
                                                                                                           apply Or.inl;
                                                                                                           exact Prop_Out_Indᵢₑ₃ᵥ; );
                        | inr out_casesᵤ => have Out_Caseᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_casesᵤ;          /- := out ∈ RULEᵤ.OUTGOING -/
@@ -5440,25 +5444,25 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            | inl Prop_Outgoing₁ᵤ => cases Prop_Outgoing₁ᵤ with
                                                                     | inl Prop_Outgoingₕ₁ᵤ => simp only [type_outgoing₁.check_h₁] at Prop_Outgoingₕ₁ᵤ ⊢;
                                                                                               cases Prop_Outgoingₕ₁ᵤ with | intro Prop_HPTₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Startₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Endₕ₁ᵤ Prop_Colorₕ₁ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Origₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Destₕ₁ᵤ Prop_Colorₕ₁ᵤ =>
                                                                                               --
                                                                                               apply Or.inl; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                                                    exact Or.inl Prop_HPTₕ₁ᵤ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );    /- := Start Node -/
-                                                                                              apply And.intro ( by exact Prop_Endₕ₁ᵤ; );                                /- := End Node -/
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );    /- := Orig Node -/
+                                                                                              apply And.intro ( by exact Prop_Destₕ₁ᵤ; );                                /- := Dest Node -/
                                                                                               exact Prop_Colorₕ₁ᵤ;                                                     /- := Colors -/
                                                                     | inr Prop_Outgoingᵢₑ₁ᵤ => simp only [type_outgoing₁.check_ie₁] at Prop_Outgoingᵢₑ₁ᵤ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_HPTᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Startᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Endᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Origᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Destᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
                                                                                                cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Colorᵢₑ₁ᵤ Prop_Out_Indᵢₑ₁ᵤ =>
                                                                                                --
                                                                                                apply Or.inl; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 1 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );                        /- := Start Node -/
-                                                                                               apply And.intro ( by exact Prop_Endᵢₑ₁ᵤ; );                                                   /- := End Node -/
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );                        /- := Orig Node -/
+                                                                                               apply And.intro ( by exact Prop_Destᵢₑ₁ᵤ; );                                                   /- := Dest Node -/
                                                                                                apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorᵢₑ₁ᵤ;                /- := Colors -/
                                                                                                                     cases Prop_Colorᵢₑ₁ᵤ with
                                                                                                                     | inl Prop_NBR_Colorᵢₑ₁ᵤ => rewrite [Prop_NBR_Colorᵢₑ₁ᵤ];
@@ -5469,21 +5473,21 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                                cases Prop_Out_Indᵢₑ₁ᵤ with | intro Incᵢₑ₁ᵤ Prop_Out_Indᵢₑ₁ᵤ =>
                                                                                                --
                                                                                                apply Exists.intro Incᵢₑ₁ᵤ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                                                                                                            apply Or.inr;
                                                                                                            exact Prop_Out_Indᵢₑ₁ᵤ; );
                                            | inr Prop_Outgoing₃ᵤ => cases Prop_Outgoing₃ᵤ with
                                                                     | inl Prop_Outgoingₕ₃ᵤ => simp only [type_outgoing₃.check_h₃] at Prop_Outgoingₕ₃ᵤ ⊢;
                                                                                               cases Prop_Outgoingₕ₃ᵤ with | intro Prop_HPTₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Startₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Endₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Origₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Destₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
                                                                                               cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Colorₕ₃ᵤ Prop_Out_Dirₕ₃ᵤ =>
                                                                                               --
                                                                                               apply Or.inr; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                                                    exact Or.inl Prop_HPTₕ₃ᵤ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );    /- := Start Node -/
-                                                                                              apply And.intro ( by exact Prop_Endₕ₃ᵤ; );                                /- := End Node -/
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );    /- := Orig Node -/
+                                                                                              apply And.intro ( by exact Prop_Destₕ₃ᵤ; );                                /- := Dest Node -/
                                                                                               apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorₕ₃ᵤ;                  /- := Colors -/
                                                                                                                    cases Prop_Colorₕ₃ᵤ with
                                                                                                                    | inl Prop_NBR_Colorᵢₑ₃ᵤ => rewrite [Prop_NBR_Colorᵢₑ₃ᵤ];
@@ -5496,19 +5500,19 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                               --
                                                                                               apply Exists.intro Colorsₕ₃ᵤ;
                                                                                               apply Exists.intro Ancₕ₃ᵤ;
-                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.COLOR::colors) ∈ DIRECT -/
+                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.color::colors) ∈ DIRECT -/
                                                                                                          apply Or.inr;
                                                                                                          exact REWRITE.Mem_RwDirect_Of_Mem Prop_Out_Dirₕ₃ᵤ; );
                                                                     | inr Prop_Outgoingᵢₑ₃ᵤ => simp only [type_outgoing₃.check_ie₃] at Prop_Outgoingᵢₑ₃ᵤ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_HPTᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Startᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Endᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Origᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Destᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
                                                                                                cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Colorᵢₑ₃ᵤ Prop_Out_Indᵢₑ₃ᵤ =>
                                                                                                --
                                                                                                apply Or.inr; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                            /- := Type 1 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );   /- := Start Node -/
-                                                                                               apply And.intro ( by exact Prop_Endᵢₑ₃ᵤ; );                              /- := End Node -/
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );   /- := Orig Node -/
+                                                                                               apply And.intro ( by exact Prop_Destᵢₑ₃ᵤ; );                              /- := Dest Node -/
                                                                                                apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorᵢₑ₃ᵤ;                /- := Colors -/
                                                                                                                     cases Prop_Colorᵢₑ₃ᵤ with
                                                                                                                     | inl Prop_NBR_Colorᵢₑ₃ᵤ => rewrite [Prop_NBR_Colorᵢₑ₃ᵤ];
@@ -5523,7 +5527,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                                apply Exists.intro Colorsᵢₑ₃ᵤ;
                                                                                                apply Exists.intro Incᵢₑ₃ᵤ;
                                                                                                apply Exists.intro Ancᵢₑ₃ᵤ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.COLOR::colors) ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.color::colors) ∈ INDIRECT -/
                                                                                                           apply Or.inr;
                                                                                                           exact Prop_Out_Indᵢₑ₃ᵤ; ); );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -5537,8 +5541,8 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            cases Dir_Casesᵥ with | intro Originalᵥ Dir_Memᵥ =>
                                            have Prop_Directᵥ := prop_directᵥ Dir_Memᵥ;
                                            simp only [type_direct.check] at Prop_Directᵥ ⊢;
-                                           cases Prop_Directᵥ with | intro Prop_Startᵥ Prop_Directᵥ =>
-                                           cases Prop_Directᵥ with | intro Prop_Endᵥ Prop_Directᵥ =>
+                                           cases Prop_Directᵥ with | intro Prop_Origᵥ Prop_Directᵥ =>
+                                           cases Prop_Directᵥ with | intro Prop_Destᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Prop_Levelᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Color₁ᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Color₂ᵥ Prop_Directᵥ =>
@@ -5547,9 +5551,9 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            cases Prop_Directᵥ with | intro Prop_Color₁ᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Prop_Colorsᵥ Prop_Dir_Outᵥ =>
                                            --
-                                           apply And.intro ( by rewrite [prop_eq_lvl];                          /- := Start Node -/
-                                                                exact Prop_Startᵥ; );
-                                           apply And.intro ( by exact REWRITE.Get_End_RwDirect dir_casesᵥ; );   /- := End Node -/
+                                           apply And.intro ( by rewrite [prop_eq_lvl];                          /- := Orig Node -/
+                                                                exact Prop_Origᵥ; );
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwDirect dir_casesᵥ; );   /- := Dest Node -/
                                            apply And.intro ( by rewrite [prop_eq_lvl];                          /- := Colors -/
                                                                 exact Prop_Levelᵥ; );
                                            apply Exists.intro Color₁ᵥ;
@@ -5572,29 +5576,29 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            apply Exists.intro Dep_Outᵥ;
                                            apply And.intro ( by exact Prop_Out_Colᵥ; );
                                            apply And.intro ( by exact Prop_Color₂ᵥ; );
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                                                 apply Or.inl;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Dir_Outᵥ; );
-                                           intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                                           intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵥ;
                                            cases all_out_casesᵥ with
                                            | inl all_out_casesᵥᵥ => have Dir_Out_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵥᵥ with | intro Originalᵥ Dir_Out_Memᵥᵥ =>
                                                                     --
-                                                                    have Prop_All_Dir_Outᵥᵥ := Prop_All_Dir_Outᵥ Dir_Out_Memᵥᵥ;                                 /- := all_out.COLOR = Color₁ ↔ all_out = Deduction.mk CENTER out Color₁ dep_out -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Dir_Outᵥᵥ ⊢;
+                                                                    have Prop_All_Dir_Outᵥᵥ := Prop_All_Dir_Outᵥ Dir_Out_Memᵥᵥ;                                 /- := all_out.color = Color₁ ↔ all_out = DEdge.mk CENTER out Color₁ dep_out -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Dir_Outᵥᵥ ⊢;
                                                                     --
-                                                                    rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵥ Dir_Out_Memᵥᵥ)] at Prop_All_Dir_Outᵥᵥ;   /- := all_out.START = RULEᵥ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵥ Dir_Out_Memᵥᵥ)] at Prop_All_Dir_Outᵥᵥ;   /- := all_out.orig = RULEᵥ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Dir_Outᵥᵥ ⊢;
                                                                     exact Prop_All_Dir_Outᵥᵥ;
                                            | inr all_out_casesᵥᵤ => have Dir_Out_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵥᵤ with | intro Originalᵤ Dir_Out_Memᵥᵤ =>
                                                                     --
-                                                                    have Prop_All_Outᵤ := prop_out_colorsᵤ Dir_Out_Memᵥᵤ eq_out_memᵤ (Or.inr eq_out_colorᵤ);  /- := all_out.COLOR = eq_out.COLOR ↔ all_out = eq_out -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Outᵤ ⊢;
-                                                                    rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Outᵤ := prop_out_colorsᵤ Dir_Out_Memᵥᵤ eq_out_memᵤ (Or.inr eq_out_colorᵤ);  /- := all_out.color = eq_out.color ↔ all_out = eq_out -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Outᵤ ⊢;
+                                                                    rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Outᵤ ⊢;
                                                                     --
                                                                     rewrite [prop_out_unitᵥ] at Prop_Dir_Outᵥ;
@@ -5612,8 +5616,8 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            cases Dir_Casesᵤ with | intro Originalᵤ Dir_Memᵤ =>
                                            have Prop_Directᵤ := prop_directᵤ Dir_Memᵤ;
                                            simp only [type_direct.check] at Prop_Directᵤ ⊢;
-                                           cases Prop_Directᵤ with | intro Prop_Startᵤ Prop_Directᵤ =>
-                                           cases Prop_Directᵤ with | intro Prop_Endᵤ Prop_Directᵤ =>
+                                           cases Prop_Directᵤ with | intro Prop_Origᵤ Prop_Directᵤ =>
+                                           cases Prop_Directᵤ with | intro Prop_Destᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Prop_Levelᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Color₁ᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Color₂ᵤ Prop_Directᵤ =>
@@ -5622,8 +5626,8 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            cases Prop_Directᵤ with | intro Prop_Color₁ᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Prop_Colorsᵤ Prop_Dir_Outᵤ =>
                                            --
-                                           apply And.intro ( by exact Prop_Startᵤ; );                           /- := Start Node -/
-                                           apply And.intro ( by exact REWRITE.Get_End_RwDirect dir_casesᵤ; );   /- := End Node -/
+                                           apply And.intro ( by exact Prop_Origᵤ; );                           /- := Orig Node -/
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwDirect dir_casesᵤ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Levelᵤ; );                           /- := Colors -/
                                            apply Exists.intro Color₁ᵤ;
                                            apply Exists.intro Color₂ᵤ;
@@ -5647,27 +5651,27 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            apply Exists.intro Dep_Outᵤ;
                                            apply And.intro ( by exact Prop_Out_Colᵤ; );
                                            apply And.intro ( by exact Prop_Color₂ᵤ; );
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                                                 apply Or.inr;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Dir_Outᵤ; );
-                                           intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                                           intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵤ;
                                            cases all_out_casesᵤ with
                                            | inl all_out_casesᵤᵥ => have Dir_Out_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵤᵥ with | intro Originalᵥ Dir_Out_Memᵤᵥ =>
                                                                     rewrite [prop_out_unitᵥ] at Dir_Out_Memᵤᵥ;
                                                                     rewrite [List.Eq_Iff_Mem_Unit] at Dir_Out_Memᵤᵥ;
-                                                                    rewrite [Deduction.mk.injEq] at Dir_Out_Memᵤᵥ ⊢;
-                                                                    cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Startᵤᵥ Dir_Out_Memᵤᵥ =>
-                                                                    cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Endᵤᵥ Dir_Out_Memᵤᵥ =>
+                                                                    rewrite [DEdge.mk.injEq] at Dir_Out_Memᵤᵥ ⊢;
+                                                                    cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Origᵤᵥ Dir_Out_Memᵤᵥ =>
+                                                                    cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Destᵤᵥ Dir_Out_Memᵤᵥ =>
                                                                     cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Colorᵤᵥ Dir_Out_Dependencyᵤᵥ =>
-                                                                    rewrite [Dir_Out_Endᵤᵥ, Dir_Out_Colorᵤᵥ, Dir_Out_Dependencyᵤᵥ];
+                                                                    rewrite [Dir_Out_Destᵤᵥ, Dir_Out_Colorᵤᵥ, Dir_Out_Dependencyᵤᵥ];
                                                                     rewrite [prop_eq_out_end, prop_eq_out_color, prop_eq_out_dependency];
                                                                     --
-                                                                    have Prop_All_Outᵤ := prop_out_colorsᵤ eq_out_memᵤ Prop_Dir_Outᵤ (Or.inl eq_out_colorᵤ);  /- := all_out.COLOR = eq_out.COLOR ↔ all_out = eq_out -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Outᵤ;
-                                                                    rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Outᵤ := prop_out_colorsᵤ eq_out_memᵤ Prop_Dir_Outᵤ (Or.inl eq_out_colorᵤ);  /- := all_out.color = eq_out.color ↔ all_out = eq_out -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Outᵤ;
+                                                                    rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Outᵤ ⊢;
                                                                     --
                                                                     exact Iff.intro ( by intro iff_eq_colorᵤᵥ;
@@ -5678,10 +5682,10 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                          simp only [iff_eq_edgeᵤᵥ]; );
                                            | inr all_out_casesᵤᵤ => have Dir_Out_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵤᵤ with | intro Originalᵤ Dir_Out_Memᵤᵤ =>
-                                                                    have Prop_All_Dir_Outᵤᵤ := Prop_All_Dir_Outᵤ Dir_Out_Memᵤᵤ;                                 /- := all_out.COLOR = Color₁ ↔ all_out = Deduction.mk CENTER out Color₁ dep_out -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Dir_Outᵤᵤ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Dir_Out_Memᵤᵤ)] at Prop_All_Dir_Outᵤᵤ;   /- := all_out.START = RULEᵤ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Dir_Outᵤᵤ := Prop_All_Dir_Outᵤ Dir_Out_Memᵤᵤ;                                 /- := all_out.color = Color₁ ↔ all_out = DEdge.mk CENTER out Color₁ dep_out -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Dir_Outᵤᵤ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Dir_Out_Memᵤᵤ)] at Prop_All_Dir_Outᵤᵤ;   /- := all_out.orig = RULEᵤ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Dir_Outᵤᵤ ⊢;
                                                                     exact Prop_All_Dir_Outᵤᵤ; );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -5693,8 +5697,8 @@ namespace COVERAGE.T3_Of_T3.EDGES
   cases ind_cases with
   | inl ind_casesᵥ => have Prop_Indirectᵥ := prop_indirectᵥ ind_casesᵥ;
                       simp only [type_indirect.check] at Prop_Indirectᵥ ⊢;
-                      cases Prop_Indirectᵥ with | intro Prop_Startᵥ Prop_Indirectᵥ =>
-                      cases Prop_Indirectᵥ with | intro Prop_Endᵥ Prop_Indirectᵥ =>
+                      cases Prop_Indirectᵥ with | intro Prop_Origᵥ Prop_Indirectᵥ =>
+                      cases Prop_Indirectᵥ with | intro Prop_Destᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Prop_Levelᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Colorᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Colorsᵥ Prop_Indirectᵥ =>
@@ -5703,10 +5707,10 @@ namespace COVERAGE.T3_Of_T3.EDGES
                       cases Prop_Indirectᵥ with | intro Prop_Colorsᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Prop_Ind_Incᵥ Prop_Ind_Outᵥ =>
                       --
-                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Start Node -/
-                                           exact Prop_Startᵥ; );
-                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := End Node -/
-                                           exact Prop_Endᵥ; );
+                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Orig Node -/
+                                           exact Prop_Origᵥ; );
+                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Dest Node -/
+                                           exact Prop_Destᵥ; );
                       apply And.intro ( by rewrite [prop_eq_lvl];         /- := Colors -/
                                            exact Prop_Levelᵥ; );
                       apply Exists.intro Colorᵥ;
@@ -5722,25 +5726,25 @@ namespace COVERAGE.T3_Of_T3.EDGES
                       cases Prop_Ind_Incᵥ with | intro Prop_Ind_Incᵥ Prop_All_Ind_Incᵥ =>
                       --
                       apply And.intro ( by apply Exists.intro Dep_Incᵥ;
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.END CENTER 0 dep_inc ∈ INCOMING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.dest CENTER 0 dep_inc ∈ INCOMING -/
                                                                 apply Or.inl;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwIncoming_Of_Mem Prop_Ind_Incᵥ; );
-                                           intro all_incᵥ all_inc_casesᵥ;                                     /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
+                                           intro all_incᵥ all_inc_casesᵥ;                                     /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_inc_casesᵥ;
                                            cases all_inc_casesᵥ with
                                            | inl all_inc_casesᵥᵥ => have Ind_Inc_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵥᵥ;                      /- := all_inc ∈ RULEᵥ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵥᵥ with | intro Originalᵥ Ind_Inc_Memᵥᵥ =>
-                                                                    have Prop_All_Ind_Incᵥᵥ := Prop_All_Ind_Incᵥ Ind_Inc_Memᵥᵥ;                                 /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Ind_Incᵥᵥ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Inc_End (prop_incomingᵥ Ind_Inc_Memᵥᵥ)] at Prop_All_Ind_Incᵥᵥ;      /- := all_inc.END = RULEᵥ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_End_RwIncoming all_inc_casesᵥᵥ];                                      /- := all_inc.END = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Ind_Incᵥᵥ := Prop_All_Ind_Incᵥ Ind_Inc_Memᵥᵥ;                                 /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Ind_Incᵥᵥ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Inc_Dest (prop_incomingᵥ Ind_Inc_Memᵥᵥ)] at Prop_All_Ind_Incᵥᵥ;      /- := all_inc.dest = RULEᵥ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Dest_RwIncoming all_inc_casesᵥᵥ];                                      /- := all_inc.dest = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Ind_Incᵥᵥ ⊢;
                                                                     exact Prop_All_Ind_Incᵥᵥ;
                                            | inr all_inc_casesᵥᵤ => have Ind_Inc_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵥᵤ;                      /- := all_inc ∈ RULEᵤ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵥᵤ with | intro Originalᵤ Ind_Inc_Memᵥᵤ =>
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have Prop_Check_Incomingᵥᵤ := prop_check_incoming Ind_Inc_Memᵥᵤ Prop_Ind_Incᵥ;              /- := all_inc.START ≠ IND.END -/
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have Prop_Check_Incomingᵥᵤ := prop_check_incoming Ind_Inc_Memᵥᵤ Prop_Ind_Incᵥ;              /- := all_inc.orig ≠ IND.dest -/
                                                                     simp only [Prop_Check_Incomingᵥᵤ, false_and]; );
                       /- := Check Indirect-Outgoing Duo: -/
                       cases Prop_Ind_Outᵥ with | intro Outᵥ Prop_Ind_Outᵥ =>
@@ -5751,26 +5755,26 @@ namespace COVERAGE.T3_Of_T3.EDGES
                       apply Exists.intro Outᵥ;
                       apply Exists.intro Dep_Outᵥ;
                       apply And.intro ( by exact Prop_Out_Colᵥ; );
-                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                            apply Or.inl;
                                            rewrite [←collapse.center];
                                            exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Ind_Outᵥ; );
-                      intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                      intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                       simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵥ;
                       cases all_out_casesᵥ with
                       | inl all_out_casesᵥᵥ => have Ind_Out_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                cases Ind_Out_Casesᵥᵥ with | intro Originalᵥ Ind_Out_Memᵥᵥ =>
-                                               have Prop_All_Ind_Outᵥᵥ := Prop_All_Ind_Outᵥ Ind_Out_Memᵥᵥ;                                 /- := all_out.COLOR = Color ↔ all_out = Deduction.mk CENTER out Color dep_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Ind_Outᵥᵥ ⊢;
-                                               rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵥ Ind_Out_Memᵥᵥ)] at Prop_All_Ind_Outᵥᵥ;   /- := all_out.START = RULEᵥ.CENTER -/
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Ind_Outᵥᵥ := Prop_All_Ind_Outᵥ Ind_Out_Memᵥᵥ;                                 /- := all_out.color = Color ↔ all_out = DEdge.mk CENTER out Color dep_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Ind_Outᵥᵥ ⊢;
+                                               rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵥ Ind_Out_Memᵥᵥ)] at Prop_All_Ind_Outᵥᵥ;   /- := all_out.orig = RULEᵥ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Ind_Outᵥᵥ ⊢;
                                                exact Prop_All_Ind_Outᵥᵥ;
                       | inr all_out_casesᵥᵤ => have Dir_Out_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                cases Dir_Out_Casesᵥᵤ with | intro Originalᵤ Dir_Out_Memᵥᵤ =>
                                                --
-                                               have Prop_All_Outᵤ := prop_out_colorsᵤ Dir_Out_Memᵥᵤ eq_out_memᵤ (Or.inr eq_out_colorᵤ);  /- := all_out.COLOR = eq_out.COLOR ↔ all_out = eq_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Outᵤ ⊢;
+                                               have Prop_All_Outᵤ := prop_out_colorsᵤ Dir_Out_Memᵥᵤ eq_out_memᵤ (Or.inr eq_out_colorᵤ);  /- := all_out.color = eq_out.color ↔ all_out = eq_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Outᵤ ⊢;
                                                simp only [true_and] at Prop_All_Outᵤ ⊢;
                                                --
                                                rewrite [prop_out_unitᵥ] at Prop_Ind_Outᵥ;
@@ -5778,7 +5782,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                simp only [←Prop_Ind_Outᵥ] at prop_eq_out_end prop_eq_out_color prop_eq_out_dependency;
                                                rewrite [prop_eq_out_end, prop_eq_out_color, prop_eq_out_dependency];
                                                --
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                exact Iff.intro ( by intro iff_eq_colorᵥᵤ;
                                                                     rewrite [Prop_All_Outᵤ] at iff_eq_colorᵥᵤ;
                                                                     simp only [iff_eq_colorᵥᵤ];
@@ -5787,8 +5791,8 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                     simp only [iff_eq_edgeᵥᵤ]; );
   | inr ind_casesᵤ => have Prop_Indirectᵤ := prop_indirectᵤ ind_casesᵤ;
                       simp only [type_indirect.check] at Prop_Indirectᵤ ⊢;
-                      cases Prop_Indirectᵤ with | intro Prop_Startᵤ Prop_Indirectᵤ =>
-                      cases Prop_Indirectᵤ with | intro Prop_Endᵤ Prop_Indirectᵤ =>
+                      cases Prop_Indirectᵤ with | intro Prop_Origᵤ Prop_Indirectᵤ =>
+                      cases Prop_Indirectᵤ with | intro Prop_Destᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Prop_Levelᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Colorᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Colorsᵤ Prop_Indirectᵤ =>
@@ -5797,8 +5801,8 @@ namespace COVERAGE.T3_Of_T3.EDGES
                       cases Prop_Indirectᵤ with | intro Prop_Colorsᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Prop_Ind_Incᵤ Prop_Ind_Outᵤ =>
                       --
-                      apply And.intro ( by exact Prop_Startᵤ; );           /- := Start Node -/
-                      apply And.intro ( by exact Prop_Endᵤ; );             /- := End Node -/
+                      apply And.intro ( by exact Prop_Origᵤ; );           /- := Orig Node -/
+                      apply And.intro ( by exact Prop_Destᵤ; );             /- := Dest Node -/
                       apply And.intro ( by exact Prop_Levelᵤ; );           /- := Colors -/
                       apply Exists.intro Colorᵤ;
                       apply Exists.intro Colorsᵤ;
@@ -5815,25 +5819,25 @@ namespace COVERAGE.T3_Of_T3.EDGES
                       cases Prop_Ind_Incᵤ with | intro Prop_Ind_Incᵤ Prop_All_Ind_Incᵤ =>
                       --
                       apply And.intro ( by apply Exists.intro Dep_Incᵤ;
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.END CENTER 0 dep_inc ∈ INCOMING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.dest CENTER 0 dep_inc ∈ INCOMING -/
                                                                 apply Or.inr;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwIncoming_Of_Mem Prop_Ind_Incᵤ; );
-                                           intro all_incᵤ all_inc_casesᵤ;                                     /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
+                                           intro all_incᵤ all_inc_casesᵤ;                                     /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_inc_casesᵤ;
                                            cases all_inc_casesᵤ with
                                            | inl all_inc_casesᵤᵥ => have Ind_Inc_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵤᵥ;                      /- := all_inc ∈ RULEᵥ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵤᵥ with | intro Originalᵥ Ind_Inc_Memᵤᵥ =>
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have Prop_Check_Incomingᵤᵥ := prop_check_incoming Prop_Ind_Incᵤ Ind_Inc_Memᵤᵥ;              /- := IND.END ≠ all_inc.START -/
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have Prop_Check_Incomingᵤᵥ := prop_check_incoming Prop_Ind_Incᵤ Ind_Inc_Memᵤᵥ;              /- := IND.dest ≠ all_inc.orig -/
                                                                     rewrite [ne_comm] at Prop_Check_Incomingᵤᵥ;
                                                                     simp only [Prop_Check_Incomingᵤᵥ, false_and];
                                            | inr all_inc_casesᵤᵤ => have Ind_Inc_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵤᵤ;                      /- := all_inc ∈ RULEᵤ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵤᵤ with | intro Originalᵤ Ind_Inc_Memᵤᵤ =>
-                                                                    have Prop_All_Ind_Incᵤᵤ := Prop_All_Ind_Incᵤ Ind_Inc_Memᵤᵤ;                                 /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Ind_Incᵤᵤ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Inc_End (prop_incomingᵤ Ind_Inc_Memᵤᵤ)] at Prop_All_Ind_Incᵤᵤ;      /- := all_inc.END = RULEᵤ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_End_RwIncoming all_inc_casesᵤᵤ];                                      /- := all_inc.END = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Ind_Incᵤᵤ := Prop_All_Ind_Incᵤ Ind_Inc_Memᵤᵤ;                                 /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Ind_Incᵤᵤ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Inc_Dest (prop_incomingᵤ Ind_Inc_Memᵤᵤ)] at Prop_All_Ind_Incᵤᵤ;      /- := all_inc.dest = RULEᵤ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Dest_RwIncoming all_inc_casesᵤᵤ];                                      /- := all_inc.dest = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Ind_Incᵤᵤ ⊢;
                                                                     exact Prop_All_Ind_Incᵤᵤ; );
                       /- Check Outgoing-Indirect Duo: -/
@@ -5845,27 +5849,27 @@ namespace COVERAGE.T3_Of_T3.EDGES
                       apply Exists.intro Outᵤ;
                       apply Exists.intro Dep_Outᵤ;
                       apply And.intro ( by exact Prop_Out_Colᵤ; );
-                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color dep_out ∈ OUTGOING -/
+                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color dep_out ∈ OUTGOING -/
                                            apply Or.inr;
                                            rewrite [←collapse.center];
                                            exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Ind_Outᵤ; );
-                      intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.COLOR = color ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                      intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.color = color ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                       simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵤ;
                       cases all_out_casesᵤ with
                       | inl all_out_casesᵤᵥ => have Dir_Out_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                cases Dir_Out_Casesᵤᵥ with | intro Originalᵥ Dir_Out_Memᵤᵥ =>
                                                rewrite [prop_out_unitᵥ] at Dir_Out_Memᵤᵥ;
                                                rewrite [List.Eq_Iff_Mem_Unit] at Dir_Out_Memᵤᵥ;
-                                               rewrite [Deduction.mk.injEq] at Dir_Out_Memᵤᵥ ⊢;
-                                               cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Startᵤᵥ Dir_Out_Memᵤᵥ =>
-                                               cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Endᵤᵥ Dir_Out_Memᵤᵥ =>
+                                               rewrite [DEdge.mk.injEq] at Dir_Out_Memᵤᵥ ⊢;
+                                               cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Origᵤᵥ Dir_Out_Memᵤᵥ =>
+                                               cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Destᵤᵥ Dir_Out_Memᵤᵥ =>
                                                cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Colorᵤᵥ Dir_Out_Dependencyᵤᵥ =>
-                                               rewrite [Dir_Out_Endᵤᵥ, Dir_Out_Colorᵤᵥ, Dir_Out_Dependencyᵤᵥ];
+                                               rewrite [Dir_Out_Destᵤᵥ, Dir_Out_Colorᵤᵥ, Dir_Out_Dependencyᵤᵥ];
                                                rewrite [prop_eq_out_end, prop_eq_out_color, prop_eq_out_dependency];
                                                --
-                                               have Prop_All_Outᵤ := prop_out_colorsᵤ eq_out_memᵤ Prop_Ind_Outᵤ (Or.inl eq_out_colorᵤ);  /- := all_out.COLOR = eq_out.COLOR ↔ all_out = eq_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Outᵤ;
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Outᵤ := prop_out_colorsᵤ eq_out_memᵤ Prop_Ind_Outᵤ (Or.inl eq_out_colorᵤ);  /- := all_out.color = eq_out.color ↔ all_out = eq_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Outᵤ;
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Outᵤ ⊢;
                                                --
                                                exact Iff.intro ( by intro iff_eq_colorᵤᵥ;
@@ -5876,10 +5880,10 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                     simp only [iff_eq_edgeᵤᵥ]; );
                       | inr all_out_casesᵤᵤ => have Ind_Out_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                cases Ind_Out_Casesᵤᵤ with | intro Originalᵤ Ind_Out_Memᵤᵤ =>
-                                               have Prop_All_Ind_Outᵤᵤ := Prop_All_Ind_Outᵤ Ind_Out_Memᵤᵤ;                                 /- := all_out.COLOR = Color ↔ all_out = Deduction.mk CENTER out Color dep_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Ind_Outᵤᵤ ⊢;
-                                               rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Ind_Out_Memᵤᵤ)] at Prop_All_Ind_Outᵤᵤ;   /- := all_out.START = RULEᵤ.CENTER -/
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Ind_Outᵤᵤ := Prop_All_Ind_Outᵤ Ind_Out_Memᵤᵤ;                                 /- := all_out.color = Color ↔ all_out = DEdge.mk CENTER out Color dep_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Ind_Outᵤᵤ ⊢;
+                                               rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Ind_Out_Memᵤᵤ)] at Prop_All_Ind_Outᵤᵤ;   /- := all_out.orig = RULEᵤ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Ind_Outᵤᵤ ⊢;
                                                exact Prop_All_Ind_Outᵤᵤ;
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -5938,7 +5942,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
   cases prop_typeᵥ with | intro prop_dir_nilᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_dir_consᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_dir_unitᵥ prop_typeᵥ =>
-  cases prop_typeᵥ with | intro prop_ind_startsᵥ prop_typeᵥ =>
+  cases prop_typeᵥ with | intro prop_ind_origsᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_ind_lenᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_incomingᵥ prop_typeᵥ =>
   cases prop_typeᵥ with | intro prop_outgoingᵥ prop_typeᵥ =>
@@ -5964,7 +5968,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
                        apply And.intro ( by rewrite [prop_pstᵤ];
                                             exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ prop_check_pastᵤ; );
                        trivial; );
-  /- Check Deduction Edges -/
+  /- Check DEdge Edges -/
   apply And.intro ( by intro prop_inc_nil;                                        /- := ( RULE.INCOMING = [] ) → ( RULE.CENTER.isHypothesis = true ) -/
                        simp only [List.append_eq_nil_iff] at prop_inc_nil;
                        simp only [←List.length_eq_zero_iff] at prop_inc_nil prop_inc_nilᵥ;
@@ -5973,65 +5977,65 @@ namespace COVERAGE.T3_Of_T3.EDGES
                        simp only [Bool.or_eq_true];
                        exact Or.inr (And.left prop_inc_nil); );
   apply And.intro ( by simp only [prop_out_unitᵥ];                                                                    /- := RULE.OUTGOING = (out::outs) -/
-                       apply Exists.intro ( Deduction.mk ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )                        /- RULEᵥ.OUTGOING -/
-                                                 ( outᵥ.END )
-                                                 ( outᵥ.COLOR )
-                                                 ( outᵥ.DEPENDENCY ) );
+                       apply Exists.intro ( DEdge.mk ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )                        /- RULEᵥ.OUTGOING -/
+                                                 ( outᵥ.dest )
+                                                 ( outᵥ.color )
+                                                 ( outᵥ.deps ) );
                        apply Exists.intro ( collapse.rewrite_outgoing ( collapse.center RULEᵤ.CENTER RULEᵥ.CENTER )   /- RULEᵤ.OUTGOING -/
                                                                       ( RULEᵤ.OUTGOING ) );
                        simp only [collapse.rewrite_outgoing];
                        simp only [collapse.center];
                        trivial; );
-  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂ gt_zero₁₂;                          /- := OUT₁.COLOR = OUT₂.COLOR ↔ OUT₁ = OUT₂ -/
+  apply And.intro ( by intro out₁ out₂ out_mem₁ out_mem₂ gt_zero₁₂;                          /- := OUT₁.color = OUT₂.color ↔ OUT₁ = OUT₂ -/
                        rewrite [prop_out_unitᵥ] at out_mem₁ out_mem₂;
                        simp only [collapse.rewrite_outgoing] at out_mem₁ out_mem₂;
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at out_mem₁ out_mem₂;
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
-                       simp only [Deduction.mk.injEq'];
+                       simp only [DEdge.mk.injEq'];
                        --
                        simp only [type_outgoing₃] at prop_outgoingᵤ;
-                       have Eq_Out_Colorᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ eq_out_memᵤ);
+                       have Eq_Out_Colorᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ eq_out_memᵤ);
                        --
                        cases out_mem₁ with
                        | inl out_mem₁ᵥ => cases out_mem₂ with
                                           | inl out_mem₂ᵥ => rewrite [out_mem₁ᵥ, out_mem₂ᵥ]; simp only [true_and];
-                                          | inr out_mem₂ᵤ => rewrite [out_mem₁ᵥ, REWRITE.Get_Start_RwOutgoing out_mem₂ᵤ];                 /- := out₁ = outᵥ, out₂.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                          | inr out_mem₂ᵤ => rewrite [out_mem₁ᵥ, REWRITE.Get_Orig_RwOutgoing out_mem₂ᵤ];                 /- := out₁ = outᵥ, out₂.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              simp only [prop_eq_out_end, prop_eq_out_color, prop_eq_out_dependency, true_and];
                                                              --
                                                              have Out_Cases₂ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₂ᵤ;                 /- := out₂ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₂ᵤ with | intro Originalᵤ Out_Mem₂ᵤ =>
-                                                             have Out_Start₂ᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Out_Mem₂ᵤ);     /- := out₂.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₂ᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Out_Mem₂ᵤ);     /- := out₂.orig = RULEᵤ.CENTER -/
                                                              --
                                                              have Iff_Out_Colorᵤ := prop_out_colorsᵤ eq_out_memᵤ Out_Mem₂ᵤ (Or.inl eq_out_colorᵤ);
-                                                             simp only [Deduction.mk.injEq'] at Out_Start₂ᵤ Iff_Out_Colorᵤ;
-                                                             simp only [Eq_Out_Colorᵤ, Out_Start₂ᵤ, true_and] at Iff_Out_Colorᵤ;
+                                                             simp only [DEdge.mk.injEq'] at Out_Orig₂ᵤ Iff_Out_Colorᵤ;
+                                                             simp only [Eq_Out_Colorᵤ, Out_Orig₂ᵤ, true_and] at Iff_Out_Colorᵤ;
                                                              exact Iff_Out_Colorᵤ;
                        | inr out_mem₁ᵤ => cases out_mem₂ with
-                                          | inl out_mem₂ᵥ => rewrite [REWRITE.Get_Start_RwOutgoing out_mem₁ᵤ, out_mem₂ᵥ];                 /- := out₁.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER, out₂ = outᵥ -/
+                                          | inl out_mem₂ᵥ => rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₁ᵤ, out_mem₂ᵥ];                 /- := out₁.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER, out₂ = outᵥ -/
                                                              simp only [prop_eq_out_end, prop_eq_out_color, prop_eq_out_dependency, true_and];
                                                              --
                                                              have Out_Cases₁ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₁ᵤ;                 /- := out₁ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₁ᵤ with | intro Originalᵤ Out_Mem₁ᵤ =>
-                                                             have Out_Start₁ᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Out_Mem₁ᵤ);     /- := out₁.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₁ᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Out_Mem₁ᵤ);     /- := out₁.orig = RULEᵤ.CENTER -/
                                                              --
                                                              have Iff_Out_Colorᵤ := prop_out_colorsᵤ Out_Mem₁ᵤ eq_out_memᵤ (Or.inr eq_out_colorᵤ);
-                                                             simp only [Deduction.mk.injEq'] at Out_Start₁ᵤ Iff_Out_Colorᵤ;
-                                                             simp only [Out_Start₁ᵤ, Eq_Out_Colorᵤ, true_and] at Iff_Out_Colorᵤ;
+                                                             simp only [DEdge.mk.injEq'] at Out_Orig₁ᵤ Iff_Out_Colorᵤ;
+                                                             simp only [Out_Orig₁ᵤ, Eq_Out_Colorᵤ, true_and] at Iff_Out_Colorᵤ;
                                                              exact Iff_Out_Colorᵤ;
-                                          | inr out_mem₂ᵤ => rewrite [REWRITE.Get_Start_RwOutgoing out_mem₁ᵤ];              /- := out₁.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
-                                                             rewrite [REWRITE.Get_Start_RwOutgoing out_mem₂ᵤ];              /- := out₂.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                          | inr out_mem₂ᵤ => rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₁ᵤ];              /- := out₁.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                             rewrite [REWRITE.Get_Orig_RwOutgoing out_mem₂ᵤ];              /- := out₂.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                              simp only [true_and];
                                                              --
                                                              have Out_Cases₁ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₁ᵤ;               /- := out₁ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₁ᵤ with | intro Original₁ᵤ Out_Mem₁ᵤ =>
-                                                             have Out_Start₁ᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₁ᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Out_Mem₁ᵤ);   /- := out₁.orig = RULEᵤ.CENTER -/
                                                              have Out_Cases₂ᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_mem₂ᵤ;               /- := out₂ ∈ RULEᵥ.OUTGOING -/
                                                              cases Out_Cases₂ᵤ with | intro Original₂ᵤ Out_Mem₂ᵤ =>
-                                                             have Out_Start₂ᵤ := COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.START = RULEᵤ.CENTER -/
+                                                             have Out_Orig₂ᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Out_Mem₂ᵤ);   /- := out₂.orig = RULEᵤ.CENTER -/
                                                              --
                                                              have Iff_Out_Colorᵤ := prop_out_colorsᵤ Out_Mem₁ᵤ Out_Mem₂ᵤ gt_zero₁₂;
-                                                             simp only [Deduction.mk.injEq] at Out_Start₁ᵤ Out_Start₂ᵤ Iff_Out_Colorᵤ;
-                                                             simp only [Out_Start₁ᵤ, Out_Start₂ᵤ, true_and] at Iff_Out_Colorᵤ;
+                                                             simp only [DEdge.mk.injEq] at Out_Orig₁ᵤ Out_Orig₂ᵤ Iff_Out_Colorᵤ;
+                                                             simp only [Out_Orig₁ᵤ, Out_Orig₂ᵤ, true_and] at Iff_Out_Colorᵤ;
                                                              exact Iff_Out_Colorᵤ; );
   apply And.intro ( by intro case_hpt;                                /- := ( RULE.CENTER.isHypothesis = false ) → ( RULE.DIRECT = [] ) -/
                        rewrite [Bool.or_eq_false_iff] at case_hpt;
@@ -6058,13 +6062,13 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            cases Inc_Caseᵥ with | intro Originalᵥ Inc_Memᵥ =>
                                            have Prop_Incomingᵥ := prop_incomingᵥ Inc_Memᵥ;                        /- := type_incoming.check inc RULEᵥ.CENTER -/
                                            simp only [type_incoming.check] at Prop_Incomingᵥ ⊢;
-                                           cases Prop_Incomingᵥ with | intro Prop_Startᵥ Prop_Incomingᵥ =>
-                                           cases Prop_Incomingᵥ with | intro Prop_Endᵥ Prop_Incomingᵥ =>
+                                           cases Prop_Incomingᵥ with | intro Prop_Origᵥ Prop_Incomingᵥ =>
+                                           cases Prop_Incomingᵥ with | intro Prop_Destᵥ Prop_Incomingᵥ =>
                                            cases Prop_Incomingᵥ with | intro Prop_Colorᵥ Prop_Inc_Indᵥ =>
                                            --
-                                           apply And.intro ( by rewrite [prop_eq_lvl];                            /- := Start Node -/
-                                                                exact Prop_Startᵥ; );
-                                           apply And.intro ( by exact REWRITE.Get_End_RwIncoming inc_casesᵥ; );   /- := End Node -/
+                                           apply And.intro ( by rewrite [prop_eq_lvl];                            /- := Orig Node -/
+                                                                exact Prop_Origᵥ; );
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwIncoming inc_casesᵥ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Colorᵥ; );                            /- := Colors -/
                                            /- := Check Incoming-Indirect Duo: -/
                                            cases Prop_Inc_Indᵥ with | intro Colorᵥ Prop_Inc_Indᵥ =>
@@ -6074,19 +6078,19 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            apply Exists.intro Colorᵥ;
                                            apply Exists.intro Colorsᵥ;
                                            apply Exists.intro Ancᵥ;
-                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                                       apply Or.inl;
                                                       exact Prop_Inc_Indᵥ; );
                        | inr inc_casesᵤ => have Inc_Caseᵤ := REWRITE.Mem_Of_Mem_RwIncoming inc_casesᵤ;            /- := inc ∈ RULEᵤ.INCOMING -/
                                            cases Inc_Caseᵤ with | intro Originalᵤ Inc_Memᵤ =>
                                            have Prop_Incomingᵤ := prop_incomingᵤ Inc_Memᵤ;                        /- := type_incoming.check inc RULEᵤ.CENTER -/
                                            simp only [type_incoming.check] at Prop_Incomingᵤ ⊢;
-                                           cases Prop_Incomingᵤ with | intro Prop_Startᵤ Prop_Incomingᵤ =>
-                                           cases Prop_Incomingᵤ with | intro Prop_Endᵤ Prop_Incomingᵤ =>
+                                           cases Prop_Incomingᵤ with | intro Prop_Origᵤ Prop_Incomingᵤ =>
+                                           cases Prop_Incomingᵤ with | intro Prop_Destᵤ Prop_Incomingᵤ =>
                                            cases Prop_Incomingᵤ with | intro Prop_Colorᵤ Prop_Inc_Indᵤ =>
                                            --
-                                           apply And.intro ( by exact Prop_Startᵤ; );                             /- := Start Node -/
-                                           apply And.intro ( by exact REWRITE.Get_End_RwIncoming inc_casesᵤ; );   /- := End Node -/
+                                           apply And.intro ( by exact Prop_Origᵤ; );                             /- := Orig Node -/
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwIncoming inc_casesᵤ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Colorᵤ; );                            /- := Colors -/
                                            /- := Check Incoming-Indirect Duo: -/
                                            cases Prop_Inc_Indᵤ with | intro Colorᵤ Prop_Inc_Indᵤ =>
@@ -6096,7 +6100,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            apply Exists.intro Colorᵤ;
                                            apply Exists.intro Colorsᵤ;
                                            apply Exists.intro Ancᵤ;
-                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.START (0::color::colors) ∈ INDIRECT -/
+                                           exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                 /- := path anc INC.orig (0::color::colors) ∈ INDIRECT -/
                                                       apply Or.inr;
                                                       exact Prop_Inc_Indᵤ; ); );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -6113,27 +6117,27 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            | inl Prop_Outgoing₁ᵥ => cases Prop_Outgoing₁ᵥ with
                                                                     | inl Prop_Outgoingₕ₁ᵥ => simp only [type_outgoing₁.check_h₁] at Prop_Outgoingₕ₁ᵥ ⊢;
                                                                                               cases Prop_Outgoingₕ₁ᵥ with | intro Prop_HPTₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Startₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Endₕ₁ᵥ Prop_Colorₕ₁ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Origₕ₁ᵥ Prop_Outgoingₕ₁ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵥ with | intro Prop_Destₕ₁ᵥ Prop_Colorₕ₁ᵥ =>
                                                                                               --
                                                                                               apply Or.inl; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                                                    exact Or.inr Prop_HPTₕ₁ᵥ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );    /- := Start Node -/
-                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                               /- := End Node -/
-                                                                                                                   exact Prop_Endₕ₁ᵥ; );
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );    /- := Orig Node -/
+                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                               /- := Dest Node -/
+                                                                                                                   exact Prop_Destₕ₁ᵥ; );
                                                                                               exact Prop_Colorₕ₁ᵥ;                                                     /- := Colors -/
                                                                     | inr Prop_Outgoingᵢₑ₁ᵥ => simp only [type_outgoing₁.check_ie₁] at Prop_Outgoingᵢₑ₁ᵥ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_HPTᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Startᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Endᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Origᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Destᵢₑ₁ᵥ Prop_Outgoingᵢₑ₁ᵥ =>
                                                                                                cases Prop_Outgoingᵢₑ₁ᵥ with | intro Prop_Colorᵢₑ₁ᵥ Prop_Out_Indᵢₑ₁ᵥ =>
                                                                                                --
                                                                                                apply Or.inl; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 1 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                        /- := Start Node -/
-                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := End Node -/
-                                                                                                                    exact Prop_Endᵢₑ₁ᵥ; );
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                        /- := Orig Node -/
+                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := Dest Node -/
+                                                                                                                    exact Prop_Destᵢₑ₁ᵥ; );
                                                                                                apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵢₑ₁ᵥ;            /- := Colors -/
                                                                                                                     rewrite [Prop_Colorᵢₑ₁ᵥ];
                                                                                                                     exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -6142,22 +6146,22 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                                cases Prop_Out_Indᵢₑ₁ᵥ with | intro Incᵢₑ₁ᵥ Prop_Out_Indᵢₑ₁ᵥ =>
                                                                                                --
                                                                                                apply Exists.intro Incᵢₑ₁ᵥ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                                                                                                            apply Or.inl;
                                                                                                            exact Prop_Out_Indᵢₑ₁ᵥ; );
                                            | inr Prop_Outgoing₃ᵥ => cases Prop_Outgoing₃ᵥ with
                                                                     | inl Prop_Outgoingₕ₃ᵥ => simp only [type_outgoing₃.check_h₃] at Prop_Outgoingₕ₃ᵥ ⊢;
                                                                                               cases Prop_Outgoingₕ₃ᵥ with | intro Prop_HPTₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Startₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Endₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Origₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Destₕ₃ᵥ Prop_Outgoingₕ₃ᵥ =>
                                                                                               cases Prop_Outgoingₕ₃ᵥ with | intro Prop_Colorₕ₃ᵥ Prop_Out_Dirₕ₃ᵥ =>
                                                                                               --
                                                                                               apply Or.inr; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                                            /- := Type 3 Hypothesis -/
                                                                                                                    exact Or.inr Prop_HPTₕ₃ᵥ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                         /- := Start Node -/
-                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                                                    /- := End Node -/
-                                                                                                                   exact Prop_Endₕ₃ᵥ; );
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                         /- := Orig Node -/
+                                                                                              apply And.intro ( by rewrite [prop_eq_lvl];                                                    /- := Dest Node -/
+                                                                                                                   exact Prop_Destₕ₃ᵥ; );
                                                                                               apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorₕ₃ᵥ;              /- := Colors -/
                                                                                                                    rewrite [Prop_Colorₕ₃ᵥ];
                                                                                                                    exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -6168,20 +6172,20 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                               --
                                                                                               apply Exists.intro Colorsₕ₃ᵥ;
                                                                                               apply Exists.intro Ancₕ₃ᵥ;
-                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.COLOR::colors) ∈ DIRECT -/
+                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.color::colors) ∈ DIRECT -/
                                                                                                          apply Or.inl;
                                                                                                          exact REWRITE.Mem_RwDirect_Of_Mem Prop_Out_Dirₕ₃ᵥ; );
                                                                     | inr Prop_Outgoingᵢₑ₃ᵥ => simp only [type_outgoing₃.check_ie₃] at Prop_Outgoingᵢₑ₃ᵥ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_HPTᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Startᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Endᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Origᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Destᵢₑ₃ᵥ Prop_Outgoingᵢₑ₃ᵥ =>
                                                                                                cases Prop_Outgoingᵢₑ₃ᵥ with | intro Prop_Colorᵢₑ₃ᵥ Prop_Out_Indᵢₑ₃ᵥ =>
                                                                                                --
                                                                                                apply Or.inr; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 3 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵥ; );                        /- := Start Node -/
-                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := End Node -/
-                                                                                                                    exact Prop_Endᵢₑ₃ᵥ; );
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵥ; );                        /- := Orig Node -/
+                                                                                               apply And.intro ( by rewrite [prop_eq_lvl];                                                   /- := Dest Node -/
+                                                                                                                    exact Prop_Destᵢₑ₃ᵥ; );
                                                                                                apply And.intro ( by rewrite [prop_pstᵥ, List.Eq_Iff_Mem_Unit] at Prop_Colorᵢₑ₃ᵥ;            /- := Colors -/
                                                                                                                     rewrite [Prop_Colorᵢₑ₃ᵥ];
                                                                                                                     exact List.Mem.tail ( RULEᵤ.CENTER.id )
@@ -6194,7 +6198,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                                apply Exists.intro Colorsᵢₑ₃ᵥ;
                                                                                                apply Exists.intro Incᵢₑ₃ᵥ;
                                                                                                apply Exists.intro Ancᵢₑ₃ᵥ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.COLOR::colors) ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.color::colors) ∈ INDIRECT -/
                                                                                                           apply Or.inl;
                                                                                                           exact Prop_Out_Indᵢₑ₃ᵥ; );
                        | inr out_casesᵤ => have Out_Caseᵤ := REWRITE.Mem_Of_Mem_RwOutgoing out_casesᵤ;          /- := out ∈ RULEᵤ.OUTGOING -/
@@ -6204,25 +6208,25 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            | inl Prop_Outgoing₁ᵤ => cases Prop_Outgoing₁ᵤ with
                                                                     | inl Prop_Outgoingₕ₁ᵤ => simp only [type_outgoing₁.check_h₁] at Prop_Outgoingₕ₁ᵤ ⊢;
                                                                                               cases Prop_Outgoingₕ₁ᵤ with | intro Prop_HPTₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Startₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Endₕ₁ᵤ Prop_Colorₕ₁ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Origₕ₁ᵤ Prop_Outgoingₕ₁ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₁ᵤ with | intro Prop_Destₕ₁ᵤ Prop_Colorₕ₁ᵤ =>
                                                                                               --
                                                                                               apply Or.inl; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                                                    exact Or.inl Prop_HPTₕ₁ᵤ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );    /- := Start Node -/
-                                                                                              apply And.intro ( by exact Prop_Endₕ₁ᵤ; );                                /- := End Node -/
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );    /- := Orig Node -/
+                                                                                              apply And.intro ( by exact Prop_Destₕ₁ᵤ; );                                /- := Dest Node -/
                                                                                               exact Prop_Colorₕ₁ᵤ;                                                     /- := Colors -/
                                                                     | inr Prop_Outgoingᵢₑ₁ᵤ => simp only [type_outgoing₁.check_ie₁] at Prop_Outgoingᵢₑ₁ᵤ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_HPTᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Startᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Endᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Origᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Destᵢₑ₁ᵤ Prop_Outgoingᵢₑ₁ᵤ =>
                                                                                                cases Prop_Outgoingᵢₑ₁ᵤ with | intro Prop_Colorᵢₑ₁ᵤ Prop_Out_Indᵢₑ₁ᵤ =>
                                                                                                --
                                                                                                apply Or.inl; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                                                 /- := Type 1 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );                        /- := Start Node -/
-                                                                                               apply And.intro ( by exact Prop_Endᵢₑ₁ᵤ; );                                                   /- := End Node -/
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );                        /- := Orig Node -/
+                                                                                               apply And.intro ( by exact Prop_Destᵢₑ₁ᵤ; );                                                   /- := Dest Node -/
                                                                                                apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorᵢₑ₁ᵤ;                /- := Colors -/
                                                                                                                     cases Prop_Colorᵢₑ₁ᵤ with
                                                                                                                     | inl Prop_NBR_Colorᵢₑ₁ᵤ => rewrite [Prop_NBR_Colorᵢₑ₁ᵤ];
@@ -6233,21 +6237,21 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                                cases Prop_Out_Indᵢₑ₁ᵤ with | intro Incᵢₑ₁ᵤ Prop_Out_Indᵢₑ₁ᵤ =>
                                                                                                --
                                                                                                apply Exists.intro Incᵢₑ₁ᵤ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path OUT.dest inc [0, OUT.color] ∈ INDIRECT -/
                                                                                                            apply Or.inr;
                                                                                                            exact Prop_Out_Indᵢₑ₁ᵤ; );
                                            | inr Prop_Outgoing₃ᵤ => cases Prop_Outgoing₃ᵤ with
                                                                     | inl Prop_Outgoingₕ₃ᵤ => simp only [type_outgoing₃.check_h₃] at Prop_Outgoingₕ₃ᵤ ⊢;
                                                                                               cases Prop_Outgoingₕ₃ᵤ with | intro Prop_HPTₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Startₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
-                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Endₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Origₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
+                                                                                              cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Destₕ₃ᵤ Prop_Outgoingₕ₃ᵤ =>
                                                                                               cases Prop_Outgoingₕ₃ᵤ with | intro Prop_Colorₕ₃ᵤ Prop_Out_Dirₕ₃ᵤ =>
                                                                                               --
                                                                                               apply Or.inr; apply Or.inl;
                                                                                               apply And.intro ( by rewrite [Bool.or_eq_true_iff];                       /- := Type 1 Hypothesis -/
                                                                                                                    exact Or.inl Prop_HPTₕ₃ᵤ; );
-                                                                                              apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );    /- := Start Node -/
-                                                                                              apply And.intro ( by exact Prop_Endₕ₃ᵤ; );                                /- := End Node -/
+                                                                                              apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );    /- := Orig Node -/
+                                                                                              apply And.intro ( by exact Prop_Destₕ₃ᵤ; );                                /- := Dest Node -/
                                                                                               apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorₕ₃ᵤ;                  /- := Colors -/
                                                                                                                    cases Prop_Colorₕ₃ᵤ with
                                                                                                                    | inl Prop_NBR_Colorᵢₑ₃ᵤ => rewrite [Prop_NBR_Colorᵢₑ₃ᵤ];
@@ -6260,19 +6264,19 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                               --
                                                                                               apply Exists.intro Colorsₕ₃ᵤ;
                                                                                               apply Exists.intro Ancₕ₃ᵤ;
-                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.COLOR::colors) ∈ DIRECT -/
+                                                                                              exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                    /- := path anc CENTER (OUT.color::colors) ∈ DIRECT -/
                                                                                                          apply Or.inr;
                                                                                                          exact REWRITE.Mem_RwDirect_Of_Mem Prop_Out_Dirₕ₃ᵤ; );
                                                                     | inr Prop_Outgoingᵢₑ₃ᵤ => simp only [type_outgoing₃.check_ie₃] at Prop_Outgoingᵢₑ₃ᵤ ⊢;
                                                                                                cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_HPTᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Startᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
-                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Endᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Origᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
+                                                                                               cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Destᵢₑ₃ᵤ Prop_Outgoingᵢₑ₃ᵤ =>
                                                                                                cases Prop_Outgoingᵢₑ₃ᵤ with | intro Prop_Colorᵢₑ₃ᵤ Prop_Out_Indᵢₑ₃ᵤ =>
                                                                                                --
                                                                                                apply Or.inr; apply Or.inr;
                                                                                                apply And.intro ( by exact Or.inr trivial; );                            /- := Type 1 Introduction & Elimination -/
-                                                                                               apply And.intro ( by exact REWRITE.Get_Start_RwOutgoing out_casesᵤ; );   /- := Start Node -/
-                                                                                               apply And.intro ( by exact Prop_Endᵢₑ₃ᵤ; );                              /- := End Node -/
+                                                                                               apply And.intro ( by exact REWRITE.Get_Orig_RwOutgoing out_casesᵤ; );   /- := Orig Node -/
+                                                                                               apply And.intro ( by exact Prop_Destᵢₑ₃ᵤ; );                              /- := Dest Node -/
                                                                                                apply And.intro ( by rewrite [List.Eq_Or_Mem_Iff_Mem_Cons] at Prop_Colorᵢₑ₃ᵤ;                /- := Colors -/
                                                                                                                     cases Prop_Colorᵢₑ₃ᵤ with
                                                                                                                     | inl Prop_NBR_Colorᵢₑ₃ᵤ => rewrite [Prop_NBR_Colorᵢₑ₃ᵤ];
@@ -6287,7 +6291,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                                apply Exists.intro Colorsᵢₑ₃ᵤ;
                                                                                                apply Exists.intro Incᵢₑ₃ᵤ;
                                                                                                apply Exists.intro Ancᵢₑ₃ᵤ;
-                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.COLOR::colors) ∈ INDIRECT -/
+                                                                                               exact ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];                   /- := path anc inc (0::OUT.color::colors) ∈ INDIRECT -/
                                                                                                           apply Or.inr;
                                                                                                           exact Prop_Out_Indᵢₑ₃ᵤ; ); );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -6301,8 +6305,8 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            cases Dir_Casesᵥ with | intro Originalᵥ Dir_Memᵥ =>
                                            have Prop_Directᵥ := prop_directᵥ Dir_Memᵥ;
                                            simp only [type_direct.check] at Prop_Directᵥ ⊢;
-                                           cases Prop_Directᵥ with | intro Prop_Startᵥ Prop_Directᵥ =>
-                                           cases Prop_Directᵥ with | intro Prop_Endᵥ Prop_Directᵥ =>
+                                           cases Prop_Directᵥ with | intro Prop_Origᵥ Prop_Directᵥ =>
+                                           cases Prop_Directᵥ with | intro Prop_Destᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Prop_Levelᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Color₁ᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Color₂ᵥ Prop_Directᵥ =>
@@ -6311,9 +6315,9 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            cases Prop_Directᵥ with | intro Prop_Color₁ᵥ Prop_Directᵥ =>
                                            cases Prop_Directᵥ with | intro Prop_Colorsᵥ Prop_Dir_Outᵥ =>
                                            --
-                                           apply And.intro ( by rewrite [prop_eq_lvl];                          /- := Start Node -/
-                                                                exact Prop_Startᵥ; );
-                                           apply And.intro ( by exact REWRITE.Get_End_RwDirect dir_casesᵥ; );   /- := End Node -/
+                                           apply And.intro ( by rewrite [prop_eq_lvl];                          /- := Orig Node -/
+                                                                exact Prop_Origᵥ; );
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwDirect dir_casesᵥ; );   /- := Dest Node -/
                                            apply And.intro ( by rewrite [prop_eq_lvl];                          /- := Colors -/
                                                                 exact Prop_Levelᵥ; );
                                            apply Exists.intro Color₁ᵥ;
@@ -6336,27 +6340,27 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            apply Exists.intro Dep_Outᵥ;
                                            apply And.intro ( by exact Prop_Out_Colᵥ; );
                                            apply And.intro ( by exact Prop_Color₂ᵥ; );
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                                                 apply Or.inl;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Dir_Outᵥ; );
-                                           intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                                           intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵥ;
                                            cases all_out_casesᵥ with
                                            | inl all_out_casesᵥᵥ => have Dir_Out_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵥᵥ with | intro Originalᵥ Dir_Out_Memᵥᵥ =>
-                                                                    have Prop_All_Dir_Outᵥᵥ := Prop_All_Dir_Outᵥ Dir_Out_Memᵥᵥ;                                 /- := all_out.COLOR = Color₁ ↔ all_out = Deduction.mk CENTER out Color₁ dep_out -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Dir_Outᵥᵥ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵥ Dir_Out_Memᵥᵥ)] at Prop_All_Dir_Outᵥᵥ;   /- := all_out.START = RULEᵥ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Dir_Outᵥᵥ := Prop_All_Dir_Outᵥ Dir_Out_Memᵥᵥ;                                 /- := all_out.color = Color₁ ↔ all_out = DEdge.mk CENTER out Color₁ dep_out -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Dir_Outᵥᵥ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵥ Dir_Out_Memᵥᵥ)] at Prop_All_Dir_Outᵥᵥ;   /- := all_out.orig = RULEᵥ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Dir_Outᵥᵥ ⊢;
                                                                     exact Prop_All_Dir_Outᵥᵥ;
                                            | inr all_out_casesᵥᵤ => have Dir_Out_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵥᵤ with | intro Originalᵤ Dir_Out_Memᵥᵤ =>
                                                                     --
-                                                                    have Prop_All_Outᵤ := prop_out_colorsᵤ Dir_Out_Memᵥᵤ eq_out_memᵤ (Or.inr eq_out_colorᵤ);  /- := all_out.COLOR = eq_out.COLOR ↔ all_out = eq_out -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Outᵤ ⊢;
-                                                                    rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Outᵤ := prop_out_colorsᵤ Dir_Out_Memᵥᵤ eq_out_memᵤ (Or.inr eq_out_colorᵤ);  /- := all_out.color = eq_out.color ↔ all_out = eq_out -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Outᵤ ⊢;
+                                                                    rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Outᵤ ⊢;
                                                                     --
                                                                     rewrite [prop_out_unitᵥ] at Prop_Dir_Outᵥ;
@@ -6374,8 +6378,8 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            cases Dir_Casesᵤ with | intro Originalᵤ Dir_Memᵤ =>
                                            have Prop_Directᵤ := prop_directᵤ Dir_Memᵤ;
                                            simp only [type_direct.check] at Prop_Directᵤ ⊢;
-                                           cases Prop_Directᵤ with | intro Prop_Startᵤ Prop_Directᵤ =>
-                                           cases Prop_Directᵤ with | intro Prop_Endᵤ Prop_Directᵤ =>
+                                           cases Prop_Directᵤ with | intro Prop_Origᵤ Prop_Directᵤ =>
+                                           cases Prop_Directᵤ with | intro Prop_Destᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Prop_Levelᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Color₁ᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Color₂ᵤ Prop_Directᵤ =>
@@ -6384,8 +6388,8 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            cases Prop_Directᵤ with | intro Prop_Color₁ᵤ Prop_Directᵤ =>
                                            cases Prop_Directᵤ with | intro Prop_Colorsᵤ Prop_Dir_Outᵤ =>
                                            --
-                                           apply And.intro ( by exact Prop_Startᵤ; );                           /- := Start Node -/
-                                           apply And.intro ( by exact REWRITE.Get_End_RwDirect dir_casesᵤ; );   /- := End Node -/
+                                           apply And.intro ( by exact Prop_Origᵤ; );                           /- := Orig Node -/
+                                           apply And.intro ( by exact REWRITE.Get_Dest_RwDirect dir_casesᵤ; );   /- := Dest Node -/
                                            apply And.intro ( by exact Prop_Levelᵤ; );                           /- := Colors -/
                                            apply Exists.intro Color₁ᵤ;
                                            apply Exists.intro Color₂ᵤ;
@@ -6409,27 +6413,27 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                            apply Exists.intro Dep_Outᵤ;
                                            apply And.intro ( by exact Prop_Out_Colᵤ; );
                                            apply And.intro ( by exact Prop_Color₂ᵤ; );
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                                                 apply Or.inr;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Dir_Outᵤ; );
-                                           intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                                           intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵤ;
                                            cases all_out_casesᵤ with
                                            | inl all_out_casesᵤᵥ => have Dir_Out_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵤᵥ with | intro Originalᵥ Dir_Out_Memᵤᵥ =>
                                                                     rewrite [prop_out_unitᵥ] at Dir_Out_Memᵤᵥ;
                                                                     rewrite [List.Eq_Iff_Mem_Unit] at Dir_Out_Memᵤᵥ;
-                                                                    rewrite [Deduction.mk.injEq] at Dir_Out_Memᵤᵥ ⊢;
-                                                                    cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Startᵤᵥ Dir_Out_Memᵤᵥ =>
-                                                                    cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Endᵤᵥ Dir_Out_Memᵤᵥ =>
+                                                                    rewrite [DEdge.mk.injEq] at Dir_Out_Memᵤᵥ ⊢;
+                                                                    cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Origᵤᵥ Dir_Out_Memᵤᵥ =>
+                                                                    cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Destᵤᵥ Dir_Out_Memᵤᵥ =>
                                                                     cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Colorᵤᵥ Dir_Out_Dependencyᵤᵥ =>
-                                                                    rewrite [Dir_Out_Endᵤᵥ, Dir_Out_Colorᵤᵥ, Dir_Out_Dependencyᵤᵥ];
+                                                                    rewrite [Dir_Out_Destᵤᵥ, Dir_Out_Colorᵤᵥ, Dir_Out_Dependencyᵤᵥ];
                                                                     rewrite [prop_eq_out_end, prop_eq_out_color, prop_eq_out_dependency];
                                                                     --
-                                                                    have Prop_All_Outᵤ := prop_out_colorsᵤ eq_out_memᵤ Prop_Dir_Outᵤ (Or.inl eq_out_colorᵤ);  /- := all_out.COLOR = eq_out.COLOR ↔ all_out = eq_out -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Outᵤ;
-                                                                    rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Outᵤ := prop_out_colorsᵤ eq_out_memᵤ Prop_Dir_Outᵤ (Or.inl eq_out_colorᵤ);  /- := all_out.color = eq_out.color ↔ all_out = eq_out -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Outᵤ;
+                                                                    rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Outᵤ ⊢;
                                                                     --
                                                                     exact Iff.intro ( by intro iff_eq_colorᵤᵥ;
@@ -6440,10 +6444,10 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                                          simp only [iff_eq_edgeᵤᵥ]; );
                                            | inr all_out_casesᵤᵤ => have Dir_Out_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                                     cases Dir_Out_Casesᵤᵤ with | intro Originalᵤ Dir_Out_Memᵤᵤ =>
-                                                                    have Prop_All_Dir_Outᵤᵤ := Prop_All_Dir_Outᵤ Dir_Out_Memᵤᵤ;                                 /- := all_out.COLOR = Color₁ ↔ all_out = Deduction.mk CENTER out Color₁ dep_out -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Dir_Outᵤᵤ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Dir_Out_Memᵤᵤ)] at Prop_All_Dir_Outᵤᵤ;   /- := all_out.START = RULEᵤ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Dir_Outᵤᵤ := Prop_All_Dir_Outᵤ Dir_Out_Memᵤᵤ;                                 /- := all_out.color = Color₁ ↔ all_out = DEdge.mk CENTER out Color₁ dep_out -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Dir_Outᵤᵤ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Dir_Out_Memᵤᵤ)] at Prop_All_Dir_Outᵤᵤ;   /- := all_out.orig = RULEᵤ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Dir_Outᵤᵤ ⊢;
                                                                     exact Prop_All_Dir_Outᵤᵤ; );
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -6455,8 +6459,8 @@ namespace COVERAGE.T3_Of_T3.EDGES
   cases ind_cases with
   | inl ind_casesᵥ => have Prop_Indirectᵥ := prop_indirectᵥ ind_casesᵥ;
                       simp only [type_indirect.check] at Prop_Indirectᵥ ⊢;
-                      cases Prop_Indirectᵥ with | intro Prop_Startᵥ Prop_Indirectᵥ =>
-                      cases Prop_Indirectᵥ with | intro Prop_Endᵥ Prop_Indirectᵥ =>
+                      cases Prop_Indirectᵥ with | intro Prop_Origᵥ Prop_Indirectᵥ =>
+                      cases Prop_Indirectᵥ with | intro Prop_Destᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Prop_Levelᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Colorᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Colorsᵥ Prop_Indirectᵥ =>
@@ -6465,10 +6469,10 @@ namespace COVERAGE.T3_Of_T3.EDGES
                       cases Prop_Indirectᵥ with | intro Prop_Colorsᵥ Prop_Indirectᵥ =>
                       cases Prop_Indirectᵥ with | intro Prop_Ind_Incᵥ Prop_Ind_Outᵥ =>
                       --
-                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Start Node -/
-                                           exact Prop_Startᵥ; );
-                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := End Node -/
-                                           exact Prop_Endᵥ; );
+                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Orig Node -/
+                                           exact Prop_Origᵥ; );
+                      apply And.intro ( by rewrite [prop_eq_lvl];         /- := Dest Node -/
+                                           exact Prop_Destᵥ; );
                       apply And.intro ( by rewrite [prop_eq_lvl];         /- := Colors -/
                                            exact Prop_Levelᵥ; );
                       apply Exists.intro Colorᵥ;
@@ -6484,25 +6488,25 @@ namespace COVERAGE.T3_Of_T3.EDGES
                       cases Prop_Ind_Incᵥ with | intro Prop_Ind_Incᵥ Prop_All_Ind_Incᵥ =>
                       --
                       apply And.intro ( by apply Exists.intro Dep_Incᵥ;
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.END CENTER 0 dep_inc ∈ INCOMING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.dest CENTER 0 dep_inc ∈ INCOMING -/
                                                                 apply Or.inl;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwIncoming_Of_Mem Prop_Ind_Incᵥ; );
-                                           intro all_incᵥ all_inc_casesᵥ;                                     /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
+                                           intro all_incᵥ all_inc_casesᵥ;                                     /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_inc_casesᵥ;
                                            cases all_inc_casesᵥ with
                                            | inl all_inc_casesᵥᵥ => have Ind_Inc_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵥᵥ;                      /- := all_inc ∈ RULEᵥ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵥᵥ with | intro Originalᵥ Ind_Inc_Memᵥᵥ =>
-                                                                    have Prop_All_Ind_Incᵥᵥ := Prop_All_Ind_Incᵥ Ind_Inc_Memᵥᵥ;                                 /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Ind_Incᵥᵥ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Inc_End (prop_incomingᵥ Ind_Inc_Memᵥᵥ)] at Prop_All_Ind_Incᵥᵥ;      /- := all_inc.END = RULEᵥ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_End_RwIncoming all_inc_casesᵥᵥ];                                      /- := all_inc.END = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Ind_Incᵥᵥ := Prop_All_Ind_Incᵥ Ind_Inc_Memᵥᵥ;                                 /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Ind_Incᵥᵥ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Inc_Dest (prop_incomingᵥ Ind_Inc_Memᵥᵥ)] at Prop_All_Ind_Incᵥᵥ;      /- := all_inc.dest = RULEᵥ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Dest_RwIncoming all_inc_casesᵥᵥ];                                      /- := all_inc.dest = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Ind_Incᵥᵥ ⊢;
                                                                     exact Prop_All_Ind_Incᵥᵥ;
                                            | inr all_inc_casesᵥᵤ => have Ind_Inc_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵥᵤ;                      /- := all_inc ∈ RULEᵤ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵥᵤ with | intro Originalᵤ Ind_Inc_Memᵥᵤ =>
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have Prop_Check_Incomingᵥᵤ := prop_check_incoming Ind_Inc_Memᵥᵤ Prop_Ind_Incᵥ;              /- := all_inc.START ≠ IND.END -/
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have Prop_Check_Incomingᵥᵤ := prop_check_incoming Ind_Inc_Memᵥᵤ Prop_Ind_Incᵥ;              /- := all_inc.orig ≠ IND.dest -/
                                                                     simp only [Prop_Check_Incomingᵥᵤ, false_and]; );
                       /- := Check Indirect-Outgoing Duo: -/
                       cases Prop_Ind_Outᵥ with | intro Outᵥ Prop_Ind_Outᵥ =>
@@ -6513,27 +6517,27 @@ namespace COVERAGE.T3_Of_T3.EDGES
                       apply Exists.intro Outᵥ;
                       apply Exists.intro Dep_Outᵥ;
                       apply And.intro ( by exact Prop_Out_Colᵥ; );
-                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color₁ dep_out ∈ OUTGOING -/
+                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color₁ dep_out ∈ OUTGOING -/
                                            apply Or.inl;
                                            rewrite [←collapse.center];
                                            exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Ind_Outᵥ; );
-                      intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.COLOR = color₁ ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                      intro all_outᵥ all_out_casesᵥ;                                       /- := all_out.color = color₁ ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                       simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵥ;
                       cases all_out_casesᵥ with
                       | inl all_out_casesᵥᵥ => have Ind_Out_Casesᵥᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                cases Ind_Out_Casesᵥᵥ with | intro Originalᵥ Ind_Out_Memᵥᵥ =>
-                                               have Prop_All_Ind_Outᵥᵥ := Prop_All_Ind_Outᵥ Ind_Out_Memᵥᵥ;                                 /- := all_out.COLOR = Color ↔ all_out = Deduction.mk CENTER out Color dep_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Ind_Outᵥᵥ ⊢;
-                                               rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵥ Ind_Out_Memᵥᵥ)] at Prop_All_Ind_Outᵥᵥ;   /- := all_out.START = RULEᵥ.CENTER -/
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Ind_Outᵥᵥ := Prop_All_Ind_Outᵥ Ind_Out_Memᵥᵥ;                                 /- := all_out.color = Color ↔ all_out = DEdge.mk CENTER out Color dep_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Ind_Outᵥᵥ ⊢;
+                                               rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵥ Ind_Out_Memᵥᵥ)] at Prop_All_Ind_Outᵥᵥ;   /- := all_out.orig = RULEᵥ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Ind_Outᵥᵥ ⊢;
                                                exact Prop_All_Ind_Outᵥᵥ;
                       | inr all_out_casesᵥᵤ => have Dir_Out_Casesᵥᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵥᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                cases Dir_Out_Casesᵥᵤ with | intro Originalᵤ Dir_Out_Memᵥᵤ =>
                                                --
-                                               have Prop_All_Outᵤ := prop_out_colorsᵤ Dir_Out_Memᵥᵤ eq_out_memᵤ (Or.inr eq_out_colorᵤ);  /- := all_out.COLOR = eq_out.COLOR ↔ all_out = eq_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Outᵤ ⊢;
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵥᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Outᵤ := prop_out_colorsᵤ Dir_Out_Memᵥᵤ eq_out_memᵤ (Or.inr eq_out_colorᵤ);  /- := all_out.color = eq_out.color ↔ all_out = eq_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Outᵤ ⊢;
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵥᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Outᵤ ⊢;
                                                --
                                                rewrite [prop_out_unitᵥ] at Prop_Ind_Outᵥ;
@@ -6549,8 +6553,8 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                     simp only [iff_eq_edgeᵥᵤ]; );
   | inr ind_casesᵤ => have Prop_Indirectᵤ := prop_indirectᵤ ind_casesᵤ;
                       simp only [type_indirect.check] at Prop_Indirectᵤ ⊢;
-                      cases Prop_Indirectᵤ with | intro Prop_Startᵤ Prop_Indirectᵤ =>
-                      cases Prop_Indirectᵤ with | intro Prop_Endᵤ Prop_Indirectᵤ =>
+                      cases Prop_Indirectᵤ with | intro Prop_Origᵤ Prop_Indirectᵤ =>
+                      cases Prop_Indirectᵤ with | intro Prop_Destᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Prop_Levelᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Colorᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Colorsᵤ Prop_Indirectᵤ =>
@@ -6559,8 +6563,8 @@ namespace COVERAGE.T3_Of_T3.EDGES
                       cases Prop_Indirectᵤ with | intro Prop_Colorsᵤ Prop_Indirectᵤ =>
                       cases Prop_Indirectᵤ with | intro Prop_Ind_Incᵤ Prop_Ind_Outᵤ =>
                       --
-                      apply And.intro ( by exact Prop_Startᵤ; );           /- := Start Node -/
-                      apply And.intro ( by exact Prop_Endᵤ; );             /- := End Node -/
+                      apply And.intro ( by exact Prop_Origᵤ; );           /- := Orig Node -/
+                      apply And.intro ( by exact Prop_Destᵤ; );             /- := Dest Node -/
                       apply And.intro ( by exact Prop_Levelᵤ; );           /- := Colors -/
                       apply Exists.intro Colorᵤ;
                       apply Exists.intro Colorsᵤ;
@@ -6577,25 +6581,25 @@ namespace COVERAGE.T3_Of_T3.EDGES
                       cases Prop_Ind_Incᵤ with | intro Prop_Ind_Incᵤ Prop_All_Ind_Incᵤ =>
                       --
                       apply And.intro ( by apply Exists.intro Dep_Incᵤ;
-                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.END CENTER 0 dep_inc ∈ INCOMING -/
+                                           apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];   /- := edge IND.dest CENTER 0 dep_inc ∈ INCOMING -/
                                                                 apply Or.inr;
                                                                 rewrite [←collapse.center];
                                                                 exact REWRITE.Mem_RwIncoming_Of_Mem Prop_Ind_Incᵤ; );
-                                           intro all_incᵤ all_inc_casesᵤ;                                     /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
+                                           intro all_incᵤ all_inc_casesᵤ;                                     /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
                                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_inc_casesᵤ;
                                            cases all_inc_casesᵤ with
                                            | inl all_inc_casesᵤᵥ => have Ind_Inc_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵤᵥ;                      /- := all_inc ∈ RULEᵥ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵤᵥ with | intro Originalᵥ Ind_Inc_Memᵤᵥ =>
-                                                                    rewrite [Deduction.mk.injEq];
-                                                                    have Prop_Check_Incomingᵤᵥ := prop_check_incoming Prop_Ind_Incᵤ Ind_Inc_Memᵤᵥ;              /- := IND.END ≠ all_inc.START -/
+                                                                    rewrite [DEdge.mk.injEq];
+                                                                    have Prop_Check_Incomingᵤᵥ := prop_check_incoming Prop_Ind_Incᵤ Ind_Inc_Memᵤᵥ;              /- := IND.dest ≠ all_inc.orig -/
                                                                     rewrite [ne_comm] at Prop_Check_Incomingᵤᵥ;
                                                                     simp only [Prop_Check_Incomingᵤᵥ, false_and];
                                            | inr all_inc_casesᵤᵤ => have Ind_Inc_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwIncoming all_inc_casesᵤᵤ;                      /- := all_inc ∈ RULEᵤ.INCOMING -/
                                                                     cases Ind_Inc_Casesᵤᵤ with | intro Originalᵤ Ind_Inc_Memᵤᵤ =>
-                                                                    have Prop_All_Ind_Incᵤᵤ := Prop_All_Ind_Incᵤ Ind_Inc_Memᵤᵤ;                                 /- := all_inc.START = IND.END ↔ all_inc = edge IND.END CENTER 0 dep_inc -/
-                                                                    rewrite [Deduction.mk.injEq] at Prop_All_Ind_Incᵤᵤ ⊢;
-                                                                    rewrite [←COLLAPSE.Simp_Inc_End (prop_incomingᵤ Ind_Inc_Memᵤᵤ)] at Prop_All_Ind_Incᵤᵤ;      /- := all_inc.END = RULEᵤ.CENTER -/
-                                                                    rewrite [←REWRITE.Get_End_RwIncoming all_inc_casesᵤᵤ];                                      /- := all_inc.END = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                                                    have Prop_All_Ind_Incᵤᵤ := Prop_All_Ind_Incᵤ Ind_Inc_Memᵤᵤ;                                 /- := all_inc.orig = IND.dest ↔ all_inc = edge IND.dest CENTER 0 dep_inc -/
+                                                                    rewrite [DEdge.mk.injEq] at Prop_All_Ind_Incᵤᵤ ⊢;
+                                                                    rewrite [←COLLAPSE.Simp_Inc_Dest (prop_incomingᵤ Ind_Inc_Memᵤᵤ)] at Prop_All_Ind_Incᵤᵤ;      /- := all_inc.dest = RULEᵤ.CENTER -/
+                                                                    rewrite [←REWRITE.Get_Dest_RwIncoming all_inc_casesᵤᵤ];                                      /- := all_inc.dest = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                                     simp only [true_and] at Prop_All_Ind_Incᵤᵤ ⊢;
                                                                     exact Prop_All_Ind_Incᵤᵤ; );
                       /- Check Outgoing-Indirect Duo: -/
@@ -6607,27 +6611,27 @@ namespace COVERAGE.T3_Of_T3.EDGES
                       apply Exists.intro Outᵤ;
                       apply Exists.intro Dep_Outᵤ;
                       apply And.intro ( by exact Prop_Out_Colᵤ; );
-                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := Deduction.mk CENTER out color dep_out ∈ OUTGOING -/
+                      apply And.intro ( by simp only [List.Mem_Or_Mem_Iff_Mem_Append];     /- := DEdge.mk CENTER out color dep_out ∈ OUTGOING -/
                                            apply Or.inr;
                                            rewrite [←collapse.center];
                                            exact REWRITE.Mem_RwOutgoing_Of_Mem Prop_Ind_Outᵤ; );
-                      intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.COLOR = color ↔ all_out = Deduction.mk CENTER out color₁ dep_out -/
+                      intro all_outᵤ all_out_casesᵤ;                                       /- := all_out.color = color ↔ all_out = DEdge.mk CENTER out color₁ dep_out -/
                       simp only [List.Mem_Or_Mem_Iff_Mem_Append] at all_out_casesᵤ;
                       cases all_out_casesᵤ with
                       | inl all_out_casesᵤᵥ => have Dir_Out_Casesᵤᵥ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵥ;                      /- := all_out ∈ RULEᵥ.OUTGOING -/
                                                cases Dir_Out_Casesᵤᵥ with | intro Originalᵥ Dir_Out_Memᵤᵥ =>
                                                rewrite [prop_out_unitᵥ] at Dir_Out_Memᵤᵥ;
                                                rewrite [List.Eq_Iff_Mem_Unit] at Dir_Out_Memᵤᵥ;
-                                               rewrite [Deduction.mk.injEq] at Dir_Out_Memᵤᵥ ⊢;
-                                               cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Startᵤᵥ Dir_Out_Memᵤᵥ =>
-                                               cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Endᵤᵥ Dir_Out_Memᵤᵥ =>
+                                               rewrite [DEdge.mk.injEq] at Dir_Out_Memᵤᵥ ⊢;
+                                               cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Origᵤᵥ Dir_Out_Memᵤᵥ =>
+                                               cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Destᵤᵥ Dir_Out_Memᵤᵥ =>
                                                cases Dir_Out_Memᵤᵥ with | intro Dir_Out_Colorᵤᵥ Dir_Out_Dependencyᵤᵥ =>
-                                               rewrite [Dir_Out_Endᵤᵥ, Dir_Out_Colorᵤᵥ, Dir_Out_Dependencyᵤᵥ];
+                                               rewrite [Dir_Out_Destᵤᵥ, Dir_Out_Colorᵤᵥ, Dir_Out_Dependencyᵤᵥ];
                                                rewrite [prop_eq_out_end, prop_eq_out_color, prop_eq_out_dependency];
                                                --
-                                               have Prop_All_Outᵤ := prop_out_colorsᵤ eq_out_memᵤ Prop_Ind_Outᵤ (Or.inl eq_out_colorᵤ);  /- := all_out.COLOR = eq_out.COLOR ↔ all_out = eq_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Outᵤ;
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵥ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Outᵤ := prop_out_colorsᵤ eq_out_memᵤ Prop_Ind_Outᵤ (Or.inl eq_out_colorᵤ);  /- := all_out.color = eq_out.color ↔ all_out = eq_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Outᵤ;
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵥ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Outᵤ ⊢;
                                                --
                                                exact Iff.intro ( by intro iff_eq_colorᵤᵥ;
@@ -6638,10 +6642,10 @@ namespace COVERAGE.T3_Of_T3.EDGES
                                                                     simp only [iff_eq_edgeᵤᵥ]; );
                       | inr all_out_casesᵤᵤ => have Ind_Out_Casesᵤᵤ := REWRITE.Mem_Of_Mem_RwOutgoing all_out_casesᵤᵤ;                      /- := all_out ∈ RULEᵤ.OUTGOING -/
                                                cases Ind_Out_Casesᵤᵤ with | intro Originalᵤ Ind_Out_Memᵤᵤ =>
-                                               have Prop_All_Ind_Outᵤᵤ := Prop_All_Ind_Outᵤ Ind_Out_Memᵤᵤ;                                 /- := all_out.COLOR = Color ↔ all_out = Deduction.mk CENTER out Color dep_out -/
-                                               rewrite [Deduction.mk.injEq] at Prop_All_Ind_Outᵤᵤ ⊢;
-                                               rewrite [←COLLAPSE.Simp_Out_Start₃ (prop_outgoingᵤ Ind_Out_Memᵤᵤ)] at Prop_All_Ind_Outᵤᵤ;   /- := all_out.START = RULEᵤ.CENTER -/
-                                               rewrite [←REWRITE.Get_Start_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.START = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
+                                               have Prop_All_Ind_Outᵤᵤ := Prop_All_Ind_Outᵤ Ind_Out_Memᵤᵤ;                                 /- := all_out.color = Color ↔ all_out = DEdge.mk CENTER out Color dep_out -/
+                                               rewrite [DEdge.mk.injEq] at Prop_All_Ind_Outᵤᵤ ⊢;
+                                               rewrite [←COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ Ind_Out_Memᵤᵤ)] at Prop_All_Ind_Outᵤᵤ;   /- := all_out.orig = RULEᵤ.CENTER -/
+                                               rewrite [←REWRITE.Get_Orig_RwOutgoing all_out_casesᵤᵤ];                                    /- := all_out.orig = collapse.center RULEᵤ.CENTER RULEᵥ.CENTER -/
                                                simp only [true_and] at Prop_All_Ind_Outᵤᵤ ⊢;
                                                exact Prop_All_Ind_Outᵤᵤ;
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -7740,7 +7744,7 @@ namespace COVERAGE.UP.T0E
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T0E {U0 U1 : Vertex} {DLDS : Graph} :
     ( type0_elimination (get_rule U0 DLDS) ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing U1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming U0 DLDS ) ) →
     ------------------------------------------------------
     ( ¬type2_elimination (get_rule U1 DLDS) )
@@ -7771,10 +7775,10 @@ namespace COVERAGE.UP.T0E
   intro prop_incomingᵤ₀;
   cases prop_incomingᵤ₀ with | intro edge prop_incomingᵤ₀ =>
   cases prop_incomingᵤ₀ with | intro prop_mem_outgoingᵤ₁ prop_mem_incomingᵤ₀ =>
-  have Prop_Edge_Startᵤ : edge.START = U1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵤ₁;
+  have Prop_Edge_Origᵤ : edge.orig = U1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵤ₁;
   --
   have Prop_Directᵤ₁ := COLLAPSE.Simp_Direct_Indirect₀₂ prop_mem_incomingᵤ₀ prop_indirectᵤ₀;
-  rewrite [Prop_Edge_Startᵤ] at Prop_Directᵤ₁;
+  rewrite [Prop_Edge_Origᵤ] at Prop_Directᵤ₁;
   /- ¬type2_elimination U1 -/
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
@@ -7894,7 +7898,7 @@ namespace COVERAGE.UP.T0E
     ( CLPS.is_collapse U0 V0 DLDS ) →
     ( type0_elimination (get_rule U0 DLDS) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing U1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming U0 DLDS ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
@@ -7931,9 +7935,9 @@ namespace COVERAGE.UP.T0E
   cases prop_incomingᵤ₀ with | intro edge prop_incomingᵤ₀ =>
   cases prop_incomingᵤ₀ with | intro prop_mem_outgoingᵤ₁ prop_mem_incomingᵤ₀ =>
   /- U1.level = U0.level + 1 -/
-  have Prop_Edge_Startᵤ : edge.START = U1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵤ₁;
-  have Prop_Edge_Endᵤ : edge.END = U0 := COLLAPSE.Simp_End_Incoming prop_mem_incomingᵤ₀;
-  have Prop_Upper_LVLᵤ : U1.level = U0.level + 1 := by rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+  have Prop_Edge_Origᵤ : edge.orig = U1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵤ₁;
+  have Prop_Edge_Destᵤ : edge.dest = U0 := COLLAPSE.Simp_Dest_Incoming prop_mem_incomingᵤ₀;
+  have Prop_Upper_LVLᵤ : U1.level = U0.level + 1 := by rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                                        rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                                                        cases prop_mem_incomingᵤ₀ with | head _ => trivial;
                                                                                       | tail _ mem_cases => cases mem_cases with
@@ -7941,9 +7945,9 @@ namespace COVERAGE.UP.T0E
                                                                                                             | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵤ; );
   /- Unfold "get_rule U1 CLPS" -/
-  rewrite [←Prop_Edge_Startᵤ];
+  rewrite [←Prop_Edge_Origᵤ];
   rewrite [COLLAPSE.Simp_Rule_Above_Left prop_colᵤ₀ prop_collapse prop_mem_incomingᵤ₀];
-  rewrite [Prop_Edge_Startᵤ];
+  rewrite [Prop_Edge_Origᵤ];
   /- type0_elimination U1 → type2_elimination U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
                        simp only [get_rule] at prop_typeᵤ₁;
@@ -8007,7 +8011,7 @@ namespace COVERAGE.UP.T0E
                                             simp only [is_collapse.update_edges_end];
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -8015,7 +8019,7 @@ namespace COVERAGE.UP.T0E
                        apply And.intro ( by simp only [prop_incomingᵤ₀, prop_outgoingᵤ₀, prop_directᵤ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵤ₀];
                                             simp only [pre_collapse.indirect.create];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                                             cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -8086,7 +8090,7 @@ namespace COVERAGE.UP.T0E
                                             simp only [is_collapse.update_edges_end];
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -8094,7 +8098,7 @@ namespace COVERAGE.UP.T0E
                        apply And.intro ( by simp only [prop_incomingᵤ₀, prop_outgoingᵤ₀, prop_directᵤ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵤ₀];
                                             simp only [pre_collapse.indirect.create];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                                             cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -8153,7 +8157,7 @@ namespace COVERAGE.UP.T0E
                        simp only [is_collapse.update_edges_end];
                        simp only [is_collapse.update_edges_end.loop];
                        simp only [collapse.center];
-                       rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                       rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                        cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                       | tail _ mem_cases => trivial; );
@@ -8161,7 +8165,7 @@ namespace COVERAGE.UP.T0E
   apply And.intro ( by simp only [prop_incomingᵤ₀, prop_outgoingᵤ₀, prop_directᵤ₀];
                        simp only [pre_collapse.indirect, prop_hptᵤ₀];
                        simp only [pre_collapse.indirect.create];
-                       rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                       rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                        cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                   simp +arith +decide;
@@ -8178,7 +8182,7 @@ namespace COVERAGE.UP.T0E
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
     ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
     ( type0_elimination (get_rule V0 DLDS) ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing V1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing V1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming V0 DLDS ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
@@ -8217,9 +8221,9 @@ namespace COVERAGE.UP.T0E
   cases prop_incomingᵥ₀ with | intro edge prop_incomingᵥ₀ =>
   cases prop_incomingᵥ₀ with | intro prop_mem_outgoingᵥ₁ prop_mem_incomingᵥ₀ =>
   /- U1.level = U0.level + 1 -/
-  have Prop_Edge_Startᵥ : edge.START = V1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵥ₁;
-  have Prop_Edge_Endᵥ : edge.END = V0 := COLLAPSE.Simp_End_Incoming prop_mem_incomingᵥ₀;
-  have Prop_Upper_LVLᵥ : V1.level = V0.level + 1 := by rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+  have Prop_Edge_Origᵥ : edge.orig = V1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵥ₁;
+  have Prop_Edge_Destᵥ : edge.dest = V0 := COLLAPSE.Simp_Dest_Incoming prop_mem_incomingᵥ₀;
+  have Prop_Upper_LVLᵥ : V1.level = V0.level + 1 := by rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                                        rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                                                        cases prop_mem_incomingᵥ₀ with | head _ => trivial;
                                                                                       | tail _ mem_cases => cases mem_cases with
@@ -8227,9 +8231,9 @@ namespace COVERAGE.UP.T0E
                                                                                                             | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵥ; );
   /- Unfold "get_rule U1 CLPS" -/
-  rewrite [←Prop_Edge_Startᵥ];
+  rewrite [←Prop_Edge_Origᵥ];
   rewrite [COLLAPSE.Simp_Rule_Above_Right prop_collapse prop_mem_incomingᵥ₀];
-  rewrite [Prop_Edge_Startᵥ];
+  rewrite [Prop_Edge_Origᵥ];
   /- type0_elimination V1 → type2_elimination V1 -/
   apply And.intro ( by intro prop_typeᵥ₁;
                        simp only [get_rule] at prop_typeᵥ₁;
@@ -8301,7 +8305,7 @@ namespace COVERAGE.UP.T0E
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
                                             rewrite [prop_eq_lvl, prop_eq_fml];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_outgoingᵥ₁] at prop_mem_outgoingᵥ₁;
                                             cases prop_mem_outgoingᵥ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -8309,7 +8313,7 @@ namespace COVERAGE.UP.T0E
                        apply And.intro ( by simp only [prop_incomingᵥ₀, prop_outgoingᵥ₀, prop_directᵥ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵥ₀];
                                             simp only [pre_collapse.indirect.create];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                                             cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -8388,7 +8392,7 @@ namespace COVERAGE.UP.T0E
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
                                             rewrite [prop_eq_lvl, prop_eq_fml];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_outgoingᵥ₁] at prop_mem_outgoingᵥ₁;
                                             cases prop_mem_outgoingᵥ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -8396,7 +8400,7 @@ namespace COVERAGE.UP.T0E
                        apply And.intro ( by simp only [prop_incomingᵥ₀, prop_outgoingᵥ₀, prop_directᵥ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵥ₀];
                                             simp only [pre_collapse.indirect.create];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                                             cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -8463,7 +8467,7 @@ namespace COVERAGE.UP.T0E
                        simp only [is_collapse.update_edges_end.loop];
                        simp only [collapse.center];
                                             rewrite [prop_eq_lvl, prop_eq_fml];
-                       rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                       rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                        rewrite [prop_outgoingᵥ₁] at prop_mem_outgoingᵥ₁;
                        cases prop_mem_outgoingᵥ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                       | tail _ mem_cases => trivial; );
@@ -8471,7 +8475,7 @@ namespace COVERAGE.UP.T0E
   apply And.intro ( by simp only [prop_incomingᵥ₀, prop_outgoingᵥ₀, prop_directᵥ₀];
                        simp only [pre_collapse.indirect, prop_hptᵥ₀];
                        simp only [pre_collapse.indirect.create];
-                       rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                       rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                        rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                        cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                   simp +arith +decide;
@@ -8487,7 +8491,7 @@ namespace COVERAGE.UP.T0I
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T0I {U0 U1 : Vertex} {DLDS : Graph} :
     ( type0_introduction (get_rule U0 DLDS) ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing U1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming U0 DLDS ) ) →
     ------------------------------------------------------
     ( ¬type2_elimination (get_rule U1 DLDS) )
@@ -8517,10 +8521,10 @@ namespace COVERAGE.UP.T0I
   intro prop_incomingᵤ₀;
   cases prop_incomingᵤ₀ with | intro edge prop_incomingᵤ₀ =>
   cases prop_incomingᵤ₀ with | intro prop_mem_outgoingᵤ₁ prop_mem_incomingᵤ₀ =>
-  have Prop_Edge_Startᵤ : edge.START = U1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵤ₁;
+  have Prop_Edge_Origᵤ : edge.orig = U1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵤ₁;
   --
   have Prop_Directᵤ₁ := COLLAPSE.Simp_Direct_Indirect₀₂ prop_mem_incomingᵤ₀ prop_indirectᵤ₀;
-  rewrite [Prop_Edge_Startᵤ] at Prop_Directᵤ₁;
+  rewrite [Prop_Edge_Origᵤ] at Prop_Directᵤ₁;
   /- ¬type2_elimination U1 -/
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
@@ -8640,7 +8644,7 @@ namespace COVERAGE.UP.T0I
     ( CLPS.is_collapse U0 V0 DLDS ) →
     ( type0_introduction (get_rule U0 DLDS) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing U1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming U0 DLDS ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
@@ -8676,17 +8680,17 @@ namespace COVERAGE.UP.T0I
   cases prop_incomingᵤ₀ with | intro edge prop_incomingᵤ₀ =>
   cases prop_incomingᵤ₀ with | intro prop_mem_outgoingᵤ₁ prop_mem_incomingᵤ₀ =>
   /- U1.level = U0.level + 1 -/
-  have Prop_Edge_Startᵤ : edge.START = U1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵤ₁;
-  have Prop_Edge_Endᵤ : edge.END = U0 := COLLAPSE.Simp_End_Incoming prop_mem_incomingᵤ₀;
-  have Prop_Upper_LVLᵤ : U1.level = U0.level + 1 := by rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+  have Prop_Edge_Origᵤ : edge.orig = U1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵤ₁;
+  have Prop_Edge_Destᵤ : edge.dest = U0 := COLLAPSE.Simp_Dest_Incoming prop_mem_incomingᵤ₀;
+  have Prop_Upper_LVLᵤ : U1.level = U0.level + 1 := by rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                                        rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                                                        cases prop_mem_incomingᵤ₀ with | head _ => trivial;
                                                                                       | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵤ; );
   /- Unfold "get_rule U1 CLPS" -/
-  rewrite [←Prop_Edge_Startᵤ];
+  rewrite [←Prop_Edge_Origᵤ];
   rewrite [COLLAPSE.Simp_Rule_Above_Left prop_colᵤ₀ prop_collapse prop_mem_incomingᵤ₀];
-  rewrite [Prop_Edge_Startᵤ];
+  rewrite [Prop_Edge_Origᵤ];
   /- type0_elimination U1 → type2_elimination U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
                        simp only [get_rule] at prop_typeᵤ₁;
@@ -8750,7 +8754,7 @@ namespace COVERAGE.UP.T0I
                                             simp only [is_collapse.update_edges_end];
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -8758,7 +8762,7 @@ namespace COVERAGE.UP.T0I
                        apply And.intro ( by simp only [prop_incomingᵤ₀, prop_outgoingᵤ₀, prop_directᵤ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵤ₀];
                                             simp only [pre_collapse.indirect.create];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                                             cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -8826,7 +8830,7 @@ namespace COVERAGE.UP.T0I
                                             simp only [is_collapse.update_edges_end];
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -8834,7 +8838,7 @@ namespace COVERAGE.UP.T0I
                        apply And.intro ( by simp only [prop_incomingᵤ₀, prop_outgoingᵤ₀, prop_directᵤ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵤ₀];
                                             simp only [pre_collapse.indirect.create];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                                             cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -8890,7 +8894,7 @@ namespace COVERAGE.UP.T0I
                        simp only [is_collapse.update_edges_end];
                        simp only [is_collapse.update_edges_end.loop];
                        simp only [collapse.center];
-                       rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                       rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                        cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                       | tail _ mem_cases => trivial; );
@@ -8898,7 +8902,7 @@ namespace COVERAGE.UP.T0I
   apply And.intro ( by simp only [prop_incomingᵤ₀, prop_outgoingᵤ₀, prop_directᵤ₀];
                        simp only [pre_collapse.indirect, prop_hptᵤ₀];
                        simp only [pre_collapse.indirect.create];
-                       rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                       rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                        cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                   simp +arith +decide;
@@ -8912,7 +8916,7 @@ namespace COVERAGE.UP.T0I
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
     ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
     ( type0_introduction (get_rule V0 DLDS) ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing V1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing V1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming V0 DLDS ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
@@ -8950,17 +8954,17 @@ namespace COVERAGE.UP.T0I
   cases prop_incomingᵥ₀ with | intro edge prop_incomingᵥ₀ =>
   cases prop_incomingᵥ₀ with | intro prop_mem_outgoingᵥ₁ prop_mem_incomingᵥ₀ =>
   /- U1.level = U0.level + 1 -/
-  have Prop_Edge_Startᵥ : edge.START = V1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵥ₁;
-  have Prop_Edge_Endᵥ : edge.END = V0 := COLLAPSE.Simp_End_Incoming prop_mem_incomingᵥ₀;
-  have Prop_Upper_LVLᵥ : V1.level = V0.level + 1 := by rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+  have Prop_Edge_Origᵥ : edge.orig = V1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵥ₁;
+  have Prop_Edge_Destᵥ : edge.dest = V0 := COLLAPSE.Simp_Dest_Incoming prop_mem_incomingᵥ₀;
+  have Prop_Upper_LVLᵥ : V1.level = V0.level + 1 := by rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                                        rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                                                        cases prop_mem_incomingᵥ₀ with | head _ => trivial;
                                                                                       | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵥ; );
   /- Unfold "get_rule U1 CLPS" -/
-  rewrite [←Prop_Edge_Startᵥ];
+  rewrite [←Prop_Edge_Origᵥ];
   rewrite [COLLAPSE.Simp_Rule_Above_Right prop_collapse prop_mem_incomingᵥ₀];
-  rewrite [Prop_Edge_Startᵥ];
+  rewrite [Prop_Edge_Origᵥ];
   /- type0_elimination V1 → type2_elimination V1 -/
   apply And.intro ( by intro prop_typeᵥ₁;
                        simp only [get_rule] at prop_typeᵥ₁;
@@ -9032,7 +9036,7 @@ namespace COVERAGE.UP.T0I
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
                                             rewrite [prop_eq_lvl, prop_eq_fml];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_outgoingᵥ₁] at prop_mem_outgoingᵥ₁;
                                             cases prop_mem_outgoingᵥ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -9040,7 +9044,7 @@ namespace COVERAGE.UP.T0I
                        apply And.intro ( by simp only [prop_incomingᵥ₀, prop_outgoingᵥ₀, prop_directᵥ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵥ₀];
                                             simp only [pre_collapse.indirect.create];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                                             cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -9116,7 +9120,7 @@ namespace COVERAGE.UP.T0I
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
                                             rewrite [prop_eq_lvl, prop_eq_fml];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_outgoingᵥ₁] at prop_mem_outgoingᵥ₁;
                                             cases prop_mem_outgoingᵥ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -9124,7 +9128,7 @@ namespace COVERAGE.UP.T0I
                        apply And.intro ( by simp only [prop_incomingᵥ₀, prop_outgoingᵥ₀, prop_directᵥ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵥ₀];
                                             simp only [pre_collapse.indirect.create];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                                             cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -9188,7 +9192,7 @@ namespace COVERAGE.UP.T0I
                        simp only [is_collapse.update_edges_end.loop];
                        simp only [collapse.center];
                                             rewrite [prop_eq_lvl, prop_eq_fml];
-                       rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                       rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                        rewrite [prop_outgoingᵥ₁] at prop_mem_outgoingᵥ₁;
                        cases prop_mem_outgoingᵥ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                       | tail _ mem_cases => trivial; );
@@ -9196,7 +9200,7 @@ namespace COVERAGE.UP.T0I
   apply And.intro ( by simp only [prop_incomingᵥ₀, prop_outgoingᵥ₀, prop_directᵥ₀];
                        simp only [pre_collapse.indirect, prop_hptᵥ₀];
                        simp only [pre_collapse.indirect.create];
-                       rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                       rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                        rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                        cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                   simp +arith +decide;
@@ -9244,7 +9248,7 @@ namespace COVERAGE.UP.T2E
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T2E {U0 U1 : Vertex} {DLDS : Graph} :
     ( type2_elimination (get_rule U0 DLDS) ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing U1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming U0 DLDS ) ) →
     ------------------------------------------------------
     ( ¬type2_elimination (get_rule U1 DLDS) )
@@ -9288,10 +9292,10 @@ namespace COVERAGE.UP.T2E
   intro prop_incomingᵤ₀;
   cases prop_incomingᵤ₀ with | intro edge prop_incomingᵤ₀ =>
   cases prop_incomingᵤ₀ with | intro prop_mem_outgoingᵤ₁ prop_mem_incomingᵤ₀ =>
-  have Prop_Edge_Startᵤ : edge.START = U1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵤ₁;
+  have Prop_Edge_Origᵤ : edge.orig = U1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵤ₁;
   --
   have Prop_Directᵤ₁ := COLLAPSE.Simp_Direct_Indirect₀₂ prop_mem_incomingᵤ₀ prop_indirectᵤ₀;
-  rewrite [Prop_Edge_Startᵤ] at Prop_Directᵤ₁;
+  rewrite [Prop_Edge_Origᵤ] at Prop_Directᵤ₁;
   /- ¬type2_elimination U1 -/
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
@@ -9411,7 +9415,7 @@ namespace COVERAGE.UP.T2E
     ( CLPS.is_collapse U0 V0 DLDS ) →
     ( type2_elimination (get_rule U0 DLDS) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing U1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming U0 DLDS ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
@@ -9461,9 +9465,9 @@ namespace COVERAGE.UP.T2E
   cases prop_incomingᵤ₀ with | intro edge prop_incomingᵤ₀ =>
   cases prop_incomingᵤ₀ with | intro prop_mem_outgoingᵤ₁ prop_mem_incomingᵤ₀ =>
   /- U1.level = U0.level + 1 -/
-  have Prop_Edge_Startᵤ : edge.START = U1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵤ₁;
-  have Prop_Edge_Endᵤ : edge.END = U0 := COLLAPSE.Simp_End_Incoming prop_mem_incomingᵤ₀;
-  have Prop_Upper_LVLᵤ : U1.level = U0.level + 1 := by rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+  have Prop_Edge_Origᵤ : edge.orig = U1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵤ₁;
+  have Prop_Edge_Destᵤ : edge.dest = U0 := COLLAPSE.Simp_Dest_Incoming prop_mem_incomingᵤ₀;
+  have Prop_Upper_LVLᵤ : U1.level = U0.level + 1 := by rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                                        rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                                                        cases prop_mem_incomingᵤ₀ with | head _ => trivial;
                                                                                       | tail _ mem_cases => cases mem_cases with
@@ -9471,9 +9475,9 @@ namespace COVERAGE.UP.T2E
                                                                                                             | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵤ; );
   /- Unfold "get_rule U1 CLPS" -/
-  rewrite [←Prop_Edge_Startᵤ];
+  rewrite [←Prop_Edge_Origᵤ];
   rewrite [COLLAPSE.Simp_Rule_Above_Left prop_colᵤ₀ prop_collapse prop_mem_incomingᵤ₀];
-  rewrite [Prop_Edge_Startᵤ];
+  rewrite [Prop_Edge_Origᵤ];
   /- type0_elimination U1 → type2_elimination U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
                        simp only [get_rule] at prop_typeᵤ₁;
@@ -9536,7 +9540,7 @@ namespace COVERAGE.UP.T2E
                                             simp only [is_collapse.update_edges_end];
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -9544,7 +9548,7 @@ namespace COVERAGE.UP.T2E
                        apply And.intro ( by simp only [prop_incomingᵤ₀, prop_outgoingᵤ₀, prop_directᵤ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵤ₀];
                                             simp only [pre_collapse.indirect.move_up];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                                             cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -9614,7 +9618,7 @@ namespace COVERAGE.UP.T2E
                                             simp only [is_collapse.update_edges_end];
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -9622,7 +9626,7 @@ namespace COVERAGE.UP.T2E
                        apply And.intro ( by simp only [prop_incomingᵤ₀, prop_outgoingᵤ₀, prop_directᵤ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵤ₀];
                                             simp only [pre_collapse.indirect.move_up];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                                             cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -9680,7 +9684,7 @@ namespace COVERAGE.UP.T2E
                        simp only [is_collapse.update_edges_end];
                        simp only [is_collapse.update_edges_end.loop];
                        simp only [collapse.center];
-                       rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                       rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                        cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                       | tail _ mem_cases => trivial; );
@@ -9688,7 +9692,7 @@ namespace COVERAGE.UP.T2E
   apply And.intro ( by simp only [prop_incomingᵤ₀, prop_outgoingᵤ₀, prop_directᵤ₀];
                        simp only [pre_collapse.indirect, prop_hptᵤ₀];
                        simp only [pre_collapse.indirect.move_up];
-                       rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                       rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                        cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                   simp +arith +decide;
@@ -9705,7 +9709,7 @@ namespace COVERAGE.UP.T2E
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
     ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
     ( type2_elimination (get_rule V0 DLDS) ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing V1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing V1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming V0 DLDS ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
@@ -9757,9 +9761,9 @@ namespace COVERAGE.UP.T2E
   cases prop_incomingᵥ₀ with | intro edge prop_incomingᵥ₀ =>
   cases prop_incomingᵥ₀ with | intro prop_mem_outgoingᵥ₁ prop_mem_incomingᵥ₀ =>
   /- U1.level = U0.level + 1 -/
-  have Prop_Edge_Startᵥ : edge.START = V1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵥ₁;
-  have Prop_Edge_Endᵥ : edge.END = V0 := COLLAPSE.Simp_End_Incoming prop_mem_incomingᵥ₀;
-  have Prop_Upper_LVLᵥ : V1.level = V0.level + 1 := by rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+  have Prop_Edge_Origᵥ : edge.orig = V1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵥ₁;
+  have Prop_Edge_Destᵥ : edge.dest = V0 := COLLAPSE.Simp_Dest_Incoming prop_mem_incomingᵥ₀;
+  have Prop_Upper_LVLᵥ : V1.level = V0.level + 1 := by rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                                        rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                                                        cases prop_mem_incomingᵥ₀ with | head _ => trivial;
                                                                                       | tail _ mem_cases => cases mem_cases with
@@ -9767,9 +9771,9 @@ namespace COVERAGE.UP.T2E
                                                                                                             | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵥ; );
   /- Unfold "get_rule U1 CLPS" -/
-  rewrite [←Prop_Edge_Startᵥ];
+  rewrite [←Prop_Edge_Origᵥ];
   rewrite [COLLAPSE.Simp_Rule_Above_Right prop_collapse prop_mem_incomingᵥ₀];
-  rewrite [Prop_Edge_Startᵥ];
+  rewrite [Prop_Edge_Origᵥ];
   /- type0_elimination V1 → type2_elimination V1 -/
   apply And.intro ( by intro prop_typeᵥ₁;
                        simp only [get_rule] at prop_typeᵥ₁;
@@ -9840,7 +9844,7 @@ namespace COVERAGE.UP.T2E
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
                                             rewrite [prop_eq_lvl, prop_eq_fml];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_outgoingᵥ₁] at prop_mem_outgoingᵥ₁;
                                             cases prop_mem_outgoingᵥ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -9848,7 +9852,7 @@ namespace COVERAGE.UP.T2E
                        apply And.intro ( by simp only [prop_incomingᵥ₀, prop_outgoingᵥ₀, prop_directᵥ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵥ₀];
                                             simp only [pre_collapse.indirect.move_up];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                                             cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -9926,7 +9930,7 @@ namespace COVERAGE.UP.T2E
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
                                             rewrite [prop_eq_lvl, prop_eq_fml];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_outgoingᵥ₁] at prop_mem_outgoingᵥ₁;
                                             cases prop_mem_outgoingᵥ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -9934,7 +9938,7 @@ namespace COVERAGE.UP.T2E
                        apply And.intro ( by simp only [prop_incomingᵥ₀, prop_outgoingᵥ₀, prop_directᵥ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵥ₀];
                                             simp only [pre_collapse.indirect.move_up];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                                             cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -10000,7 +10004,7 @@ namespace COVERAGE.UP.T2E
                        simp only [is_collapse.update_edges_end.loop];
                        simp only [collapse.center];
                                             rewrite [prop_eq_lvl, prop_eq_fml];
-                       rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                       rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                        rewrite [prop_outgoingᵥ₁] at prop_mem_outgoingᵥ₁;
                        cases prop_mem_outgoingᵥ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                       | tail _ mem_cases => trivial; );
@@ -10008,7 +10012,7 @@ namespace COVERAGE.UP.T2E
   apply And.intro ( by simp only [prop_incomingᵥ₀, prop_outgoingᵥ₀, prop_directᵥ₀];
                        simp only [pre_collapse.indirect, prop_hptᵥ₀];
                        simp only [pre_collapse.indirect.move_up];
-                       rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                       rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                        rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                        cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                   simp +arith +decide;
@@ -10024,7 +10028,7 @@ namespace COVERAGE.UP.T2I
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T2I {U0 U1 : Vertex} {DLDS : Graph} :
     ( type2_introduction (get_rule U0 DLDS) ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing U1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming U0 DLDS ) ) →
     ------------------------------------------------------
     ( ¬type2_elimination (get_rule U1 DLDS) )
@@ -10067,10 +10071,10 @@ namespace COVERAGE.UP.T2I
   intro prop_incomingᵤ₀;
   cases prop_incomingᵤ₀ with | intro edge prop_incomingᵤ₀ =>
   cases prop_incomingᵤ₀ with | intro prop_mem_outgoingᵤ₁ prop_mem_incomingᵤ₀ =>
-  have Prop_Edge_Startᵤ : edge.START = U1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵤ₁;
+  have Prop_Edge_Origᵤ : edge.orig = U1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵤ₁;
   --
   have Prop_Directᵤ₁ := COLLAPSE.Simp_Direct_Indirect₀₂ prop_mem_incomingᵤ₀ prop_indirectᵤ₀;
-  rewrite [Prop_Edge_Startᵤ] at Prop_Directᵤ₁;
+  rewrite [Prop_Edge_Origᵤ] at Prop_Directᵤ₁;
   /- ¬type2_elimination U1 -/
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
@@ -10190,7 +10194,7 @@ namespace COVERAGE.UP.T2I
     ( CLPS.is_collapse U0 V0 DLDS ) →
     ( type2_introduction (get_rule U0 DLDS) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing U1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming U0 DLDS ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
@@ -10239,17 +10243,17 @@ namespace COVERAGE.UP.T2I
   cases prop_incomingᵤ₀ with | intro edge prop_incomingᵤ₀ =>
   cases prop_incomingᵤ₀ with | intro prop_mem_outgoingᵤ₁ prop_mem_incomingᵤ₀ =>
   /- U1.level = U0.level + 1 -/
-  have Prop_Edge_Startᵤ : edge.START = U1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵤ₁;
-  have Prop_Edge_Endᵤ : edge.END = U0 := COLLAPSE.Simp_End_Incoming prop_mem_incomingᵤ₀;
-  have Prop_Upper_LVLᵤ : U1.level = U0.level + 1 := by rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+  have Prop_Edge_Origᵤ : edge.orig = U1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵤ₁;
+  have Prop_Edge_Destᵤ : edge.dest = U0 := COLLAPSE.Simp_Dest_Incoming prop_mem_incomingᵤ₀;
+  have Prop_Upper_LVLᵤ : U1.level = U0.level + 1 := by rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                                        rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                                                        cases prop_mem_incomingᵤ₀ with | head _ => trivial;
                                                                                       | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵤ; );
   /- Unfold "get_rule U1 CLPS" -/
-  rewrite [←Prop_Edge_Startᵤ];
+  rewrite [←Prop_Edge_Origᵤ];
   rewrite [COLLAPSE.Simp_Rule_Above_Left prop_colᵤ₀ prop_collapse prop_mem_incomingᵤ₀];
-  rewrite [Prop_Edge_Startᵤ];
+  rewrite [Prop_Edge_Origᵤ];
   /- type0_elimination U1 → type2_elimination U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
                        simp only [get_rule] at prop_typeᵤ₁;
@@ -10312,7 +10316,7 @@ namespace COVERAGE.UP.T2I
                                             simp only [is_collapse.update_edges_end];
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -10320,7 +10324,7 @@ namespace COVERAGE.UP.T2I
                        apply And.intro ( by simp only [prop_incomingᵤ₀, prop_outgoingᵤ₀, prop_directᵤ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵤ₀];
                                             simp only [pre_collapse.indirect.move_up];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                                             cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -10387,7 +10391,7 @@ namespace COVERAGE.UP.T2I
                                             simp only [is_collapse.update_edges_end];
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -10395,7 +10399,7 @@ namespace COVERAGE.UP.T2I
                        apply And.intro ( by simp only [prop_incomingᵤ₀, prop_outgoingᵤ₀, prop_directᵤ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵤ₀];
                                             simp only [pre_collapse.indirect.move_up];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                                             cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -10450,7 +10454,7 @@ namespace COVERAGE.UP.T2I
                        simp only [is_collapse.update_edges_end];
                        simp only [is_collapse.update_edges_end.loop];
                        simp only [collapse.center];
-                       rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                       rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                        cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                       | tail _ mem_cases => trivial; );
@@ -10458,7 +10462,7 @@ namespace COVERAGE.UP.T2I
   apply And.intro ( by simp only [prop_incomingᵤ₀, prop_outgoingᵤ₀, prop_directᵤ₀];
                        simp only [pre_collapse.indirect, prop_hptᵤ₀];
                        simp only [pre_collapse.indirect.move_up];
-                       rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                       rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
                        cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                   simp +arith +decide;
@@ -10472,7 +10476,7 @@ namespace COVERAGE.UP.T2I
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
     ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
     ( type2_introduction (get_rule V0 DLDS) ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing V1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing V1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming V0 DLDS ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
@@ -10523,17 +10527,17 @@ namespace COVERAGE.UP.T2I
   cases prop_incomingᵥ₀ with | intro edge prop_incomingᵥ₀ =>
   cases prop_incomingᵥ₀ with | intro prop_mem_outgoingᵥ₁ prop_mem_incomingᵥ₀ =>
   /- U1.level = U0.level + 1 -/
-  have Prop_Edge_Startᵥ : edge.START = V1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵥ₁;
-  have Prop_Edge_Endᵥ : edge.END = V0 := COLLAPSE.Simp_End_Incoming prop_mem_incomingᵥ₀;
-  have Prop_Upper_LVLᵥ : V1.level = V0.level + 1 := by rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+  have Prop_Edge_Origᵥ : edge.orig = V1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵥ₁;
+  have Prop_Edge_Destᵥ : edge.dest = V0 := COLLAPSE.Simp_Dest_Incoming prop_mem_incomingᵥ₀;
+  have Prop_Upper_LVLᵥ : V1.level = V0.level + 1 := by rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                                        rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                                                        cases prop_mem_incomingᵥ₀ with | head _ => trivial;
                                                                                       | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵥ; );
   /- Unfold "get_rule U1 CLPS" -/
-  rewrite [←Prop_Edge_Startᵥ];
+  rewrite [←Prop_Edge_Origᵥ];
   rewrite [COLLAPSE.Simp_Rule_Above_Right prop_collapse prop_mem_incomingᵥ₀];
-  rewrite [Prop_Edge_Startᵥ];
+  rewrite [Prop_Edge_Origᵥ];
   /- type0_elimination V1 → type2_elimination V1 -/
   apply And.intro ( by intro prop_typeᵥ₁;
                        simp only [get_rule] at prop_typeᵥ₁;
@@ -10604,7 +10608,7 @@ namespace COVERAGE.UP.T2I
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
                                             rewrite [prop_eq_lvl, prop_eq_fml];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_outgoingᵥ₁] at prop_mem_outgoingᵥ₁;
                                             cases prop_mem_outgoingᵥ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -10612,7 +10616,7 @@ namespace COVERAGE.UP.T2I
                        apply And.intro ( by simp only [prop_incomingᵥ₀, prop_outgoingᵥ₀, prop_directᵥ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵥ₀];
                                             simp only [pre_collapse.indirect.move_up];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                                             cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -10687,7 +10691,7 @@ namespace COVERAGE.UP.T2I
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
                                             rewrite [prop_eq_lvl, prop_eq_fml];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_outgoingᵥ₁] at prop_mem_outgoingᵥ₁;
                                             cases prop_mem_outgoingᵥ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -10695,7 +10699,7 @@ namespace COVERAGE.UP.T2I
                        apply And.intro ( by simp only [prop_incomingᵥ₀, prop_outgoingᵥ₀, prop_directᵥ₀];
                                             simp only [pre_collapse.indirect, prop_hptᵥ₀];
                                             simp only [pre_collapse.indirect.move_up];
-                                            rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                                            rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                                             cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                                        simp +arith +decide;
@@ -10758,7 +10762,7 @@ namespace COVERAGE.UP.T2I
                        simp only [is_collapse.update_edges_end.loop];
                        simp only [collapse.center];
                                             rewrite [prop_eq_lvl, prop_eq_fml];
-                       rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                       rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                        rewrite [prop_outgoingᵥ₁] at prop_mem_outgoingᵥ₁;
                        cases prop_mem_outgoingᵥ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                       | tail _ mem_cases => trivial; );
@@ -10766,7 +10770,7 @@ namespace COVERAGE.UP.T2I
   apply And.intro ( by simp only [prop_incomingᵥ₀, prop_outgoingᵥ₀, prop_directᵥ₀];
                        simp only [pre_collapse.indirect, prop_hptᵥ₀];
                        simp only [pre_collapse.indirect.move_up];
-                       rewrite [←Prop_Edge_Startᵥ, ←Prop_Edge_Endᵥ];
+                       rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                        rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
                        cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
                                                                   simp +arith +decide;
@@ -10780,7 +10784,7 @@ namespace COVERAGE.UP.T1X
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T1X {U0 U1 : Vertex} {DLDS : Graph} :
     ( type1_collapse (get_rule U0 DLDS) ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing U1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming U0 DLDS ) ) →
     ------------------------------------------------------
     ( ¬type0_elimination (get_rule U1 DLDS) )
@@ -10805,19 +10809,19 @@ namespace COVERAGE.UP.T1X
   intro prop_incomingᵤ₀;
   cases prop_incomingᵤ₀ with | intro edge prop_incomingᵤ₀ =>
   cases prop_incomingᵤ₀ with | intro prop_mem_outgoingᵤ₁ prop_mem_incomingᵤ₀ =>
-  have Prop_Edge_Startᵤ : edge.START = U1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵤ₁;
+  have Prop_Edge_Origᵤ : edge.orig = U1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵤ₁;
   --
   simp only [type_incoming] at prop_incomingᵤ₀;
   have Prop_Inc_Indᵤ₀ := prop_incomingᵤ₀ prop_mem_incomingᵤ₀;
   simp only [type_incoming.check] at Prop_Inc_Indᵤ₀;
-  cases Prop_Inc_Indᵤ₀ with | intro Prop_Inc_Ind_Startᵤ₀ Prop_Inc_Indᵤ₀ =>
-  cases Prop_Inc_Indᵤ₀ with | intro Prop_Inc_Ind_Endᵤ₀ Prop_Inc_Indᵤ₀ =>
+  cases Prop_Inc_Indᵤ₀ with | intro Prop_Inc_Ind_Origᵤ₀ Prop_Inc_Indᵤ₀ =>
+  cases Prop_Inc_Indᵤ₀ with | intro Prop_Inc_Ind_Destᵤ₀ Prop_Inc_Indᵤ₀ =>
   cases Prop_Inc_Indᵤ₀ with | intro Prop_Inc_Ind_Colorᵤ₀ Prop_Inc_Indᵤ₀ =>
   cases Prop_Inc_Indᵤ₀ with | intro Colorᵤ₀ Prop_Inc_Indᵤ₀ =>
   cases Prop_Inc_Indᵤ₀ with | intro Colorsᵤ₀ Prop_Inc_Indᵤ₀ =>
   cases Prop_Inc_Indᵤ₀ with | intro Ancᵤ₀ Prop_Inc_Ind_Duoᵤ₀ =>
   --
-  rewrite [Prop_Edge_Startᵤ] at Prop_Inc_Ind_Duoᵤ₀;
+  rewrite [Prop_Edge_Origᵤ] at Prop_Inc_Ind_Duoᵤ₀;
   have Prop_Directᵤ₁ := COLLAPSE.Simp_Direct_Indirect₁₃ Prop_Inc_Ind_Duoᵤ₀;
   /- ¬type0_elimination U1 -/
   apply And.intro ( by rewrite [←imp_false];
@@ -10895,7 +10899,7 @@ namespace COVERAGE.UP.T1X
     ( CLPS.is_collapse U0 V0 DLDS ) →
     ( type1_collapse (get_rule U0 DLDS) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing U1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming U0 DLDS ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
@@ -10926,19 +10930,19 @@ namespace COVERAGE.UP.T1X
   cases prop_incomingᵤ₀ with | intro edge prop_incomingᵤ₀ =>
   cases prop_incomingᵤ₀ with | intro prop_mem_outgoingᵤ₁ prop_mem_incomingᵤ₀ =>
   /- U1.level = U0.level + 1 -/
-  have Prop_Edge_Startᵤ : edge.START = U1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵤ₁;
-  have Prop_Edge_Endᵤ : edge.END = U0 := COLLAPSE.Simp_End_Incoming prop_mem_incomingᵤ₀;
-  have Prop_Upper_LVLᵤ : U1.level = U0.level + 1 := by rewrite [←Prop_Edge_Startᵤ];
-                                                       cases prop_incomingᵤ₀ prop_mem_incomingᵤ₀ with | intro Prop_Startᵤ₀ _ =>
-                                                       cases Prop_Startᵤ₀ with | intro _ Prop_Startᵤ₀ =>
-                                                       cases Prop_Startᵤ₀ with | intro Prop_Start_LVLᵤ₀ _ =>
-                                                       simp only [get_rule] at Prop_Start_LVLᵤ₀;
-                                                       exact Prop_Start_LVLᵤ₀;
+  have Prop_Edge_Origᵤ : edge.orig = U1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵤ₁;
+  have Prop_Edge_Destᵤ : edge.dest = U0 := COLLAPSE.Simp_Dest_Incoming prop_mem_incomingᵤ₀;
+  have Prop_Upper_LVLᵤ : U1.level = U0.level + 1 := by rewrite [←Prop_Edge_Origᵤ];
+                                                       cases prop_incomingᵤ₀ prop_mem_incomingᵤ₀ with | intro Prop_Origᵤ₀ _ =>
+                                                       cases Prop_Origᵤ₀ with | intro _ Prop_Origᵤ₀ =>
+                                                       cases Prop_Origᵤ₀ with | intro Prop_Orig_LVLᵤ₀ _ =>
+                                                       simp only [get_rule] at Prop_Orig_LVLᵤ₀;
+                                                       exact Prop_Orig_LVLᵤ₀;
   apply And.intro ( by exact Prop_Upper_LVLᵤ; );
   /- Unfold "get_rule U1 CLPS" -/
-  rewrite [←Prop_Edge_Startᵤ];
+  rewrite [←Prop_Edge_Origᵤ];
   rewrite [COLLAPSE.Simp_Rule_Above_Collapse prop_colᵤ₀ prop_collapse prop_mem_incomingᵤ₀];
-  rewrite [Prop_Edge_Startᵤ];
+  rewrite [Prop_Edge_Origᵤ];
   /- type2_elimination U1 → type2_elimination U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
                        simp only [get_rule] at prop_typeᵤ₁;
@@ -11001,7 +11005,7 @@ namespace COVERAGE.UP.T1X
                        apply And.intro ( by exact prop_nbrᵤ₀; );                               /- := out_nbr > 0 -/
                        apply And.intro ( by exact prop_anc_nbrᵤ₁; );                           /- := anc_nbr > 0 -/
                        apply And.intro ( by exact prop_anc_lvlᵤ₁; );                           /- := anc_lvl + List.length (0::color::colors) = RULE.CENTER.level -/
-                       apply And.intro ( by rewrite [←Prop_Edge_Endᵤ];                         /- := color ∈ (out_nbr::past::pasts) -/
+                       apply And.intro ( by rewrite [←Prop_Edge_Destᵤ];                         /- := color ∈ (out_nbr::past::pasts) -/
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq];
                                                                                        cases prop_colorᵤ₁ with
@@ -11022,7 +11026,7 @@ namespace COVERAGE.UP.T1X
                                             simp only [is_collapse.update_edges_end];
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -11090,7 +11094,7 @@ namespace COVERAGE.UP.T1X
                        apply And.intro ( by exact prop_nbrᵤ₀; );                               /- := out_nbr > 0 -/
                        apply And.intro ( by exact prop_anc_nbrᵤ₁; );                           /- := anc_nbr > 0 -/
                        apply And.intro ( by exact prop_anc_lvlᵤ₁; );                           /- := anc_lvl + List.length (0::color::colors) = RULE.CENTER.level -/
-                       apply And.intro ( by rewrite [←Prop_Edge_Endᵤ];                         /- := color ∈ (out_nbr::past::pasts) -/
+                       apply And.intro ( by rewrite [←Prop_Edge_Destᵤ];                         /- := color ∈ (out_nbr::past::pasts) -/
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq];
                                                                                        cases prop_colorᵤ₁ with
@@ -11111,7 +11115,7 @@ namespace COVERAGE.UP.T1X
                                             simp only [is_collapse.update_edges_end];
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -11167,7 +11171,7 @@ namespace COVERAGE.UP.T1X
   apply And.intro ( by exact prop_nbrᵤ₀; );                               /- := out_nbr > 0 -/
   apply And.intro ( by exact prop_anc_nbrᵤ₁; );                           /- := anc_nbr > 0 -/
   apply And.intro ( by exact prop_anc_lvlᵤ₁; );                           /- := anc_lvl + List.length (0::color::colors) = RULE.CENTER.level -/
-  apply And.intro ( by rewrite [←Prop_Edge_Endᵤ];                         /- := color ∈ (out_nbr::past::pasts) -/
+  apply And.intro ( by rewrite [←Prop_Edge_Destᵤ];                         /- := color ∈ (out_nbr::past::pasts) -/
                        rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                        cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq];
                                                                   cases prop_colorᵤ₁ with
@@ -11188,7 +11192,7 @@ namespace COVERAGE.UP.T1X
                        simp only [is_collapse.update_edges_end];
                        simp only [is_collapse.update_edges_end.loop];
                        simp only [collapse.center];
-                       rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                       rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                        cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                       | tail _ mem_cases => trivial; );
@@ -11203,7 +11207,7 @@ namespace COVERAGE.UP.T3X
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T3X {U0 U1 : Vertex} {DLDS : Graph} :
     ( type3_collapse (get_rule U0 DLDS) ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing U1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming U0 DLDS ) ) →
     ------------------------------------------------------
     ( ¬type0_elimination (get_rule U1 DLDS) )
@@ -11229,19 +11233,19 @@ namespace COVERAGE.UP.T3X
   intro prop_incomingᵤ₀;
   cases prop_incomingᵤ₀ with | intro edge prop_incomingᵤ₀ =>
   cases prop_incomingᵤ₀ with | intro prop_mem_outgoingᵤ₁ prop_mem_incomingᵤ₀ =>
-  have Prop_Edge_Startᵤ : edge.START = U1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵤ₁;
+  have Prop_Edge_Origᵤ : edge.orig = U1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵤ₁;
   --
   simp only [type_incoming] at prop_incomingᵤ₀;
   have Prop_Inc_Indᵤ₀ := prop_incomingᵤ₀ prop_mem_incomingᵤ₀;
   simp only [type_incoming.check] at Prop_Inc_Indᵤ₀;
-  cases Prop_Inc_Indᵤ₀ with | intro Prop_Inc_Ind_Startᵤ₀ Prop_Inc_Indᵤ₀ =>
-  cases Prop_Inc_Indᵤ₀ with | intro Prop_Inc_Ind_Endᵤ₀ Prop_Inc_Indᵤ₀ =>
+  cases Prop_Inc_Indᵤ₀ with | intro Prop_Inc_Ind_Origᵤ₀ Prop_Inc_Indᵤ₀ =>
+  cases Prop_Inc_Indᵤ₀ with | intro Prop_Inc_Ind_Destᵤ₀ Prop_Inc_Indᵤ₀ =>
   cases Prop_Inc_Indᵤ₀ with | intro Prop_Inc_Ind_Colorᵤ₀ Prop_Inc_Indᵤ₀ =>
   cases Prop_Inc_Indᵤ₀ with | intro Colorᵤ₀ Prop_Inc_Indᵤ₀ =>
   cases Prop_Inc_Indᵤ₀ with | intro Colorsᵤ₀ Prop_Inc_Indᵤ₀ =>
   cases Prop_Inc_Indᵤ₀ with | intro Ancᵤ₀ Prop_Inc_Ind_Duoᵤ₀ =>
   --
-  rewrite [Prop_Edge_Startᵤ] at Prop_Inc_Ind_Duoᵤ₀;
+  rewrite [Prop_Edge_Origᵤ] at Prop_Inc_Ind_Duoᵤ₀;
   have Prop_Directᵤ₁ := COLLAPSE.Simp_Direct_Indirect₁₃ Prop_Inc_Ind_Duoᵤ₀;
   /- ¬type0_elimination U1 -/
   apply And.intro ( by rewrite [←imp_false];
@@ -11319,7 +11323,7 @@ namespace COVERAGE.UP.T3X
     ( CLPS.is_collapse U0 V0 DLDS ) →
     ( type3_collapse (get_rule U0 DLDS) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : Deduction), ( edge ∈ get_rule.outgoing U1 DLDS )
+    ( ∃(edge : DEdge), ( edge ∈ get_rule.outgoing U1 DLDS )
                          ∧ ( edge ∈ get_rule.incoming U0 DLDS ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
@@ -11351,19 +11355,19 @@ namespace COVERAGE.UP.T3X
   cases prop_incomingᵤ₀ with | intro edge prop_incomingᵤ₀ =>
   cases prop_incomingᵤ₀ with | intro prop_mem_outgoingᵤ₁ prop_mem_incomingᵤ₀ =>
   /- U1.level = U0.level + 1 -/
-  have Prop_Edge_Startᵤ : edge.START = U1 := COLLAPSE.Simp_Start_Outgoing prop_mem_outgoingᵤ₁;
-  have Prop_Edge_Endᵤ : edge.END = U0 := COLLAPSE.Simp_End_Incoming prop_mem_incomingᵤ₀;
-  have Prop_Upper_LVLᵤ : U1.level = U0.level + 1 := by rewrite [←Prop_Edge_Startᵤ];
-                                                       cases prop_incomingᵤ₀ prop_mem_incomingᵤ₀ with | intro Prop_Startᵤ₀ _ =>
-                                                       cases Prop_Startᵤ₀ with | intro _ Prop_Startᵤ₀ =>
-                                                       cases Prop_Startᵤ₀ with | intro Prop_Start_LVLᵤ₀ _ =>
-                                                       simp only [get_rule] at Prop_Start_LVLᵤ₀;
-                                                       exact Prop_Start_LVLᵤ₀;
+  have Prop_Edge_Origᵤ : edge.orig = U1 := COLLAPSE.Simp_Orig_Outgoing prop_mem_outgoingᵤ₁;
+  have Prop_Edge_Destᵤ : edge.dest = U0 := COLLAPSE.Simp_Dest_Incoming prop_mem_incomingᵤ₀;
+  have Prop_Upper_LVLᵤ : U1.level = U0.level + 1 := by rewrite [←Prop_Edge_Origᵤ];
+                                                       cases prop_incomingᵤ₀ prop_mem_incomingᵤ₀ with | intro Prop_Origᵤ₀ _ =>
+                                                       cases Prop_Origᵤ₀ with | intro _ Prop_Origᵤ₀ =>
+                                                       cases Prop_Origᵤ₀ with | intro Prop_Orig_LVLᵤ₀ _ =>
+                                                       simp only [get_rule] at Prop_Orig_LVLᵤ₀;
+                                                       exact Prop_Orig_LVLᵤ₀;
   apply And.intro ( by exact Prop_Upper_LVLᵤ; );
   /- Unfold "get_rule U1 CLPS" -/
-  rewrite [←Prop_Edge_Startᵤ];
+  rewrite [←Prop_Edge_Origᵤ];
   rewrite [COLLAPSE.Simp_Rule_Above_Collapse prop_colᵤ₀ prop_collapse prop_mem_incomingᵤ₀];
-  rewrite [Prop_Edge_Startᵤ];
+  rewrite [Prop_Edge_Origᵤ];
   /- type2_elimination U1 → type2_elimination U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
                        simp only [get_rule] at prop_typeᵤ₁;
@@ -11426,7 +11430,7 @@ namespace COVERAGE.UP.T3X
                        apply And.intro ( by exact prop_nbrᵤ₀; );                               /- := out_nbr > 0 -/
                        apply And.intro ( by exact prop_anc_nbrᵤ₁; );                           /- := anc_nbr > 0 -/
                        apply And.intro ( by exact prop_anc_lvlᵤ₁; );                           /- := anc_lvl + List.length (0::color::colors) = RULE.CENTER.level -/
-                       apply And.intro ( by rewrite [←Prop_Edge_Endᵤ];                         /- := color ∈ (out_nbr::past::pasts) -/
+                       apply And.intro ( by rewrite [←Prop_Edge_Destᵤ];                         /- := color ∈ (out_nbr::past::pasts) -/
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq];
                                                                                        cases prop_colorᵤ₁ with
@@ -11447,7 +11451,7 @@ namespace COVERAGE.UP.T3X
                                             simp only [is_collapse.update_edges_end];
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -11515,7 +11519,7 @@ namespace COVERAGE.UP.T3X
                        apply And.intro ( by exact prop_nbrᵤ₀; );                               /- := out_nbr > 0 -/
                        apply And.intro ( by exact prop_anc_nbrᵤ₁; );                           /- := anc_nbr > 0 -/
                        apply And.intro ( by exact prop_anc_lvlᵤ₁; );                           /- := anc_lvl + List.length (0::color::colors) = RULE.CENTER.level -/
-                       apply And.intro ( by rewrite [←Prop_Edge_Endᵤ];                         /- := color ∈ (out_nbr::past::pasts) -/
+                       apply And.intro ( by rewrite [←Prop_Edge_Destᵤ];                         /- := color ∈ (out_nbr::past::pasts) -/
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq];
                                                                                        cases prop_colorᵤ₁ with
@@ -11536,7 +11540,7 @@ namespace COVERAGE.UP.T3X
                                             simp only [is_collapse.update_edges_end];
                                             simp only [is_collapse.update_edges_end.loop];
                                             simp only [collapse.center];
-                                            rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                                            rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                                             cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                                            | tail _ mem_cases => trivial; );
@@ -11592,7 +11596,7 @@ namespace COVERAGE.UP.T3X
   apply And.intro ( by exact prop_nbrᵤ₀; );                               /- := out_nbr > 0 -/
   apply And.intro ( by exact prop_anc_nbrᵤ₁; );                           /- := anc_nbr > 0 -/
   apply And.intro ( by exact prop_anc_lvlᵤ₁; );                           /- := anc_lvl + List.length (0::color::colors) = RULE.CENTER.level -/
-  apply And.intro ( by rewrite [←Prop_Edge_Endᵤ];                         /- := color ∈ (out_nbr::past::pasts) -/
+  apply And.intro ( by rewrite [←Prop_Edge_Destᵤ];                         /- := color ∈ (out_nbr::past::pasts) -/
                        rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                        cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq];
                                                                   cases prop_colorᵤ₁ with
@@ -11613,7 +11617,7 @@ namespace COVERAGE.UP.T3X
                        simp only [is_collapse.update_edges_end];
                        simp only [is_collapse.update_edges_end.loop];
                        simp only [collapse.center];
-                       rewrite [←Prop_Edge_Startᵤ, ←Prop_Edge_Endᵤ];
+                       rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_outgoingᵤ₁] at prop_mem_outgoingᵤ₁;
                        cases prop_mem_outgoingᵤ₁ with | head _ => simp only [List.cons.injEq, ite_true];
                                                       | tail _ mem_cases => trivial; );
@@ -11623,4 +11627,3 @@ namespace COVERAGE.UP.T3X
   exact prop_indirectᵤ₁;
 end COVERAGE.UP.T3X
 
-/- End -/
