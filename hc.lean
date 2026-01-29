@@ -73,15 +73,13 @@ structure Deduction where
   (END : Vertex)
   (COLOR : Nat)
   (DEPENDENCY : List Formula)
-deriving Repr
+  deriving Repr
 
-/- DLDS: Ancestral Paths -/
 structure Ancestral where
-path :: (START : Vertex)
-        (END : Vertex)
-        (COLORS : List Nat)
-deriving Repr
-export Ancestral (path)
+  (START : Vertex)
+  (END : Vertex)
+  (COLORS : List Nat)
+  deriving Repr
 
 /- DLDS: Graph -/
 structure Graph where
@@ -129,8 +127,8 @@ match EDGE₁, EDGE₂ with
 /- Instances of Decidability: Ancestral Paths -/
 @[inline] def Ancestral.decEq (PATH₁ PATH₂ : @& Ancestral) : Decidable (PATH₁ = PATH₂) :=
 match PATH₁, PATH₂ with
-| (path STT₁ END₁ CLRS₁), (path STT₂ END₂ CLRS₂) => by
-  rewrite [Ancestral.path.injEq];
+| (Ancestral.mk STT₁ END₁ CLRS₁), (Ancestral.mk STT₂ END₂ CLRS₂) => by
+  rewrite [Ancestral.mk.injEq];
   have DecSTT : Decidable (STT₁ = STT₂) := Vertex.decEq STT₁ STT₂;
   have DecEND : Decidable (END₁ = END₂) := Vertex.decEq END₁ END₂;
   have DecCLRS : Decidable (CLRS₁ = CLRS₂) := List.hasDecEq CLRS₁ CLRS₂;
@@ -192,13 +190,13 @@ theorem Deduction.mk.injEq' {EDGE₁ EDGE₂ : Deduction} :
 match EDGE₁, EDGE₂ with
 | (.mk STT₁ END₁ CLR₁ DEP₁), (.mk STT₂ END₂ CLR₂ DEP₂) => simp only [Deduction.mk.injEq];
 /- Unfold Equality: Ancestral -/
-theorem Ancestral.path.injEq' {PATH₁ PATH₂ : Ancestral} :
+theorem Ancestral.mk.injEq' {PATH₁ PATH₂ : Ancestral} :
   -----------------------------------------------------------------------------------
   ( (PATH₁ = PATH₂) ↔ ( PATH₁.START = PATH₂.START
                       ∧ PATH₁.END = PATH₂.END
                       ∧ PATH₁.COLORS = PATH₂.COLORS ) ) := by
 match PATH₁, PATH₂ with
-| (path STT₁ END₁ CLRS₁), (path STT₂ END₂ CLRS₂) => simp only [Ancestral.path.injEq];
+| (Ancestral.mk STT₁ END₁ CLRS₁), (Ancestral.mk STT₂ END₂ CLRS₂) => simp only [Ancestral.mk.injEq];
 
 
 /- Methods & Definitions -/
@@ -386,7 +384,7 @@ def type2_elimination (RULE : Neighborhood) : Prop :=
                              (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml out_hpt true (past::pasts))
                              0
                              (minor_dep ∪ major_dep) ]
-    ∧ RULE.DIRECT   = [ path (Vertex.mk anc_nbr anc_lvl anc_fml false false [])
+    ∧ RULE.DIRECT   = [ Ancestral.mk (Vertex.mk anc_nbr anc_lvl anc_fml false false [])
                              RULE.CENTER
                              (0::color::colors) ]
     ∧ RULE.INDIRECT = [] )
@@ -413,7 +411,7 @@ def type2_introduction (RULE : Neighborhood) : Prop :=
                              (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml out_hpt true (past::pasts))
                              0
                              (inc_dep − [antecedent]) ]
-    ∧ RULE.DIRECT   = [ path (Vertex.mk anc_nbr anc_lvl anc_fml false false [])
+    ∧ RULE.DIRECT   = [ Ancestral.mk (Vertex.mk anc_nbr anc_lvl anc_fml false false [])
                              RULE.CENTER
                              (0::color::colors) ]
     ∧ RULE.INDIRECT = [] )
@@ -435,7 +433,7 @@ def type2_hypothesis (RULE : Neighborhood) : Prop :=
                              (Vertex.mk out_nbr (RULE.CENTER.level-1) out_fml out_hpt true (past::pasts))
                              0
                              [RULE.CENTER.formula] ]
-    ∧ RULE.DIRECT   = [ path (Vertex.mk anc_nbr anc_lvl anc_fml false false [])
+    ∧ RULE.DIRECT   = [ Ancestral.mk (Vertex.mk anc_nbr anc_lvl anc_fml false false [])
                              RULE.CENTER
                              (0::color::colors) ]
     ∧ RULE.INDIRECT = [] )
@@ -452,7 +450,7 @@ def type_incoming (RULE : Neighborhood) : Prop := ∀{INC : Deduction}, ( INC �
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
       ∧ ( INC.COLOR = 0 )                                                                                                /- := Incoming Edge => -/
         /- Deduction-Ancestral Duo: -/-----------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ∃(color : Nat)(colors : List Nat)(anc : Vertex), ( path anc INC.START (0::color::colors) ∈ INDIRECT ) )     /- => Indirect Path => -/
+      ∧ ( ∃(color : Nat)(colors : List Nat)(anc : Vertex), ( Ancestral.mk anc INC.START (0::color::colors) ∈ INDIRECT ) )     /- => Indirect Path => -/
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /- Neighborhood: Check Outgoing Edges (Type 1) -/------------------------------------------------------------------------------------------------------------------------------
@@ -480,7 +478,7 @@ def type_outgoing₁ (RULE : Neighborhood) : Prop := ∀{OUT : Deduction}, ( OUT
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
       ∧ ( OUT.COLOR ∈ (CENTER.id::CENTER.past) )                                                                             /- := Outgoing Edge => -/
         /- Deduction-Ancestral Duo: -/-----------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ∃(inc : Vertex), ( path OUT.END inc [0, OUT.COLOR] ∈ INDIRECT ) )                                                      /- => Indirect Path => -/
+      ∧ ( ∃(inc : Vertex), ( Ancestral.mk OUT.END inc [0, OUT.COLOR] ∈ INDIRECT ) )                                                      /- => Indirect Path => -/
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /- Neighborhood: Check Outgoing Edges (Type 3) -/------------------------------------------------------------------------------------------------------------------------------
 def type_outgoing₃ (RULE : Neighborhood) : Prop := ∀{OUT : Deduction}, ( OUT ∈ RULE.OUTGOING ) → ( ( type_outgoing₁.check_h₁ OUT RULE.CENTER
@@ -499,7 +497,7 @@ def type_outgoing₃ (RULE : Neighborhood) : Prop := ∀{OUT : Deduction}, ( OUT
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
       ∧ ( OUT.COLOR ∈ (CENTER.id::CENTER.past) )                                                                             /- := Outgoing Edge => -/
         /- Deduction-Ancestral Duo: -/-----------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ∃(colors : List Nat)(anc : Vertex), ( path anc CENTER (OUT.COLOR::colors) ∈ DIRECT ) )                               /- => Direct Path . -/
+      ∧ ( ∃(colors : List Nat)(anc : Vertex), ( Ancestral.mk anc CENTER (OUT.COLOR::colors) ∈ DIRECT ) )                               /- => Direct Path . -/
         -----------------------------------------------------------------------------------------------------------------------------------------------------------------------
         check_ie₃ (OUT : Deduction) (CENTER : Vertex) (INDIRECT : List Ancestral) : Prop :=
         /- Type 3 Introduction & Elimination -/--------------------------------------------------------------------------------------------------------------------------------
@@ -513,7 +511,7 @@ def type_outgoing₃ (RULE : Neighborhood) : Prop := ∀{OUT : Deduction}, ( OUT
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
       ∧ ( OUT.COLOR ∈ (CENTER.id::CENTER.past) )                                                                             /- := Outgoing Edge => -/
         /- Deduction-Ancestral Duo: -/-----------------------------------------------------------------------------------------------------------------------------------------
-      ∧ ( ∃(colors : List Nat)(inc anc : Vertex), ( path anc inc (0::OUT.COLOR::colors) ∈ INDIRECT ) )                         /- => Indirect Path => -/
+      ∧ ( ∃(colors : List Nat)(inc anc : Vertex), ( Ancestral.mk anc inc (0::OUT.COLOR::colors) ∈ INDIRECT ) )                         /- => Indirect Path => -/
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /- Neighborhood: Check Direct Paths (Type 1 & 3) -/----------------------------------------------------------------------------------------------------------------------------
@@ -693,7 +691,7 @@ def pre_collapse.direct (COLOR : Nat) (HYPOTHESIS : Bool) (DIRECT : List Ancestr
         | [] => panic! "Blank Path!!!"
         | ((_+1)::_) => panic! "Broken Path!!!"
         -- Correctly Colored Path => Return Indirect Path(s)
-        | (0::COLORS) => [ path PATH.START PATH.END (COLOR::COLORS) ]
+        | (0::COLORS) => [ Ancestral.mk PATH.START PATH.END (COLOR::COLORS) ]
     -----------------------------------------------------------------------------------------------------------------------------------------
 /- Create: Ancestral Paths -/----------------------------------------------------------------------------------------------------------------
 def pre_collapse.indirect (COLOR : Nat) (HYPOTHESIS : Bool) (INCOMING OUTGOING : List Deduction) (DIRECT : List Ancestral) : List Ancestral :=
@@ -714,14 +712,14 @@ def pre_collapse.indirect (COLOR : Nat) (HYPOTHESIS : Bool) (INCOMING OUTGOING :
   where create (COLOR : Nat) (INCOMING : List Deduction) (OUT : Deduction) : List Ancestral :=
         match INCOMING with
         | [] => []
-        | (IN::INS) => ( path OUT.END IN.START [0, COLOR] )
+        | (IN::INS) => ( Ancestral.mk OUT.END IN.START [0, COLOR] )
                     :: ( create COLOR INS OUT )
         move_up (COLOR : Nat) (INCOMING : List Deduction) (PATH : Ancestral) : List Ancestral :=
         match INCOMING, PATH with
-        | _, (path _ _ []) => panic! "Blank Path!!!"
+        | _, (Ancestral.mk _ _ []) => panic! "Blank Path!!!"
         -- Colored Path => Return Indirect Path(s)
-        | [], (path _ _ (_::_)) => []
-        | (IN::INS), (path _ _ (ZERO::COLORS)) => ( path PATH.START IN.START (ZERO::COLOR::COLORS) )
+        | [], (Ancestral.mk _ _ (_::_)) => []
+        | (IN::INS), (Ancestral.mk _ _ (ZERO::COLORS)) => ( Ancestral.mk PATH.START IN.START (ZERO::COLOR::COLORS) )
                                                 :: ( move_up COLOR INS PATH )
     -----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -763,7 +761,7 @@ def collapse.rewrite_outgoing (COLLAPSE : Vertex) (EDGES : List Deduction) : Lis
 def collapse.rewrite_direct (COLLAPSE : Vertex) (PATHS : List Ancestral) : List Ancestral :=
     match PATHS with
     | [] => []
-    | (PATH::PATHS) => ( path PATH.START COLLAPSE PATH.COLORS ) :: ( rewrite_direct COLLAPSE PATHS )
+    | (PATH::PATHS) => ( Ancestral.mk PATH.START COLLAPSE PATH.COLORS ) :: ( rewrite_direct COLLAPSE PATHS )
     -----------------------------------------------------------------------------------------------------------------------------------------
 
 /- Collapse Definitions (Collapses a Single Pair of Nodes) -/
@@ -817,7 +815,7 @@ def is_collapse.update_paths_end (OLD NEW : Vertex) (PATHS : List Ancestral) : L
     | [] => []
     | (PATH::PATHS) => ( loop OLD NEW PATH ) :: ( update_paths_end OLD NEW PATHS )
   where loop (OLD NEW : Vertex) (PATH : Ancestral) : Ancestral :=
-        path PATH.START
+        Ancestral.mk PATH.START
              (if PATH.END = OLD then NEW else PATH.END)
              PATH.COLORS
     -----------------------------------------------------------------------------------------------------------------------------------------
@@ -827,7 +825,7 @@ def is_collapse.update_paths_start (OLD NEW : Vertex) (PATHS : List Ancestral) :
     | [] => []
     | (PATH::PATHS) => ( loop OLD NEW PATH ) :: ( update_paths_start OLD NEW PATHS )
   where loop (OLD NEW : Vertex) (PATH : Ancestral) : Ancestral :=
-        path (if PATH.START = OLD then NEW else PATH.START)
+        Ancestral.mk (if PATH.START = OLD then NEW else PATH.START)
              PATH.END
              PATH.COLORS
     -----------------------------------------------------------------------------------------------------------------------------------------
@@ -1076,9 +1074,9 @@ namespace COLLAPSE
 
   /- Lemma: Simplify "get_rule.direct" at "get_rule.indirect" -/
   theorem Simp_Direct_Indirect₁₃ {NODE₀ NODE₁ : Vertex} {DLDS : Graph} :
-    ( path (Start : Vertex) NODE₁ (Colors : List Nat) ∈ get_rule.indirect NODE₀ DLDS ) →
+    ( Ancestral.mk (Start : Vertex) NODE₁ (Colors : List Nat) ∈ get_rule.indirect NODE₀ DLDS ) →
     ------------------------------------
-    ( path (Start : Vertex) NODE₁ (Colors : List Nat) ∈ get_rule.direct NODE₁ DLDS ) := by
+    ( Ancestral.mk (Start : Vertex) NODE₁ (Colors : List Nat) ∈ get_rule.direct NODE₁ DLDS ) := by
   simp only [get_rule.indirect];
   induction get_rule.incoming NODE₀ DLDS with
   | nil => intro prop_indirect₀;
@@ -1547,7 +1545,7 @@ namespace REWRITE
   theorem Mem_RwDirect_Of_Mem {COLLAPSE : Vertex} {DIR : Ancestral} {DIRECT : List Ancestral} :
     ( DIR ∈ DIRECT ) →
     -----------------------------------------------------------------------------------
-    ( path DIR.START COLLAPSE DIR.COLORS ∈ collapse.rewrite_direct COLLAPSE DIRECT ) := by
+    ( Ancestral.mk DIR.START COLLAPSE DIR.COLORS ∈ collapse.rewrite_direct COLLAPSE DIRECT ) := by
   match DIRECT with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases;
@@ -1560,7 +1558,7 @@ namespace REWRITE
   theorem Mem_Of_Mem_RwDirect {COLLAPSE : Vertex} {RWRT : Ancestral} {DIRECT : List Ancestral} :
     ( RWRT ∈ collapse.rewrite_direct COLLAPSE DIRECT ) →
     -----------------------------------------------------------------------------------
-    ( ∃(ORIGINAL : Vertex), ( path RWRT.START ORIGINAL RWRT.COLORS ∈ DIRECT ) ) := by
+    ( ∃(ORIGINAL : Vertex), ( Ancestral.mk RWRT.START ORIGINAL RWRT.COLORS ∈ DIRECT ) ) := by
   match DIRECT with
   | [] => intros; trivial;
   | (HEAD::TAIL) => intro mem_cases;
