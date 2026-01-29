@@ -3,14 +3,14 @@ set_option linter.unusedSimpArgs false
 -- Formula --
 
 inductive Formula where
-| atm (n : Nat) : Formula
+| atom (n : Nat) : Formula
 | imp (a b : Formula) : Formula
 
 instance : OfNat Formula n where
-  ofNat := Formula.atm n
+  ofNat := Formula.atom n
 
 def Formula.toString : Formula → String
-| .atm n => n.repr
+| .atom n => n.repr
 | .imp a b => "(" ++ a.toString ++ "⊃" ++ b.toString ++ ")"
 
 instance : ToString Formula where
@@ -18,19 +18,19 @@ instance : ToString Formula where
 instance : Repr Formula where
   reprPrec f _ := f.toString
 
-prefix:max "#" => Formula.atm
+prefix:max "#" => Formula.atom
 infixr:66 "⊃" => Formula.imp
 
-#check #0
-#check 0⊃1
-#eval (0⊃1⊃2 : Formula)
-#eval ((0⊃1)⊃2 : Formula)
+#check (#0 : Formula)           -- (atom 0)
+#check (0⊃1 : Formula)          -- (imp (atom 0) (atom 1))
+#eval (0⊃1⊃2 : Formula)         -- (0⊃(1⊃2))
+#eval ((0⊃1)⊃2 : Formula)       -- ((0⊃1)⊃2)
 
 def Formula.decEq (f₁ f₂ : Formula) : Decidable (f₁ = f₂) :=
   match f₁, f₂ with
-  | .atm n₁, .atm n₂ => by rewrite [Formula.atm.injEq]; exact Nat.decEq n₁ n₂;
-  | .atm _, .imp _ _ => by exact isFalse (Formula.noConfusion);
-  | .imp _ _, .atm _ => by exact isFalse (Formula.noConfusion);
+  | .atom n₁, .atom n₂ => by rewrite [Formula.atom.injEq]; exact Nat.decEq n₁ n₂;
+  | .atom _, .imp _ _ => by exact isFalse (Formula.noConfusion);
+  | .imp _ _, .atom _ => by exact isFalse (Formula.noConfusion);
   | .imp a₁ b₁, .imp a₂ b₂ => by
     rewrite [Formula.imp.injEq];
     have _ : Decidable (a₁ = a₂) := Formula.decEq a₁ a₂;
@@ -150,30 +150,6 @@ def DLDS.decEq (G₁ G₂ : DLDS) : Decidable (G₁ = G₂) := by
 
 instance : DecidableEq DLDS := DLDS.decEq
 
-structure Neighborhood where
-  (center : Node)
-  (inc : List DEdge)
-  (out : List DEdge)
-  (direct : List AEdge)
-  (indirect : List AEdge)
-  deriving Repr
-
-def Neighborhood.decEq (N₁ N₂ : Neighborhood) : Decidable (N₁ = N₂) :=
-  match N₁, N₂ with
-  | .mk c₁ inc₁ out₁ dir₁ ind₁, .mk c₂ inc₂ out₂ dir₂ ind₂ => by
-    rewrite [Neighborhood.mk.injEq];
-    have _ : Decidable (c₁ = c₂) := Node.decEq c₁ c₂;
-    have _ : Decidable (inc₁ = inc₂) := List.hasDecEq inc₁ inc₂;
-    have _ : Decidable (out₁ = out₂) := List.hasDecEq out₁ out₂;
-    have _ : Decidable (dir₁ = dir₂) := List.hasDecEq dir₁ dir₂;
-    have _ : Decidable (ind₁ = ind₂) := List.hasDecEq ind₁ ind₂;
-    have _₁ := @instDecidableAnd (dir₁ = dir₂) (ind₁ = ind₂) _ _;
-    have _₂ := @instDecidableAnd (out₁ = out₂) (dir₁ = dir₂ ∧ ind₁ = ind₂) _ _;
-    have _₃ := @instDecidableAnd (inc₁ = inc₂) (out₁ = out₂ ∧ dir₁ = dir₂ ∧ ind₁ = ind₂) _ _;
-    exact @instDecidableAnd (c₁ = c₂) (inc₁ = inc₂ ∧ out₁ = out₂ ∧ dir₁ = dir₂ ∧ ind₁ = ind₂) _ _;
-
-instance : DecidableEq Neighborhood := Neighborhood.decEq
-
 def DLDS.get_inc_dedges (G : DLDS) (x : Node) : List DEdge :=
   loop G.dedges
   where loop (dedges : List DEdge) : List DEdge :=
@@ -202,54 +178,54 @@ def DLDS.get_ind_aedges (G : DLDS) (x : Node) : List AEdge :=
     | [] => []
     | d :: ds => DLDS.get_dir_aedges.loop d.orig aedges ++ loop ds aedges
 
-/- Collapse: NODE × G → Neighborhood -/--------------------------------------------------------------------------------------
-def get_rule (NODE : Node) (G : DLDS) : Neighborhood :=
-    Neighborhood.mk ( NODE )
-         ( G.get_inc_dedges NODE )
-         ( G.get_out_dedges NODE )
-         ( G.get_dir_aedges NODE )
-         ( G.get_ind_aedges NODE )
-    ----------------------------------------------------------------------------------------------------------------------------
+structure Neighborhood where
+  (center : Node)
+  (inc : List DEdge)
+  (out : List DEdge)
+  (direct : List AEdge)
+  (indirect : List AEdge)
+  deriving Repr
 
-namespace List
-  /- Set-Like Conversion -/
-  prefix:max "#" => List.eraseDups
-  /- Set-Like Union: l₁ ∪ l₂ = {a | a ∈ l₁ ∨ a ∈ l₂} -/
-  notation:66 l₁:40 " ∪ " l₂:40 => List.eraseDups (List.append l₁ l₂)
-  /- Set-Like Subtraction: l₁ − l₂ = {a | a ∈ l₁ ∧ a ∉ l₂} -/
-  notation:66 l₁:40 " − " l₂:40 => List.eraseDups (List.removeAll l₁ l₂)
-end List
+def Neighborhood.decEq (N₁ N₂ : Neighborhood) : Decidable (N₁ = N₂) :=
+  match N₁, N₂ with
+  | .mk c₁ inc₁ out₁ dir₁ ind₁, .mk c₂ inc₂ out₂ dir₂ ind₂ => by
+    rewrite [Neighborhood.mk.injEq];
+    have _ : Decidable (c₁ = c₂) := Node.decEq c₁ c₂;
+    have _ : Decidable (inc₁ = inc₂) := List.hasDecEq inc₁ inc₂;
+    have _ : Decidable (out₁ = out₂) := List.hasDecEq out₁ out₂;
+    have _ : Decidable (dir₁ = dir₂) := List.hasDecEq dir₁ dir₂;
+    have _ : Decidable (ind₁ = ind₂) := List.hasDecEq ind₁ ind₂;
+    have _₁ := @instDecidableAnd (dir₁ = dir₂) (ind₁ = ind₂) _ _;
+    have _₂ := @instDecidableAnd (out₁ = out₂) (dir₁ = dir₂ ∧ ind₁ = ind₂) _ _;
+    have _₃ := @instDecidableAnd (inc₁ = inc₂) (out₁ = out₂ ∧ dir₁ = dir₂ ∧ ind₁ = ind₂) _ _;
+    exact @instDecidableAnd (c₁ = c₂) (inc₁ = inc₂ ∧ out₁ = out₂ ∧ dir₁ = dir₂ ∧ ind₁ = ind₂) _ _;
 
+instance : DecidableEq Neighborhood := Neighborhood.decEq
 
-/- Collapse & Type Conditionals -/
-/- Check: Past Collapses (Node) & Path Colors (AEdge) -/-------------------------------------------------------------
-def check_numbers (ns : List Nat) : Prop :=
+def DLDS.get_neighborhood (G : DLDS) (x : Node) : Neighborhood :=
+    (Neighborhood.mk x
+      (G.get_inc_dedges x) (G.get_out_dedges x)
+      (G.get_dir_aedges x) (G.get_ind_aedges x))
+
+-- Checks --
+
+def check_nonempty_and_nonzero (ns : List Nat) : Prop :=
   ns ≠ [] ∧ ∀ {n : Nat}, n ∈ ns → n > 0
 
-/- Check: Nodes Set (DLDS) -/----------------------------------------------------------------------------------------------
-def check_dlds (G : DLDS) : Prop :=
-    ( ∀{NODE₁ NODE₂ : Node}, ( NODE₁ ∈ G.nodes ) →
-                               ( NODE₂ ∈ G.nodes ) →
-      --------------------------------------
-      ( ( NODE₁.id = NODE₂.id ) ↔ ( NODE₁ = NODE₂ ) ) )
-  ∧ ( ∀{EDGE : DEdge}, ( EDGE ∈ G.dedges ) →
-      --------------------------------------
-      ( EDGE.orig ∈ G.nodes ∧ EDGE.dest ∈ G.nodes ) )
-  ∧ ( ∀{PATH : AEdge}, ( PATH ∈ G.aedges ) →
-      --------------------------------------
-      ( PATH.orig ∈ G.nodes ∧ PATH.dest ∈ G.nodes ) )
-    ------------------------------------------------------------------------------------------------------------------------
-/- Check: Collapse Nodes (Nodees) & Incoming Edges (DEdges) -/--------------------------------------------------------
-def check_collapse_nodes (RULEᵤ RULEᵥ : Neighborhood) : Prop :=
-    ( RULEᵤ.center.id > RULEᵥ.center.id )
-  ∧ ( RULEᵥ.center.id ∉ RULEᵤ.center.past )
-  ∧ ( RULEᵤ.center.level = RULEᵥ.center.level )
-  ∧ ( RULEᵤ.center.formula = RULEᵥ.center.formula )
-  ∧ ( ∀{INCᵤ INCᵥ : DEdge}, ( INCᵤ ∈ RULEᵤ.inc ) →
-                                ( INCᵥ ∈ RULEᵥ.inc ) →
-                                ( INCᵤ.orig ≠ INCᵥ.orig ) )
-    ------------------------------------------------------------------------------------------------------------------------
-/- Check: Outgoing Edges (DEdges) & Collapse Nodes (Nodees) & Incoming Edges (DEdges) -/-------------------------
+def check_dlds (G : DLDS) : Prop := -- *UNUSED*
+  ∀ {x₁ x₂ : Node}, x₁ ∈ G.nodes → x₂ ∈ G.nodes → (x₁.id = x₂.id ↔ x₁ = x₂ )
+    ∧ ∀ {d : DEdge}, d ∈ G.dedges → (d.orig ∈ G.nodes ∧ d.dest ∈ G.nodes)
+    ∧ ∀ {a : AEdge}, a ∈ G.aedges → (a.orig ∈ G.nodes ∧ a.dest ∈ G.nodes)
+
+def check_collapse_nodes (Nᵤ Nᵥ : Neighborhood) : Prop :=
+    Nᵤ.center.id > Nᵥ.center.id
+    ∧ Nᵥ.center.id ∉ Nᵤ.center.past
+    ∧ Nᵤ.center.level = Nᵥ.center.level
+    ∧ Nᵤ.center.formula = Nᵥ.center.formula
+    ∧ ∀{iᵤ iᵥ : DEdge}, iᵤ ∈ Nᵤ.inc → iᵥ ∈ Nᵥ.inc → iᵤ.orig ≠ iᵥ.orig
+
+-- *STOPPED HERE*
+
 def check_collapse_edges (RULEᵤ RULEᵥ : Neighborhood) : Prop :=
     ( ∃(OUTᵤ OUTᵥ : DEdge), ( OUTᵤ ∈ RULEᵤ.out )
                               ∧ ( OUTᵥ ∈ RULEᵥ.out )
@@ -262,7 +238,16 @@ def check_collapse_edges (RULEᵤ RULEᵥ : Neighborhood) : Prop :=
   ∧ ( ∀{INCᵤ INCᵥ : DEdge}, ( INCᵤ ∈ RULEᵤ.inc ) →
                                 ( INCᵥ ∈ RULEᵥ.inc ) →
                                 ( INCᵤ.orig ≠ INCᵥ.orig ) )
-    ------------------------------------------------------------------------------------------------------------------------
+
+namespace List
+  /- Set-Like Conversion -/
+  prefix:max "#" => List.eraseDups
+  /- Set-Like Union: l₁ ∪ l₂ = {a | a ∈ l₁ ∨ a ∈ l₂} -/
+  notation:66 l₁:40 " ∪ " l₂:40 => List.eraseDups (List.append l₁ l₂)
+  /- Set-Like Subtraction: l₁ − l₂ = {a | a ∈ l₁ ∧ a ∉ l₂} -/
+  notation:66 l₁:40 " − " l₂:40 => List.eraseDups (List.removeAll l₁ l₂)
+end List
+
 
 /- Neighborhood Type Hierarchy -/
 /- Neighborhood: Type 0 (Non-Collapsed Node Without Incoming AEdge Paths) ⊇-Elimination -/
@@ -345,7 +330,7 @@ def type2_elimination (RULE : Neighborhood) : Prop :=
       ------------------------------------------------------
       ( inc_nbr > 0 ) ∧ ( out_nbr > 0 )
     ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = RULE.center.level )
-    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( check_numbers (past::pasts) ) ∧ ( check_numbers (color::colors) )
+    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( check_nonempty_and_nonzero (past::pasts) ) ∧ ( check_nonempty_and_nonzero (color::colors) )
     ∧ RULE.inc = [ DEdge.mk (Node.mk (inc_nbr+1) (RULE.center.level+1) (antecedent⊃RULE.center.formula) major_hpt false []) /- Right Child & Major Premise -/
                              RULE.center
                              0
@@ -376,7 +361,7 @@ def type2_introduction (RULE : Neighborhood) : Prop :=
       ( RULE.center.formula = antecedent⊃consequent )
     ∧ ( inc_nbr > 0 ) ∧ ( out_nbr > 0 )
     ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = RULE.center.level )
-    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( check_numbers (past::pasts) ) ∧ ( check_numbers (color::colors) )
+    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( check_nonempty_and_nonzero (past::pasts) ) ∧ ( check_nonempty_and_nonzero (color::colors) )
     ∧ RULE.inc = [ DEdge.mk (Node.mk inc_nbr (RULE.center.level+1) consequent false false [])  /- Unique Child & Sole Premise -/
                              RULE.center
                              0
@@ -401,7 +386,7 @@ def type2_hypothesis (RULE : Neighborhood) : Prop :=
     ------------------------------------------------------
       ( out_nbr > 0 )
     ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = RULE.center.level )
-    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( check_numbers (past::pasts) ) ∧ ( check_numbers (color::colors) )
+    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( check_nonempty_and_nonzero (past::pasts) ) ∧ ( check_nonempty_and_nonzero (color::colors) )
     ∧ RULE.inc = []
     ∧ RULE.out = [ DEdge.mk RULE.center
                              (Node.mk out_nbr (RULE.center.level-1) out_fml out_hpt true (past::pasts))
@@ -466,7 +451,7 @@ def type_outgoing₃ (RULE : Neighborhood) : Prop := ∀{OUT : DEdge}, ( OUT ∈
       ∧ ( OUT.orig = center )
         /- Dest Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
       ∧ ( ( OUT.dest.id > 0 ) ∧ ( OUT.dest.level = center.level - 1 )
-        ∧ ( OUT.dest.isCollapsed = true ) ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_numbers (past::pasts) )
+        ∧ ( OUT.dest.isCollapsed = true ) ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_nonempty_and_nonzero (past::pasts) )
                                                                           ∧ ( OUT.dest.past = (past::pasts) ) ) )
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
       ∧ ( OUT.color ∈ (center.id::center.past) )                                                                             /- := Outgoing Edge => -/
@@ -480,7 +465,7 @@ def type_outgoing₃ (RULE : Neighborhood) : Prop := ∀{OUT : DEdge}, ( OUT ∈
       ∧ ( OUT.orig = center )
         /- Dest Node: -/--------------------------------------------------------------------------------------------------------------------------------------------------------
       ∧ ( ( OUT.dest.id > 0 ) ∧ ( OUT.dest.level = center.level - 1 )
-        ∧ ( OUT.dest.isCollapsed = true ) ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_numbers (past::pasts) )
+        ∧ ( OUT.dest.isCollapsed = true ) ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_nonempty_and_nonzero (past::pasts) )
                                                                           ∧ ( OUT.dest.past = (past::pasts) ) ) )
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
       ∧ ( OUT.color ∈ (center.id::center.past) )                                                                             /- := Outgoing Edge => -/
@@ -499,7 +484,7 @@ def type_direct (RULE : Neighborhood) : Prop := ∀{DIR : AEdge}, ( DIR ∈ RULE
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
       ∧ ( DIR.orig.level + List.length (DIR.colors) = center.level )
       ∧ ( ∃(color₁ color₂ : Nat),
-          ∃(colors : List Nat), ( check_numbers (color₁::color₂::colors) )
+          ∃(colors : List Nat), ( check_nonempty_and_nonzero (color₁::color₂::colors) )
                                ∧ ( color₁ ∈ (center.id::center.past) )
                                ∧ ( DIR.colors = (color₁::color₂::colors) )                                                /- := Direct Path => -/
                                  /- DEdge-AEdge Duo: -/----------------------------------------------------------------------------------------------------------------
@@ -523,7 +508,7 @@ def type_indirect (RULE : Neighborhood) : Prop := ∀{IND : AEdge}, ( IND ∈ RU
         /- Colors: -/---------------------------------------------------------------------------------------------------------------------------------------------------------
       ∧ ( IND.orig.level + List.length (IND.colors) = center.level + 1 )
       ∧ ( ∃(color : Nat),
-          ∃(colors : List Nat), ( check_numbers (color::colors) )
+          ∃(colors : List Nat), ( check_nonempty_and_nonzero (color::colors) )
                                ∧ ( color ∈ (center.id::center.past) )
                                ∧ ( IND.colors = (0::color::colors) )                                                         /- := Indirect Path => -/
                                  /- DEdge-AEdge Trio: -/---------------------------------------------------------------------------------------------------------------
@@ -566,7 +551,7 @@ def type1_collapse (RULE : Neighborhood) : Prop :=
     /- Check Center -/-----------------------------------------------------------------------------------------------------------------------
     ( ( RULE.center.id > 0 ) ∧ ( RULE.center.level > 0 )
     ∧ ( RULE.center.isCollapsed = true )
-    ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_numbers (past::pasts) )
+    ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_nonempty_and_nonzero (past::pasts) )
                                        ∧ ( RULE.center.past = (past::pasts) ) )
     /- Check DEdge Edges -/--------------------------------------------------------------------------------------------------------------
     ∧ ( ( RULE.inc = [] ) → ( RULE.center.isHypothesis = true ) )
@@ -614,7 +599,7 @@ def type3_collapse (RULE : Neighborhood) : Prop :=
     /- Check Center -/-----------------------------------------------------------------------------------------------------------------------
     ( ( RULE.center.id > 0 ) ∧ ( RULE.center.level > 0 )
     ∧ ( RULE.center.isCollapsed = true )
-    ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_numbers (past::pasts) )
+    ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_nonempty_and_nonzero (past::pasts) )
                                        ∧ ( RULE.center.past = (past::pasts) ) )
     /- Check DEdge Edges -/--------------------------------------------------------------------------------------------------------------
     ∧ ( ( RULE.inc = [] ) → ( RULE.center.isHypothesis = true ) )
@@ -752,8 +737,8 @@ def collapse (RULEᵤ RULEᵥ : Neighborhood) : Neighborhood :=
         ++ RULEᵤ.indirect )
     -----------------------------------------------------------------------------------------------------------------------------------------
 /- Collapse: NODE × NODE × G → Neighborhood -/--------------------------------------------------------------------------------------------
-def collapse_rule (U V : Node) (G : DLDS) : Neighborhood := collapse ( pre_collapse (get_rule U G) )
-                                                                           ( pre_collapse (get_rule V G) )
+def collapse_rule (U V : Node) (G : DLDS) : Neighborhood := collapse ( pre_collapse (G.get_neighborhood U) )
+                                                                           ( pre_collapse (G.get_neighborhood V) )
     -----------------------------------------------------------------------------------------------------------------------------------------
 
 ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -811,7 +796,7 @@ def DLDS.is_collapse (U V : Node) : DLDS → DLDS → Prop
 | CLPS, G => ( ∀{inc : DEdge}, ( U.isCollapsed = true ) →
                                       ( inc ∈ G.get_inc_dedges U ) →
                   ---------------------------------------------------------------------
-                  ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
+                  ( CLPS.get_neighborhood inc.orig  = Neighborhood.mk ( inc.orig )
                                                    ( G.get_inc_dedges inc.orig )
                 /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (G.get_out_dedges inc.orig) )
                 /- Direct Inc ∈ Indirect UV -/     ( G.get_dir_aedges inc.orig )
@@ -821,7 +806,7 @@ def DLDS.is_collapse (U V : Node) : DLDS → DLDS → Prop
               ∧ ( ∀{inc : DEdge}, ( U.isCollapsed = false ) →
                                       ( inc ∈ G.get_inc_dedges U ) →
                   ---------------------------------------------------------------------
-                  ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
+                  ( CLPS.get_neighborhood inc.orig = Neighborhood.mk ( inc.orig )
                                                    ( G.get_inc_dedges inc.orig )
                 /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (G.get_out_dedges inc.orig) )
                 /- Direct Inc ∈ Indirect UV -/     ( DLDS.get_dir_aedges.loop ( inc.orig )
@@ -835,7 +820,7 @@ def DLDS.is_collapse (U V : Node) : DLDS → DLDS → Prop
                 /- Above & Left Side -/----------------------------------------------------------------------------------------------------------
               ∧ ( ∀{inc : DEdge}, ( inc ∈ G.get_inc_dedges V ) →
                   ---------------------------------------------------------------------
-                  ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
+                  ( CLPS.get_neighborhood inc.orig = Neighborhood.mk ( inc.orig )
                                                    ( G.get_inc_dedges inc.orig )
                 /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (G.get_out_dedges inc.orig) )
                 /- Direct Inc ∈ Indirect UV -/     ( DLDS.get_dir_aedges.loop ( inc.orig )
@@ -965,13 +950,13 @@ end List
 
 
 namespace COLLAPSE
-  /- Lemma: Simplify "check_numbers [UNIT]" -/
+  /- Lemma: Simplify "check_nonempty_and_nonzero [UNIT]" -/
   theorem Check_Numbers_Unit {UNIT : Nat} :
     ( UNIT > 0 ) →
     ---------------------------
-    ( check_numbers [UNIT] ) := by
+    ( check_nonempty_and_nonzero [UNIT] ) := by
   intro prop_unit;
-  simp only [check_numbers];
+  simp only [check_nonempty_and_nonzero];
   exact And.intro ( by rewrite [ne_eq];
                        simp only [List.cons_ne_self];
                        exact not_false; )
@@ -979,14 +964,14 @@ namespace COLLAPSE
                        cases mem_cases with
                        | head _ => exact prop_unit;
                        | tail _ mem_cases => trivial; );
-  /- Lemma: Simplify "check_numbers (HEAD::TAIL)" -/
+  /- Lemma: Simplify "check_nonempty_and_nonzero (HEAD::TAIL)" -/
   theorem Check_Numbers_Cons {HEAD : Nat} {TAIL : List Nat} :
     ( HEAD > 0 ) →
-    ( check_numbers TAIL ) →
+    ( check_nonempty_and_nonzero TAIL ) →
     ---------------------------
-    ( check_numbers (HEAD::TAIL) ) := by
+    ( check_nonempty_and_nonzero (HEAD::TAIL) ) := by
   intro prop_head prop_tail;
-  simp only [check_numbers] at prop_tail ⊢;
+  simp only [check_nonempty_and_nonzero] at prop_tail ⊢;
   cases prop_tail with | intro prop_nil prop_mem =>
   exact And.intro ( by exact List.cons_ne_nil HEAD TAIL; )
                   ( by intro color mem_cases;
@@ -1198,7 +1183,7 @@ namespace COLLAPSE
     /- Incoming Nodes -/-------------------------------------------------------------
     ( ∀{inc : DEdge}, ( inc ∈ G.get_inc_dedges U ) →
       -----------------------------------------------------------------------------
-    ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
+    ( CLPS.get_neighborhood inc.orig = Neighborhood.mk ( inc.orig )
                                      ( G.get_inc_dedges inc.orig )
   /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (G.get_out_dedges inc.orig) )
   /- Direct Inc ∈ Indirect UV -/     ( G.get_dir_aedges inc.orig )
@@ -1215,7 +1200,7 @@ namespace COLLAPSE
     /- Incoming Nodes -/-------------------------------------------------------------
     ( ∀{inc : DEdge}, ( inc ∈ G.get_inc_dedges U ) →
       -----------------------------------------------------------------------------
-      ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
+      ( CLPS.get_neighborhood inc.orig = Neighborhood.mk ( inc.orig )
                                        ( G.get_inc_dedges inc.orig )
     /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (G.get_out_dedges inc.orig) )
     /- Direct Inc ∈ Indirect UV -/     ( DLDS.get_dir_aedges.loop ( inc.orig )
@@ -1237,7 +1222,7 @@ namespace COLLAPSE
     /- Incoming Nodes -/-------------------------------------------------------------
     ( ∀{inc : DEdge}, ( inc ∈ G.get_inc_dedges V ) →
       -----------------------------------------------------------------------------
-      ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
+      ( CLPS.get_neighborhood inc.orig = Neighborhood.mk ( inc.orig )
                                        ( G.get_inc_dedges inc.orig )
     /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (G.get_out_dedges inc.orig) )
     /- Direct Inc ∈ Indirect UV -/     ( DLDS.get_dir_aedges.loop ( inc.orig )
@@ -1807,7 +1792,7 @@ namespace COVERAGE.T1_Of_T0
                                    simp only [Nat.sub_add_cancel prop_lvl]; );
               apply Exists.intro RULE.center.id;                                              /- color (Path Notation) -/
               apply Exists.intro [];                                                              /- colors (Path Notation) -/
-              apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbr );                  /- := check_numbers (color::colors) -/
+              apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbr );                  /- := check_nonempty_and_nonzero (color::colors) -/
               apply And.intro ( by exact List.Mem.head RULE.center.past; );                       /- := color ∈ (RULE.center.id::RULE.center.past) -/
               apply And.intro ( by trivial; );                                                    /- := IND.colors = (0::color::colors) -/
               /- Match-Verification Loop: -/
@@ -1843,7 +1828,7 @@ namespace COVERAGE.T1_Of_T0
                                                          simp only [Nat.sub_add_cancel prop_lvl]; );
                                     apply Exists.intro RULE.center.id;                                              /- color (Path Notation) -/
                                     apply Exists.intro [];                                                              /- colors (Path Notation) -/
-                                    apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbr );                  /- := check_numbers (color::colors) -/
+                                    apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbr );                  /- := check_nonempty_and_nonzero (color::colors) -/
                                     apply And.intro ( by exact List.Mem.head RULE.center.past; );                       /- := color ∈ (RULE.center.id::RULE.center.past) -/
                                     apply And.intro ( by trivial; );                                                    /- := IND.colors = (0::color::colors) -/
                                     /- Match-Verification Loop: -/
@@ -1974,7 +1959,7 @@ namespace COVERAGE.T1_Of_T0
                                    simp only [Nat.sub_add_cancel prop_lvl]; );
               apply Exists.intro RULE.center.id;                                              /- color (Path Notation) -/
               apply Exists.intro [];                                                              /- colors (Path Notation) -/
-              apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbr );                  /- := check_numbers (color::colors) -/
+              apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbr );                  /- := check_nonempty_and_nonzero (color::colors) -/
               apply And.intro ( by exact List.Mem.head RULE.center.past; );                       /- := color ∈ (RULE.center.id::RULE.center.past) -/
               apply And.intro ( by trivial; );                                                    /- := IND.colors = (0::color::colors) -/
               /- Match-Verification Loop: -/
@@ -2172,7 +2157,7 @@ namespace COVERAGE.T3_Of_T2
                        | head _ => simp only [Node.mk.injEq, true_and];
                                    apply And.intro ( by exact Or.inl prop_hpt; );                                   /- := center.isHypothesis = false ∨ center.isCollapsed = true -/
                                    apply And.intro ( by exact prop_out_nbr; );                                      /- := OUT.dest.id > 0 -/
-                                   apply And.intro ( by apply Exists.intro past;                                    /- := check_numbers (past::pasts) ∧ OUT.dest.past = (past::pasts) -/
+                                   apply And.intro ( by apply Exists.intro past;                                    /- := check_nonempty_and_nonzero (past::pasts) ∧ OUT.dest.past = (past::pasts) -/
                                                         apply Exists.intro pasts;
                                                         simp only [prop_pasts];
                                                         trivial; );
@@ -2200,7 +2185,7 @@ namespace COVERAGE.T3_Of_T2
                                    trivial; );
               apply Exists.intro RULE.center.id;                                              /- color (Path Notation) -/
               apply Exists.intro (color::colors);                                               /- colors (Path Notation) -/
-              apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbr prop_colors; );    /- := check_numbers (color::colors) -/
+              apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbr prop_colors; );    /- := check_nonempty_and_nonzero (color::colors) -/
               apply And.intro ( by exact List.Mem.head RULE.center.past; );                       /- := color ∈ (RULE.center.id::RULE.center.past) -/
               apply And.intro ( by trivial; );                                                    /- := IND.colors = (0::color::colors) -/
               /- Match-Verification Loop: -/
@@ -2247,7 +2232,7 @@ namespace COVERAGE.T3_Of_T2
                                                          trivial; );
                                     apply Exists.intro RULE.center.id;                                              /- color (Path Notation) -/
                                     apply Exists.intro (color::colors);                                               /- colors (Path Notation) -/
-                                    apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbr prop_colors; );    /- := check_numbers (color::colors) -/
+                                    apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbr prop_colors; );    /- := check_nonempty_and_nonzero (color::colors) -/
                                     apply And.intro ( by exact List.Mem.head RULE.center.past; );                       /- := color ∈ (RULE.center.id::RULE.center.past) -/
                                     apply And.intro ( by trivial; );                                                    /- := IND.colors = (0::color::colors) -/
                                     /- Match-Verification Loop: -/
@@ -2380,7 +2365,7 @@ namespace COVERAGE.T3_Of_T2
                        | head _ => simp only [Node.mk.injEq, true_and];
                                    apply And.intro ( by exact Or.inl prop_hpt; );                                   /- := center.isHypothesis = false ∨ center.isCollapsed = true -/
                                    apply And.intro ( by exact prop_out_nbr; );                                      /- := OUT.dest.id > 0 -/
-                                   apply And.intro ( by apply Exists.intro past;                                    /- := check_numbers (past::pasts) ∧ OUT.dest.past = (past::pasts) -/
+                                   apply And.intro ( by apply Exists.intro past;                                    /- := check_nonempty_and_nonzero (past::pasts) ∧ OUT.dest.past = (past::pasts) -/
                                                         apply Exists.intro pasts;
                                                         simp only [prop_pasts];
                                                         trivial; );
@@ -2408,7 +2393,7 @@ namespace COVERAGE.T3_Of_T2
                                    trivial; );
               apply Exists.intro RULE.center.id;                                              /- color (Path Notation) -/
               apply Exists.intro (color::colors);                                               /- colors (Path Notation) -/
-              apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbr prop_colors; );    /- := check_numbers (color::colors) -/
+              apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbr prop_colors; );    /- := check_nonempty_and_nonzero (color::colors) -/
               apply And.intro ( by exact List.Mem.head RULE.center.past; );                       /- := color ∈ (RULE.center.id::RULE.center.past) -/
               apply And.intro ( by trivial; );                                                    /- := IND.colors = (0::color::colors) -/
               /- Match-Verification Loop: -/
@@ -2520,7 +2505,7 @@ namespace COVERAGE.T3_Of_T2
                        | head _ => simp only [Node.mk.injEq, true_and];
                                    apply And.intro ( by exact prop_hpt; );                                          /- := center.isHypothesis = true -/
                                    apply And.intro ( by exact prop_out_nbr; );                                      /- := OUT.dest.id > 0 -/
-                                   apply And.intro ( by apply Exists.intro past;                                    /- := check_numbers (past::pasts) ∧ OUT.dest.past = (past::pasts) -/
+                                   apply And.intro ( by apply Exists.intro past;                                    /- := check_nonempty_and_nonzero (past::pasts) ∧ OUT.dest.past = (past::pasts) -/
                                                         apply Exists.intro pasts;
                                                         simp only [prop_pasts];
                                                         trivial; );
@@ -2544,7 +2529,7 @@ namespace COVERAGE.T3_Of_T2
                                    apply Exists.intro RULE.center.id;                                              /- color₁ (Path Notation) -/
                                    apply Exists.intro color;                                                          /- color₂ (Path Notation) -/
                                    apply Exists.intro colors;                                                         /- colors (Path Notation) -/
-                                   apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbr prop_colors; );    /- := check_numbers (color::colors) -/
+                                   apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbr prop_colors; );    /- := check_nonempty_and_nonzero (color::colors) -/
                                    apply And.intro ( by exact List.Mem.head RULE.center.past; );                       /- := color ∈ (RULE.center.id::RULE.center.past) -/
                                    apply And.intro ( by trivial; );                                                    /- := DIR.colors = (0::color::colors) -/
                                    /- Match-Verification Loop: -/
@@ -2625,7 +2610,7 @@ namespace COVERAGE.T1_Of_T1.NODES
   apply And.intro ( by exact prop_nbrᵤ; );                                        /- := RULE.center.id > 0 -/
   apply And.intro ( by exact prop_lvlᵤ; );                                        /- := RULE.center.level > 0 -/
   apply And.intro ( by trivial; );                                                /- := RULE.center.isCollapsed = true -/
-  apply And.intro ( by apply Exists.intro RULEᵥ.center.id;                    /- := check_numbers (past :: pasts) ∧ RULE.center.past = (past::pasts) -/
+  apply And.intro ( by apply Exists.intro RULEᵥ.center.id;                    /- := check_nonempty_and_nonzero (past :: pasts) ∧ RULE.center.past = (past::pasts) -/
                        apply Exists.intro RULEᵤ.center.past;
                        apply And.intro ( by simp only [prop_pstᵤ];
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ; );
@@ -3123,7 +3108,7 @@ namespace COVERAGE.T1_Of_T1.NODES
   apply And.intro ( by exact prop_nbrᵤ; );                                        /- := RULE.center.id > 0 -/
   apply And.intro ( by exact prop_lvlᵤ; );                                        /- := RULE.center.level > 0 -/
   apply And.intro ( by trivial; );                                                /- := RULE.center.isCollapsed = true -/
-  apply And.intro ( by apply Exists.intro RULEᵥ.center.id;                    /- := check_numbers (past :: pasts) ∧ RULE.center.past = (past::pasts) -/
+  apply And.intro ( by apply Exists.intro RULEᵥ.center.id;                    /- := check_nonempty_and_nonzero (past :: pasts) ∧ RULE.center.past = (past::pasts) -/
                        apply Exists.intro RULEᵤ.center.past;
                        apply And.intro ( by rewrite [prop_pstᵤ];
                                             exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ prop_check_pastᵤ; );
@@ -3545,7 +3530,7 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                                                                                   exact And.intro ( by exact Nat.ne_of_lt prop_nbrᵤ; )
                                                                                                                                   ( by rewrite [←imp_false];
                                                                                                                                        intro Past_Zero;
-                                                                                                                                       simp only [check_numbers] at prop_check_pastᵤ;
+                                                                                                                                       simp only [check_nonempty_and_nonzero] at prop_check_pastᵤ;
                                                                                                                                        cases prop_check_pastᵤ with | intro _ prop_check_pastᵤ =>
                                                                                                                                        apply absurd (prop_check_pastᵤ Past_Zero);
                                                                                                                                        trivial; );
@@ -3630,7 +3615,7 @@ namespace COVERAGE.T3_Of_T3.NODES
   apply And.intro ( by exact prop_nbrᵤ; );                                        /- := RULE.center.id > 0 -/
   apply And.intro ( by exact prop_lvlᵤ; );                                        /- := RULE.center.level > 0 -/
   apply And.intro ( by trivial; );                                                /- := RULE.center.isCollapsed = true -/
-  apply And.intro ( by apply Exists.intro RULEᵥ.center.id;                    /- := check_numbers (past :: pasts) ∧ RULE.center.past = (past::pasts) -/
+  apply And.intro ( by apply Exists.intro RULEᵥ.center.id;                    /- := check_nonempty_and_nonzero (past :: pasts) ∧ RULE.center.past = (past::pasts) -/
                        apply Exists.intro RULEᵤ.center.past;
                        apply And.intro ( by simp only [prop_pstᵤ];
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ; );
@@ -4387,7 +4372,7 @@ namespace COVERAGE.T3_Of_T3.NODES
   apply And.intro ( by exact prop_nbrᵤ; );                                        /- := RULE.center.id > 0 -/
   apply And.intro ( by exact prop_lvlᵤ; );                                        /- := RULE.center.level > 0 -/
   apply And.intro ( by trivial; );                                                /- := RULE.center.isCollapsed = true -/
-  apply And.intro ( by apply Exists.intro RULEᵥ.center.id;                    /- := check_numbers (past :: pasts) ∧ RULE.center.past = (past::pasts) -/
+  apply And.intro ( by apply Exists.intro RULEᵥ.center.id;                    /- := check_nonempty_and_nonzero (past :: pasts) ∧ RULE.center.past = (past::pasts) -/
                        apply Exists.intro RULEᵤ.center.past;
                        apply And.intro ( by rewrite [prop_pstᵤ];
                                             exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ prop_check_pastᵤ; );
@@ -4877,7 +4862,7 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                                                         exact And.intro ( by exact Nat.ne_of_lt prop_nbrᵤ; )
                                                                                                                                                         ( by rewrite [←imp_false];
                                                                                                                                                              intro Past_Zero;
-                                                                                                                                                             simp only [check_numbers] at prop_check_pastᵤ;
+                                                                                                                                                             simp only [check_nonempty_and_nonzero] at prop_check_pastᵤ;
                                                                                                                                                              cases prop_check_pastᵤ with | intro _ prop_check_pastᵤ =>
                                                                                                                                                              apply absurd (prop_check_pastᵤ Past_Zero);
                                                                                                                                                              trivial; );
@@ -5073,7 +5058,7 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                                   exact And.intro ( by exact Nat.ne_of_lt prop_nbrᵤ; )
                                                                                                                                   ( by rewrite [←imp_false];
                                                                                                                                        intro Past_Zero;
-                                                                                                                                       simp only [check_numbers] at prop_check_pastᵤ;
+                                                                                                                                       simp only [check_nonempty_and_nonzero] at prop_check_pastᵤ;
                                                                                                                                        cases prop_check_pastᵤ with | intro _ prop_check_pastᵤ =>
                                                                                                                                        apply absurd (prop_check_pastᵤ Past_Zero);
                                                                                                                                        trivial; );
@@ -5169,7 +5154,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
   apply And.intro ( by exact prop_nbrᵤ; );                                        /- := RULE.center.id > 0 -/
   apply And.intro ( by exact prop_lvlᵤ; );                                        /- := RULE.center.level > 0 -/
   apply And.intro ( by trivial; );                                                /- := RULE.center.isCollapsed = true -/
-  apply And.intro ( by apply Exists.intro RULEᵥ.center.id;                    /- := check_numbers (past :: pasts) ∧ RULE.center.past = (past::pasts) -/
+  apply And.intro ( by apply Exists.intro RULEᵥ.center.id;                    /- := check_nonempty_and_nonzero (past :: pasts) ∧ RULE.center.past = (past::pasts) -/
                        apply Exists.intro RULEᵤ.center.past;
                        apply And.intro ( by simp only [prop_pstᵤ];
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ; );
@@ -5933,7 +5918,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
   apply And.intro ( by exact prop_nbrᵤ; );                                        /- := RULE.center.id > 0 -/
   apply And.intro ( by exact prop_lvlᵤ; );                                        /- := RULE.center.level > 0 -/
   apply And.intro ( by trivial; );                                                /- := RULE.center.isCollapsed = true -/
-  apply And.intro ( by apply Exists.intro RULEᵥ.center.id;                    /- := check_numbers (past :: pasts) ∧ RULE.center.past = (past::pasts) -/
+  apply And.intro ( by apply Exists.intro RULEᵥ.center.id;                    /- := check_nonempty_and_nonzero (past :: pasts) ∧ RULE.center.past = (past::pasts) -/
                        apply Exists.intro RULEᵤ.center.past;
                        apply And.intro ( by rewrite [prop_pstᵤ];
                                             exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ prop_check_pastᵤ; );
@@ -6625,10 +6610,10 @@ end COVERAGE.T3_Of_T3.EDGES
 namespace COVERAGE.R00.NODES
   /- R0E0E: Type0 ⊇-Elimination = Type0 ⊇-Elimination -/
   theorem Coverage_R0E0E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_elimination (get_rule U G) ) →
-    ( type0_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_elimination (G.get_neighborhood U) ) →
+    ( type0_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6638,10 +6623,10 @@ namespace COVERAGE.R00.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0I0E: Type0 ⊇-Introduction = Type0 ⊇-Elimination -/
   theorem Coverage_R0I0E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_introduction (get_rule U G) ) →
-    ( type0_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_introduction (G.get_neighborhood U) ) →
+    ( type0_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6651,10 +6636,10 @@ namespace COVERAGE.R00.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0H0E: Type0 Hypothesis = Type0 ⊇-Elimination -/
   theorem Coverage_R0H0E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_hypothesis (get_rule U G) ) →
-    ( type0_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_hypothesis (G.get_neighborhood U) ) →
+    ( type0_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6664,10 +6649,10 @@ namespace COVERAGE.R00.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0E0I: Type0 ⊇-Elimination = Type0 ⊇-Introduction -/
   theorem Coverage_R0E0I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_elimination (get_rule U G) ) →
-    ( type0_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_elimination (G.get_neighborhood U) ) →
+    ( type0_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6677,10 +6662,10 @@ namespace COVERAGE.R00.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0I0I: Type0 ⊇-Introduction = Type0 ⊇-Introduction -/
   theorem Coverage_R0I0I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_introduction (get_rule U G) ) →
-    ( type0_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_introduction (G.get_neighborhood U) ) →
+    ( type0_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6690,10 +6675,10 @@ namespace COVERAGE.R00.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0I0H: Type0 Hypothesis = Type0 ⊇-Introduction -/
   theorem Coverage_R0H0I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_hypothesis (get_rule U G) ) →
-    ( type0_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_hypothesis (G.get_neighborhood U) ) →
+    ( type0_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6703,10 +6688,10 @@ namespace COVERAGE.R00.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0E0H: Type0 ⊇-Elimination = Type0 ⊇-Hypothesis (Top Formula) -/
   theorem Coverage_R0E0H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_elimination (get_rule U G) ) →
-    ( type0_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_elimination (G.get_neighborhood U) ) →
+    ( type0_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6716,10 +6701,10 @@ namespace COVERAGE.R00.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0I0H: Type0 ⊇-Introduction = Type0 ⊇-Hypothesis (Top Formula) -/
   theorem Coverage_R0I0H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_introduction (get_rule U G) ) →
-    ( type0_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_introduction (G.get_neighborhood U) ) →
+    ( type0_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6729,10 +6714,10 @@ namespace COVERAGE.R00.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0H0H: Type0 Hypothesis = Type0 Hypothesis (Top Formula) -/
   theorem Coverage_R0H0H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_hypothesis (get_rule U G) ) →
-    ( type0_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_hypothesis (G.get_neighborhood U) ) →
+    ( type0_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6745,10 +6730,10 @@ end COVERAGE.R00.NODES
 namespace COVERAGE.R02.NODES
   /- R0E0E: Type0 ⊇-Elimination = Type2 ⊇-Elimination -/
   theorem Coverage_R0E2E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_elimination (get_rule U G) ) →
-    ( type2_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_elimination (G.get_neighborhood U) ) →
+    ( type2_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6758,10 +6743,10 @@ namespace COVERAGE.R02.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0I0E: Type0 ⊇-Introduction = Type2 ⊇-Elimination -/
   theorem Coverage_R0I2E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_introduction (get_rule U G) ) →
-    ( type2_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_introduction (G.get_neighborhood U) ) →
+    ( type2_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6771,10 +6756,10 @@ namespace COVERAGE.R02.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0H0E: Type0 Hypothesis = Type2 ⊇-Elimination -/
   theorem Coverage_R0H2E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_hypothesis (get_rule U G) ) →
-    ( type2_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_hypothesis (G.get_neighborhood U) ) →
+    ( type2_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6784,10 +6769,10 @@ namespace COVERAGE.R02.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0E0I: Type0 ⊇-Elimination = Type2 ⊇-Introduction -/
   theorem Coverage_R0E2I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_elimination (get_rule U G) ) →
-    ( type2_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_elimination (G.get_neighborhood U) ) →
+    ( type2_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6797,10 +6782,10 @@ namespace COVERAGE.R02.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0I0I: Type0 ⊇-Introduction = Type2 ⊇-Introduction -/
   theorem Coverage_R0I2I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_introduction (get_rule U G) ) →
-    ( type2_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_introduction (G.get_neighborhood U) ) →
+    ( type2_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6810,10 +6795,10 @@ namespace COVERAGE.R02.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0H0I: Type0 Hypothesis = Type2 Introduction -/
   theorem Coverage_R0H2I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_hypothesis (get_rule U G) ) →
-    ( type2_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_hypothesis (G.get_neighborhood U) ) →
+    ( type2_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6823,10 +6808,10 @@ namespace COVERAGE.R02.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0E0H: Type0 ⊇-Elimination = Type2 ⊇-Hypothesis (Top Formula) -/
   theorem Coverage_R0E2H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_elimination (get_rule U G) ) →
-    ( type2_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_elimination (G.get_neighborhood U) ) →
+    ( type2_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6836,10 +6821,10 @@ namespace COVERAGE.R02.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0I0H: Type0 ⊇-Introduction = Type2 ⊇-Hypothesis (Top Formula) -/
   theorem Coverage_R0I2H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_introduction (get_rule U G) ) →
-    ( type2_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_introduction (G.get_neighborhood U) ) →
+    ( type2_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6849,10 +6834,10 @@ namespace COVERAGE.R02.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R0H0H: Type0 Hypothesis = Type2 Hypothesis (Top Formula) -/
   theorem Coverage_R0H2H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type0_hypothesis (get_rule U G) ) →
-    ( type2_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type0_hypothesis (G.get_neighborhood U) ) →
+    ( type2_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6865,10 +6850,10 @@ end COVERAGE.R02.NODES
 namespace COVERAGE.R20.NODES
   /- R2E0E: Type2 ⊇-Elimination = Type0 ⊇-Elimination -/
   theorem Coverage_R2E0E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_elimination (get_rule U G) ) →
-    ( type0_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_elimination (G.get_neighborhood U) ) →
+    ( type0_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6878,10 +6863,10 @@ namespace COVERAGE.R20.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2I0E: Type2 ⊇-Introduction = Type0 ⊇-Elimination -/
   theorem Coverage_R2I0E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_introduction (get_rule U G) ) →
-    ( type0_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_introduction (G.get_neighborhood U) ) →
+    ( type0_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6891,10 +6876,10 @@ namespace COVERAGE.R20.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2H0E: Type2 Hypothesis = Type0 ⊇-Elimination -/
   theorem Coverage_R2H0E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_hypothesis (get_rule U G) ) →
-    ( type0_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_hypothesis (G.get_neighborhood U) ) →
+    ( type0_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6904,10 +6889,10 @@ namespace COVERAGE.R20.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2E0I: Type2 ⊇-Elimination = Type0 ⊇-Introduction -/
   theorem Coverage_R2E0I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_elimination (get_rule U G) ) →
-    ( type0_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_elimination (G.get_neighborhood U) ) →
+    ( type0_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6917,10 +6902,10 @@ namespace COVERAGE.R20.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2I0I: Type2 ⊇-Introduction = Type0 ⊇-Introduction -/
   theorem Coverage_R2I0I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_introduction (get_rule U G) ) →
-    ( type0_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_introduction (G.get_neighborhood U) ) →
+    ( type0_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6930,10 +6915,10 @@ namespace COVERAGE.R20.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2H0I: Type2 Hypothesis = Type0 Introduction -/
   theorem Coverage_R2H0I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_hypothesis (get_rule U G) ) →
-    ( type0_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_hypothesis (G.get_neighborhood U) ) →
+    ( type0_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6943,10 +6928,10 @@ namespace COVERAGE.R20.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2E0H: Type2 ⊇-Elimination = Type0 ⊇-Hypothesis (Top Formula) -/
   theorem Coverage_R2E0H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_elimination (get_rule U G) ) →
-    ( type0_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_elimination (G.get_neighborhood U) ) →
+    ( type0_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6956,10 +6941,10 @@ namespace COVERAGE.R20.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2I0H: Type2 ⊇-Introduction = Type0 ⊇-Hypothesis (Top Formula) -/
   theorem Coverage_R2I0H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_introduction (get_rule U G) ) →
-    ( type0_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_introduction (G.get_neighborhood U) ) →
+    ( type0_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6969,10 +6954,10 @@ namespace COVERAGE.R20.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2H0H: Type2 Hypothesis = Type0 Hypothesis (Top Formula) -/
   theorem Coverage_R2H0H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_hypothesis (get_rule U G) ) →
-    ( type0_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_hypothesis (G.get_neighborhood U) ) →
+    ( type0_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6986,10 +6971,10 @@ namespace COVERAGE.R22.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2E2E: Type2 ⊇-Elimination = Type2 ⊇-Elimination -/
   theorem Coverage_R2E2E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_elimination (get_rule U G) ) →
-    ( type2_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_elimination (G.get_neighborhood U) ) →
+    ( type2_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -6999,10 +6984,10 @@ namespace COVERAGE.R22.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2I2E: Type2 ⊇-Introduction = Type2 ⊇-Elimination -/
   theorem Coverage_R2I2E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_introduction (get_rule U G) ) →
-    ( type2_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_introduction (G.get_neighborhood U) ) →
+    ( type2_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7012,10 +6997,10 @@ namespace COVERAGE.R22.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2H2E: Type2 ⊇-Hypothesis = Type2 ⊇-Elimination -/
   theorem Coverage_R2H2E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_hypothesis (get_rule U G) ) →
-    ( type2_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_hypothesis (G.get_neighborhood U) ) →
+    ( type2_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7025,10 +7010,10 @@ namespace COVERAGE.R22.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2E2I: Type2 ⊇-Elimination = Type2 ⊇-Introduction -/
   theorem Coverage_R2E2I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_elimination (get_rule U G) ) →
-    ( type2_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_elimination (G.get_neighborhood U) ) →
+    ( type2_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7038,10 +7023,10 @@ namespace COVERAGE.R22.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2I2I: Type2 ⊇-Introduction = Type2 ⊇-Introduction -/
   theorem Coverage_R2I2I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_introduction (get_rule U G) ) →
-    ( type2_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_introduction (G.get_neighborhood U) ) →
+    ( type2_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7051,10 +7036,10 @@ namespace COVERAGE.R22.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2H2I: Type2 ⊇-Hypothesis = Type2 Introduction -/
   theorem Coverage_R2H2I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_hypothesis (get_rule U G) ) →
-    ( type2_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_hypothesis (G.get_neighborhood U) ) →
+    ( type2_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7064,10 +7049,10 @@ namespace COVERAGE.R22.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2E2H: Type2 ⊇-Elimination = Type2 ⊇-Hypothesis (Top Formula) -/
   theorem Coverage_R2E2H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_elimination (get_rule U G) ) →
-    ( type2_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_elimination (G.get_neighborhood U) ) →
+    ( type2_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7077,10 +7062,10 @@ namespace COVERAGE.R22.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2I2H: Type2 ⊇-Introduction = Type2 ⊇-Hypothesis (Top Formula) -/
   theorem Coverage_R2I2H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_introduction (get_rule U G) ) →
-    ( type2_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_introduction (G.get_neighborhood U) ) →
+    ( type2_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7090,10 +7075,10 @@ namespace COVERAGE.R22.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2H2H: Type2 Hypothesis = Type2 Hypothesis (Top Formula) -/
   theorem Coverage_R2H2H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_hypothesis (get_rule U G) ) →
-    ( type2_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_hypothesis (G.get_neighborhood U) ) →
+    ( type2_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7106,10 +7091,10 @@ end COVERAGE.R22.NODES
 namespace COVERAGE.R10.NODES
   /- R1X0E: Type1 Collapsed Node = Type0 ⊇-Elimination -/
   theorem Coverage_R1X0E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type1_collapse (get_rule U G) ) →
-    ( type0_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type1_collapse (G.get_neighborhood U) ) →
+    ( type0_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7119,10 +7104,10 @@ namespace COVERAGE.R10.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R1X0I: Type1 Collapsed Node = Type0 ⊇-Introduction -/
   theorem Coverage_R1X0I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type1_collapse (get_rule U G) ) →
-    ( type0_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type1_collapse (G.get_neighborhood U) ) →
+    ( type0_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7132,10 +7117,10 @@ namespace COVERAGE.R10.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R1X0H: Type1 Collapsed Node = Type0 Hypothesis (Top Formula) -/
   theorem Coverage_R1X0H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type1_collapse (get_rule U G) ) →
-    ( type0_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type1_collapse (G.get_neighborhood U) ) →
+    ( type0_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7148,10 +7133,10 @@ end COVERAGE.R10.NODES
 namespace COVERAGE.R12.NODES
   /- R1X2E: Type1 Collapsed Node = Type2 ⊇-Elimination -/
   theorem Coverage_R1X2E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type1_collapse (get_rule U G) ) →
-    ( type2_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type1_collapse (G.get_neighborhood U) ) →
+    ( type2_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7161,10 +7146,10 @@ namespace COVERAGE.R12.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R1X2I: Type1 Collapsed Node = Type2 ⊇-Introduction -/
   theorem Coverage_R1X2I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type1_collapse (get_rule U G) ) →
-    ( type2_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type1_collapse (G.get_neighborhood U) ) →
+    ( type2_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7174,10 +7159,10 @@ namespace COVERAGE.R12.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R1X2H: Type1 Collapsed Node = Type2 Hypothesis (Top Formula) -/
   theorem Coverage_R1X2H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type1_collapse (get_rule U G) ) →
-    ( type2_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type1_collapse (G.get_neighborhood U) ) →
+    ( type2_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7190,10 +7175,10 @@ end COVERAGE.R12.NODES
 namespace COVERAGE.R30.NODES
   /- R3X0E: Type3 Collapsed Node = Type0 ⊇-Elimination -/
   theorem Coverage_R3X0E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type3_collapse (get_rule U G) ) →
-    ( type0_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type3_collapse (G.get_neighborhood U) ) →
+    ( type0_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7203,10 +7188,10 @@ namespace COVERAGE.R30.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R3X0I: Type3 Collapsed Node = Type0 ⊇-Introduction -/
   theorem Coverage_R3X0I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type3_collapse (get_rule U G) ) →
-    ( type0_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type3_collapse (G.get_neighborhood U) ) →
+    ( type0_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7216,10 +7201,10 @@ namespace COVERAGE.R30.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R3X0H: Type3 Collapsed Node = Type0 Hypothesis (Top Formula) -/
   theorem Coverage_R3X0H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type3_collapse (get_rule U G) ) →
-    ( type0_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type3_collapse (G.get_neighborhood U) ) →
+    ( type0_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7232,10 +7217,10 @@ end COVERAGE.R30.NODES
 namespace COVERAGE.R32.NODES
   /- R3X2E: Type3 Collapsed Node = Type2 ⊇-Elimination -/
   theorem Coverage_R3X2E {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type3_collapse (get_rule U G) ) →
-    ( type2_elimination (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type3_collapse (G.get_neighborhood U) ) →
+    ( type2_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7245,10 +7230,10 @@ namespace COVERAGE.R32.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R3X2I: Type3 Collapsed Node = Type2 ⊇-Introduction -/
   theorem Coverage_R3X2I {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type3_collapse (get_rule U G) ) →
-    ( type2_introduction (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type3_collapse (G.get_neighborhood U) ) →
+    ( type2_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7258,10 +7243,10 @@ namespace COVERAGE.R32.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R3X2H: Type3 Collapsed Node = Type2 Hypothesis (Top Formula) -/
   theorem Coverage_R3X2H {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type3_collapse (get_rule U G) ) →
-    ( type2_hypothesis (get_rule V G) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type3_collapse (G.get_neighborhood U) ) →
+    ( type2_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7276,10 +7261,10 @@ namespace COVERAGE.R22.EDGES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2E2E: Type2 ⊇-Elimination = Type2 ⊇-Elimination -/
   theorem Coverage_R2E2E {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_elimination (get_rule U G) ) →
-    ( type2_elimination (get_rule V G) ) →
+    ( check_collapse_edges (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_elimination (G.get_neighborhood U) ) →
+    ( type2_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7289,10 +7274,10 @@ namespace COVERAGE.R22.EDGES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2I2E: Type2 ⊇-Introduction = Type2 ⊇-Elimination -/
   theorem Coverage_R2I2E {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_introduction (get_rule U G) ) →
-    ( type2_elimination (get_rule V G) ) →
+    ( check_collapse_edges (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_introduction (G.get_neighborhood U) ) →
+    ( type2_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7302,10 +7287,10 @@ namespace COVERAGE.R22.EDGES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2H2E: Type2 ⊇-Hypothesis = Type2 ⊇-Elimination -/
   theorem Coverage_R2H2E {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_hypothesis (get_rule U G) ) →
-    ( type2_elimination (get_rule V G) ) →
+    ( check_collapse_edges (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_hypothesis (G.get_neighborhood U) ) →
+    ( type2_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7315,10 +7300,10 @@ namespace COVERAGE.R22.EDGES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2E2I: Type2 ⊇-Elimination = Type2 ⊇-Introduction -/
   theorem Coverage_R2E2I {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_elimination (get_rule U G) ) →
-    ( type2_introduction (get_rule V G) ) →
+    ( check_collapse_edges (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_elimination (G.get_neighborhood U) ) →
+    ( type2_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7328,10 +7313,10 @@ namespace COVERAGE.R22.EDGES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2I2I: Type2 ⊇-Introduction = Type2 ⊇-Introduction -/
   theorem Coverage_R2I2I {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_introduction (get_rule U G) ) →
-    ( type2_introduction (get_rule V G) ) →
+    ( check_collapse_edges (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_introduction (G.get_neighborhood U) ) →
+    ( type2_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7341,10 +7326,10 @@ namespace COVERAGE.R22.EDGES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2H2I: Type2 ⊇-Hypothesis = Type2 Introduction -/
   theorem Coverage_R2H2I {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_hypothesis (get_rule U G) ) →
-    ( type2_introduction (get_rule V G) ) →
+    ( check_collapse_edges (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_hypothesis (G.get_neighborhood U) ) →
+    ( type2_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7354,10 +7339,10 @@ namespace COVERAGE.R22.EDGES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2E2H: Type2 ⊇-Elimination = Type2 ⊇-Hypothesis (Top Formula) -/
   theorem Coverage_R2E2H {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_elimination (get_rule U G) ) →
-    ( type2_hypothesis (get_rule V G) ) →
+    ( check_collapse_edges (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_elimination (G.get_neighborhood U) ) →
+    ( type2_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7367,10 +7352,10 @@ namespace COVERAGE.R22.EDGES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2I2H: Type2 ⊇-Introduction = Type2 ⊇-Hypothesis (Top Formula) -/
   theorem Coverage_R2I2H {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_introduction (get_rule U G) ) →
-    ( type2_hypothesis (get_rule V G) ) →
+    ( check_collapse_edges (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_introduction (G.get_neighborhood U) ) →
+    ( type2_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7380,10 +7365,10 @@ namespace COVERAGE.R22.EDGES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R2H2H: Type2 Hypothesis = Type2 Hypothesis (Top Formula) -/
   theorem Coverage_R2H2H {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type2_hypothesis (get_rule U G) ) →
-    ( type2_hypothesis (get_rule V G) ) →
+    ( check_collapse_edges (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type2_hypothesis (G.get_neighborhood U) ) →
+    ( type2_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7396,10 +7381,10 @@ end COVERAGE.R22.EDGES
 namespace COVERAGE.R32.EDGES
   /- R3X2E: Type3 Collapsed Node = Type2 ⊇-Elimination -/
   theorem Coverage_R3X2E {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type3_collapse (get_rule U G) ) →
-    ( type2_elimination (get_rule V G) ) →
+    ( check_collapse_edges (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type3_collapse (G.get_neighborhood U) ) →
+    ( type2_elimination (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7409,10 +7394,10 @@ namespace COVERAGE.R32.EDGES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R3X2I: Type3 Collapsed Node = Type2 ⊇-Introduction -/
   theorem Coverage_R3X2I {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type3_collapse (get_rule U G) ) →
-    ( type2_introduction (get_rule V G) ) →
+    ( check_collapse_edges (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type3_collapse (G.get_neighborhood U) ) →
+    ( type2_introduction (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7422,10 +7407,10 @@ namespace COVERAGE.R32.EDGES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- R3X2H: Type3 Collapsed Node = Type2 Hypothesis (Top Formula) -/
   theorem Coverage_R3X2H {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
-    ( type3_collapse (get_rule U G) ) →
-    ( type2_hypothesis (get_rule V G) ) →
+    ( check_collapse_edges (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
+    ( type3_collapse (G.get_neighborhood U) ) →
+    ( type2_hypothesis (G.get_neighborhood V) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7441,16 +7426,16 @@ namespace COVERAGE.MAIN.NODES
   --333 set_option trace.Meta.Tactic.simp true
   /- Coverage Theorem: Type1 of Type0 & Type0 -/
   theorem T1CoverageT0T0 {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
     /- Left-Side Node (U) -/
-    ( ( type0_elimination (get_rule U G) )
-    ∨ ( type0_introduction (get_rule U G) )
-    ∨ ( type0_hypothesis (get_rule U G) ) ) →
+    ( ( type0_elimination (G.get_neighborhood U) )
+    ∨ ( type0_introduction (G.get_neighborhood U) )
+    ∨ ( type0_hypothesis (G.get_neighborhood U) ) ) →
     /- Right-Side Node (V) -/
-    ( ( type0_elimination (get_rule V G) )
-    ∨ ( type0_introduction (get_rule V G) )
-    ∨ ( type0_hypothesis (get_rule V G) ) ) →
+    ( ( type0_elimination (G.get_neighborhood V) )
+    ∨ ( type0_introduction (G.get_neighborhood V) )
+    ∨ ( type0_hypothesis (G.get_neighborhood V) ) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7471,14 +7456,14 @@ namespace COVERAGE.MAIN.NODES
 
   /- Coverage Theorem: Type1 of Type1 & Type0 -/
   theorem T1CoverageT1T0 {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
     /- Left-Side Node (U) -/
-    ( ( type1_collapse (get_rule U G) ) ) →
+    ( ( type1_collapse (G.get_neighborhood U) ) ) →
     /- Right-Side Node (V) -/
-    ( ( type0_elimination (get_rule V G) )
-    ∨ ( type0_introduction (get_rule V G) )
-    ∨ ( type0_hypothesis (get_rule V G) ) ) →
+    ( ( type0_elimination (G.get_neighborhood V) )
+    ∨ ( type0_introduction (G.get_neighborhood V) )
+    ∨ ( type0_hypothesis (G.get_neighborhood V) ) ) →
     ---------------------------
     ( type1_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_type1Xᵤ prop_typeᵥ;
@@ -7490,16 +7475,16 @@ namespace COVERAGE.MAIN.NODES
 
   /- Coverage Theorem: Type3 of Type0 & Type2 -/
   theorem T3CoverageT0T2 {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
     /- Left-Side Node (U) -/
-    ( ( type0_elimination (get_rule U G) )
-    ∨ ( type0_introduction (get_rule U G) )
-    ∨ ( type0_hypothesis (get_rule U G) ) ) →
+    ( ( type0_elimination (G.get_neighborhood U) )
+    ∨ ( type0_introduction (G.get_neighborhood U) )
+    ∨ ( type0_hypothesis (G.get_neighborhood U) ) ) →
     /- Right-Side Node (V) -/
-    ( ( type2_elimination (get_rule V G) )
-    ∨ ( type2_introduction (get_rule V G) )
-    ∨ ( type2_hypothesis (get_rule V G) ) ) →
+    ( ( type2_elimination (G.get_neighborhood V) )
+    ∨ ( type2_introduction (G.get_neighborhood V) )
+    ∨ ( type2_hypothesis (G.get_neighborhood V) ) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7519,16 +7504,16 @@ namespace COVERAGE.MAIN.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- Coverage Theorem: Type3 of Type2 & Type0 -/
   theorem T3CoverageT2T0 {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
+    ( check_collapse_nodes (pre_collapse (G.get_neighborhood U) )
+                           (pre_collapse (G.get_neighborhood V) ) ) →
     /- Left-Side Node (U) -/
-    ( ( type2_elimination (get_rule U G) )
-    ∨ ( type2_introduction (get_rule U G) )
-    ∨ ( type2_hypothesis (get_rule U G) ) ) →
+    ( ( type2_elimination (G.get_neighborhood U) )
+    ∨ ( type2_introduction (G.get_neighborhood U) )
+    ∨ ( type2_hypothesis (G.get_neighborhood U) ) ) →
     /- Right-Side Node (V) -/
-    ( ( type0_elimination (get_rule V G) )
-    ∨ ( type0_introduction (get_rule V G) )
-    ∨ ( type0_hypothesis (get_rule V G) ) ) →
+    ( ( type0_elimination (G.get_neighborhood V) )
+    ∨ ( type0_introduction (G.get_neighborhood V) )
+    ∨ ( type0_hypothesis (G.get_neighborhood V) ) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7548,16 +7533,16 @@ namespace COVERAGE.MAIN.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- Coverage Theorem: Type3 of Type2 & Type2 -/
   theorem T3CoverageT2T2 {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
+    ( check_collapse_nodes (pre_collapse (DLDS.get_neighborhood G U) )
+                           (pre_collapse (DLDS.get_neighborhood G V) ) ) →
     /- Left-Side Node (U) -/
-    ( ( type2_elimination (get_rule U G) )
-    ∨ ( type2_introduction (get_rule U G) )
-    ∨ ( type2_hypothesis (get_rule U G) ) ) →
+    ( ( type2_elimination (DLDS.get_neighborhood G U) )
+    ∨ ( type2_introduction (DLDS.get_neighborhood G U) )
+    ∨ ( type2_hypothesis (DLDS.get_neighborhood G U) ) ) →
     /- Right-Side Node (V) -/
-    ( ( type2_elimination (get_rule V G) )
-    ∨ ( type2_introduction (get_rule V G) )
-    ∨ ( type2_hypothesis (get_rule V G) ) ) →
+    ( ( type2_elimination (DLDS.get_neighborhood G V) )
+    ∨ ( type2_introduction (DLDS.get_neighborhood G V) )
+    ∨ ( type2_hypothesis (DLDS.get_neighborhood G V) ) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_typeᵤ prop_typeᵥ;
@@ -7578,14 +7563,14 @@ namespace COVERAGE.MAIN.NODES
 
   /- Coverage Theorem: Type3 of Type1 & Type2 -/
   theorem T3CoverageT1T2 {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
+    ( check_collapse_nodes (pre_collapse (DLDS.get_neighborhood G U) )
+                           (pre_collapse (DLDS.get_neighborhood G V) ) ) →
     /- Left-Side Node (U) -/
-    ( ( type1_collapse (get_rule U G) ) ) →
+    ( ( type1_collapse (DLDS.get_neighborhood G U) ) ) →
     /- Right-Side Node (V) -/
-    ( ( type2_elimination (get_rule V G) )
-    ∨ ( type2_introduction (get_rule V G) )
-    ∨ ( type2_hypothesis (get_rule V G) ) ) →
+    ( ( type2_elimination (DLDS.get_neighborhood G V) )
+    ∨ ( type2_introduction (DLDS.get_neighborhood G V) )
+    ∨ ( type2_hypothesis (DLDS.get_neighborhood G V) ) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_type1Xᵤ prop_typeᵥ;
@@ -7596,14 +7581,14 @@ namespace COVERAGE.MAIN.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- Coverage Theorem: Type3 of Type3 & Type0 -/
   theorem T3CoverageT3T0 {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
+    ( check_collapse_nodes (pre_collapse (DLDS.get_neighborhood G U) )
+                           (pre_collapse (DLDS.get_neighborhood G V) ) ) →
     /- Left-Side Node (U) -/
-    ( ( type3_collapse (get_rule U G) ) ) →
+    ( ( type3_collapse (DLDS.get_neighborhood G U) ) ) →
     /- Right-Side Node (V) -/
-    ( ( type0_elimination (get_rule V G) )
-    ∨ ( type0_introduction (get_rule V G) )
-    ∨ ( type0_hypothesis (get_rule V G) ) ) →
+    ( ( type0_elimination (DLDS.get_neighborhood G V) )
+    ∨ ( type0_introduction (DLDS.get_neighborhood G V) )
+    ∨ ( type0_hypothesis (DLDS.get_neighborhood G V) ) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_type3Xᵤ prop_typeᵥ;
@@ -7614,14 +7599,14 @@ namespace COVERAGE.MAIN.NODES
   -----------------------------------------------------------------------------------------------------------------------------------------
   /- Coverage Theorem: Type3 of Type3 & Type2 -/
   theorem T3CoverageT3T2 {U V : Node} {G : DLDS} :
-    ( check_collapse_nodes (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
+    ( check_collapse_nodes (pre_collapse (DLDS.get_neighborhood G U) )
+                           (pre_collapse (DLDS.get_neighborhood G V) ) ) →
     /- Left-Side Node (U) -/
-    ( ( type3_collapse (get_rule U G) ) ) →
+    ( ( type3_collapse (DLDS.get_neighborhood G U) ) ) →
     /- Right-Side Node (V) -/
-    ( ( type2_elimination (get_rule V G) )
-    ∨ ( type2_introduction (get_rule V G) )
-    ∨ ( type2_hypothesis (get_rule V G) ) ) →
+    ( ( type2_elimination (DLDS.get_neighborhood G V) )
+    ∨ ( type2_introduction (DLDS.get_neighborhood G V) )
+    ∨ ( type2_hypothesis (DLDS.get_neighborhood G V) ) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_nodes prop_type3Xᵤ prop_typeᵥ;
@@ -7638,16 +7623,16 @@ namespace COVERAGE.MAIN.EDGES
   --333 set_option trace.Meta.Tactic.simp true
   /- Coverage Theorem: Type3 of Type2 & Type2 -/
   theorem T3CoverageT2T2 {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
+    ( check_collapse_edges (pre_collapse (DLDS.get_neighborhood G U) )
+                           (pre_collapse (DLDS.get_neighborhood G V) ) ) →
     /- Left-Side Node (U) -/
-    ( ( type2_elimination (get_rule U G) )
-    ∨ ( type2_introduction (get_rule U G) )
-    ∨ ( type2_hypothesis (get_rule U G) ) ) →
+    ( ( type2_elimination (DLDS.get_neighborhood G U) )
+    ∨ ( type2_introduction (DLDS.get_neighborhood G U) )
+    ∨ ( type2_hypothesis (DLDS.get_neighborhood G U) ) ) →
     /- Right-Side Node (V) -/
-    ( ( type2_elimination (get_rule V G) )
-    ∨ ( type2_introduction (get_rule V G) )
-    ∨ ( type2_hypothesis (get_rule V G) ) ) →
+    ( ( type2_elimination (DLDS.get_neighborhood G V) )
+    ∨ ( type2_introduction (DLDS.get_neighborhood G V) )
+    ∨ ( type2_hypothesis (DLDS.get_neighborhood G V) ) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_typeᵤ prop_typeᵥ;
@@ -7668,14 +7653,14 @@ namespace COVERAGE.MAIN.EDGES
 
   /- Coverage Theorem: Type3 of Type3 & Type2 -/
   theorem T3CoverageT3T2 {U V : Node} {G : DLDS} :
-    ( check_collapse_edges (pre_collapse (get_rule U G) )
-                           (pre_collapse (get_rule V G) ) ) →
+    ( check_collapse_edges (pre_collapse (DLDS.get_neighborhood G U) )
+                           (pre_collapse (DLDS.get_neighborhood G V) ) ) →
     /- Left-Side Node (U) -/
-    ( ( type3_collapse (get_rule U G) ) ) →
+    ( ( type3_collapse (DLDS.get_neighborhood G U) ) ) →
     /- Right-Side Node (V) -/
-    ( ( type2_elimination (get_rule V G) )
-    ∨ ( type2_introduction (get_rule V G) )
-    ∨ ( type2_hypothesis (get_rule V G) ) ) →
+    ( ( type2_elimination (DLDS.get_neighborhood G V) )
+    ∨ ( type2_introduction (DLDS.get_neighborhood G V) )
+    ∨ ( type2_hypothesis (DLDS.get_neighborhood G V) ) ) →
     ---------------------------
     ( type3_collapse (collapse_rule U V G) ) := by
   intro prop_check_edges prop_type3Xᵤ prop_typeᵥ;
@@ -7692,11 +7677,11 @@ end COVERAGE.MAIN.EDGES
 namespace COVERAGE.UP.T0H
   /- Lemma: Collapse stops at the Top Formulas -/
   theorem Not_Above_T0H {NODE : Node} {G : DLDS} :
-    ( type0_hypothesis (get_rule NODE G) ) →
+    ( type0_hypothesis (DLDS.get_neighborhood G NODE) ) →
     ---------------------------
     ( G.get_inc_dedges NODE = [] ) := by
   intro prop_type;
-  simp only [get_rule] at prop_type;
+  simp only [DLDS.get_neighborhood] at prop_type;
   simp only [type0_hypothesis] at prop_type;
   cases prop_type with | intro _ prop_type =>
   cases prop_type with | intro _ prop_type =>
@@ -7713,15 +7698,15 @@ end COVERAGE.UP.T0H
 namespace COVERAGE.UP.T0E
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T0E {U0 U1 : Node} {G : DLDS} :
-    ( type0_elimination (get_rule U0 G) ) →
+    ( type0_elimination (DLDS.get_neighborhood G U0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
                          ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
-    ( ¬type2_elimination (get_rule U1 G) )
-  ∧ ( ¬type2_introduction (get_rule U1 G) )
-  ∧ ( ¬type2_hypothesis (get_rule U1 G) ) := by
+    ( ¬type2_elimination (DLDS.get_neighborhood G U1) )
+  ∧ ( ¬type2_introduction (DLDS.get_neighborhood G U1) )
+  ∧ ( ¬type2_hypothesis (DLDS.get_neighborhood G U1) ) := by
   intro prop_typeᵤ₀;
-  simp only [get_rule] at prop_typeᵤ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₀;
   simp only [type0_elimination] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
@@ -7753,7 +7738,7 @@ namespace COVERAGE.UP.T0E
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
                        apply absurd Prop_Directᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type2_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -7794,7 +7779,7 @@ namespace COVERAGE.UP.T0E
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
                        apply absurd Prop_Directᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type2_introduction] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -7833,7 +7818,7 @@ namespace COVERAGE.UP.T0E
   rewrite [←imp_false];
   intro prop_typeᵤ₁;
   apply absurd Prop_Directᵤ₁;
-  simp only [get_rule] at prop_typeᵤ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
   simp only [type2_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -7866,19 +7851,19 @@ namespace COVERAGE.UP.T0E
   /- Lemma: Collapse Moves Towards Minor & Major Premises -/
   theorem Above_Left_T0E {U0 V0 U1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
-    ( type0_elimination (get_rule U0 G) ) →
+    ( type0_elimination (DLDS.get_neighborhood G U0) ) →
     ( V0.id > 0 ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
                          ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
-  ∧ ( type0_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
-  ∧ ( type0_introduction (get_rule U1 G) → type2_introduction (get_rule U1 CLPS) )
-  ∧ ( type0_hypothesis (get_rule U1 G) → type2_hypothesis (get_rule U1 CLPS) ) := by
+  ∧ ( type0_elimination (G.get_neighborhood U1) → type2_elimination (DLDS.get_neighborhood CLPS U1) )
+  ∧ ( type0_introduction (G.get_neighborhood U1) → type2_introduction (DLDS.get_neighborhood CLPS U1) )
+  ∧ ( type0_hypothesis (G.get_neighborhood U1) → type2_hypothesis (DLDS.get_neighborhood CLPS U1) ) := by
   intro prop_collapse;
   --
   intro prop_typeᵤ₀;
-  simp only [get_rule] at prop_typeᵤ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₀;
   simp only [type0_elimination] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
@@ -7914,13 +7899,13 @@ namespace COVERAGE.UP.T0E
                                                                                                             | head _ => trivial;
                                                                                                             | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵤ; );
-  /- Unfold "get_rule U1 CLPS" -/
+  /- Unfold "CLPS.get_neighborhood U1" -/
   rewrite [←Prop_Edge_Origᵤ];
   rewrite [COLLAPSE.Simp_Rule_Above_Left prop_colᵤ₀ prop_collapse prop_mem_incomingᵤ₀];
   rewrite [Prop_Edge_Origᵤ];
   /- type0_elimination U1 → type2_elimination U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type0_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -7971,9 +7956,9 @@ namespace COVERAGE.UP.T0E
                                             simp only [Nat.zero_add, ←Nat.add_assoc];
                                             simp only [Nat.sub_add_cancel prop_lvlᵤ₀]; );
                        apply And.intro ( by exact List.Mem.head (V0.id :: U0.past); );     /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by rewrite [prop_pstᵤ₀];                              /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by rewrite [prop_pstᵤ₀];                              /- := check_nonempty_and_nonzero (past::pasts) -/
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵤ₀; );   /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵤ₀; );   /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵤ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8001,7 +7986,7 @@ namespace COVERAGE.UP.T0E
                        exact prop_indirectᵤ₁; );
   /- type0_introduction U1 → type2_introduction U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type0_introduction] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -8050,9 +8035,9 @@ namespace COVERAGE.UP.T0E
                                             simp only [Nat.zero_add, ←Nat.add_assoc];
                                             simp only [Nat.sub_add_cancel prop_lvlᵤ₀]; );
                        apply And.intro ( by exact List.Mem.head (V0.id :: U0.past); );     /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by rewrite [prop_pstᵤ₀];                              /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by rewrite [prop_pstᵤ₀];                              /- := check_nonempty_and_nonzero (past::pasts) -/
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵤ₀; );   /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵤ₀; );   /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵤ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8080,7 +8065,7 @@ namespace COVERAGE.UP.T0E
                        exact prop_indirectᵤ₁; );
   /- type0_hypothesis U1 → type2_hypothesis U1 -/
   intro prop_typeᵤ₁;
-  simp only [get_rule] at prop_typeᵤ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
   simp only [type0_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -8117,9 +8102,9 @@ namespace COVERAGE.UP.T0E
                        simp only [Nat.zero_add, ←Nat.add_assoc];
                        simp only [Nat.sub_add_cancel prop_lvlᵤ₀]; );
   apply And.intro ( by exact List.Mem.head (V0.id :: U0.past); );     /- := color ∈ (out_nbr::past::pasts) -/
-  apply And.intro ( by rewrite [prop_pstᵤ₀];                              /- := check_numbers (past::pasts) -/
+  apply And.intro ( by rewrite [prop_pstᵤ₀];                              /- := check_nonempty_and_nonzero (past::pasts) -/
                        exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );
-  apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵤ₀; );   /- := check_numbers (color::colors) -/
+  apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵤ₀; );   /- := check_nonempty_and_nonzero (color::colors) -/
   /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by exact prop_incomingᵤ₁; );
   /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8150,15 +8135,15 @@ namespace COVERAGE.UP.T0E
   theorem Above_Right_T0E {U0 V0 V1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
-    ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
-    ( type0_elimination (get_rule V0 G) ) →
+    ( U0.id > 0 ) → ( check_nonempty_and_nonzero (U0.id::U0.past) ) →
+    ( type0_elimination (DLDS.get_neighborhood G V0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges V1 )
                          ∧ ( edge ∈ G.get_inc_dedges V0 ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
-  ∧ ( type0_elimination (get_rule V1 G) → type2_elimination (get_rule V1 CLPS) )
-  ∧ ( type0_introduction (get_rule V1 G) → type2_introduction (get_rule V1 CLPS) )
-  ∧ ( type0_hypothesis (get_rule V1 G) → type2_hypothesis (get_rule V1 CLPS) ) := by
+  ∧ ( type0_elimination (DLDS.get_neighborhood G V1) → type2_elimination (DLDS.get_neighborhood CLPS V1) )
+  ∧ ( type0_introduction (DLDS.get_neighborhood G V1) → type2_introduction (DLDS.get_neighborhood CLPS V1) )
+  ∧ ( type0_hypothesis (DLDS.get_neighborhood G V1) → type2_hypothesis (DLDS.get_neighborhood CLPS V1) ) := by
   intro prop_collapse;
   --
   intro prop_eq_lvl prop_eq_fml;
@@ -8166,7 +8151,7 @@ namespace COVERAGE.UP.T0E
   intro prop_nbrᵤ₀ prop_pstᵤ₀;
   --
   intro prop_typeᵥ₀;
-  simp only [get_rule] at prop_typeᵥ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵥ₀;
   simp only [type0_elimination] at prop_typeᵥ₀;
   cases prop_typeᵥ₀ with | intro prop_nbrᵥ₀ prop_typeᵥ₀ =>
   cases prop_typeᵥ₀ with | intro prop_lvlᵥ₀ prop_typeᵥ₀ =>
@@ -8200,13 +8185,13 @@ namespace COVERAGE.UP.T0E
                                                                                                             | head _ => trivial;
                                                                                                             | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵥ; );
-  /- Unfold "get_rule U1 CLPS" -/
+  /- Unfold "CLPS.get_neighborhood U1" -/
   rewrite [←Prop_Edge_Origᵥ];
   rewrite [COLLAPSE.Simp_Rule_Above_Right prop_collapse prop_mem_incomingᵥ₀];
   rewrite [Prop_Edge_Origᵥ];
   /- type0_elimination V1 → type2_elimination V1 -/
   apply And.intro ( by intro prop_typeᵥ₁;
-                       simp only [get_rule] at prop_typeᵥ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵥ₁;
                        simp only [type0_elimination] at prop_typeᵥ₁;
                        cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
@@ -8257,7 +8242,7 @@ namespace COVERAGE.UP.T0E
                                             simp only [Nat.zero_add, ←Nat.add_assoc];
                                             simp only [Nat.sub_add_cancel prop_lvlᵥ₀]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );   /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by simp only [check_numbers] at prop_pstᵤ₀ ⊢;                  /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;                  /- := check_nonempty_and_nonzero (past::pasts) -/
                                             apply And.intro ( by simp only [ne_eq];
                                                                  simp only [List.cons_ne_nil];
                                                                  trivial; );
@@ -8266,7 +8251,7 @@ namespace COVERAGE.UP.T0E
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
                                             | tail _ mem_cases => exact prop_pstᵤ₀ (List.Mem.tail U0.id mem_cases); );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );            /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );            /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵥ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8295,7 +8280,7 @@ namespace COVERAGE.UP.T0E
                        exact prop_indirectᵥ₁; );
   /- type0_introduction V1 → type2_introduction V1 -/
   apply And.intro ( by intro prop_typeᵥ₁;
-                       simp only [get_rule] at prop_typeᵥ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵥ₁;
                        simp only [type0_introduction] at prop_typeᵥ₁;
                        cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
@@ -8344,7 +8329,7 @@ namespace COVERAGE.UP.T0E
                                             simp only [Nat.zero_add, ←Nat.add_assoc];
                                             simp only [Nat.sub_add_cancel prop_lvlᵥ₀]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );   /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by simp only [check_numbers] at prop_pstᵤ₀ ⊢;                  /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;                  /- := check_nonempty_and_nonzero (past::pasts) -/
                                             apply And.intro ( by simp only [ne_eq];
                                                                  simp only [List.cons_ne_nil];
                                                                  trivial; );
@@ -8353,7 +8338,7 @@ namespace COVERAGE.UP.T0E
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
                                             | tail _ mem_cases => exact prop_pstᵤ₀ (List.Mem.tail U0.id mem_cases); );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );            /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );            /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵥ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8382,7 +8367,7 @@ namespace COVERAGE.UP.T0E
                        exact prop_indirectᵥ₁; );
   /- type0_hypothesis V1 → type2_hypothesis V1 -/
   intro prop_typeᵥ₁;
-  simp only [get_rule] at prop_typeᵥ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵥ₁;
   simp only [type0_hypothesis] at prop_typeᵥ₁;
   cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
@@ -8419,7 +8404,7 @@ namespace COVERAGE.UP.T0E
                        simp only [Nat.zero_add, ←Nat.add_assoc];
                        simp only [Nat.sub_add_cancel prop_lvlᵥ₀]; );
   apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );   /- := color ∈ (out_nbr::past::pasts) -/
-  apply And.intro ( by simp only [check_numbers] at prop_pstᵤ₀ ⊢;                  /- := check_numbers (past::pasts) -/
+  apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;                  /- := check_nonempty_and_nonzero (past::pasts) -/
                        apply And.intro ( by simp only [ne_eq];
                                             simp only [List.cons_ne_nil];
                                             trivial; );
@@ -8428,7 +8413,7 @@ namespace COVERAGE.UP.T0E
                        cases mem_cases with
                        | head => exact prop_nbrᵥ₀;
                        | tail _ mem_cases => exact prop_pstᵤ₀ (List.Mem.tail U0.id mem_cases); );
-  apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );            /- := check_numbers (color::colors) -/
+  apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );            /- := check_nonempty_and_nonzero (color::colors) -/
   /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by exact prop_incomingᵥ₁; );
   /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8460,15 +8445,15 @@ end COVERAGE.UP.T0E
 namespace COVERAGE.UP.T0I
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T0I {U0 U1 : Node} {G : DLDS} :
-    ( type0_introduction (get_rule U0 G) ) →
+    ( type0_introduction (G.get_neighborhood U0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
                          ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
-    ( ¬type2_elimination (get_rule U1 G) )
-  ∧ ( ¬type2_introduction (get_rule U1 G) )
-  ∧ ( ¬type2_hypothesis (get_rule U1 G) ) := by
+    ( ¬type2_elimination (G.get_neighborhood U1) )
+  ∧ ( ¬type2_introduction (G.get_neighborhood U1) )
+  ∧ ( ¬type2_hypothesis (G.get_neighborhood U1) ) := by
   intro prop_typeᵤ₀;
-  simp only [get_rule] at prop_typeᵤ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₀;
   simp only [type0_introduction] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
@@ -8499,7 +8484,7 @@ namespace COVERAGE.UP.T0I
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
                        apply absurd Prop_Directᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type2_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -8540,7 +8525,7 @@ namespace COVERAGE.UP.T0I
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
                        apply absurd Prop_Directᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type2_introduction] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -8579,7 +8564,7 @@ namespace COVERAGE.UP.T0I
   rewrite [←imp_false];
   intro prop_typeᵤ₁;
   apply absurd Prop_Directᵤ₁;
-  simp only [get_rule] at prop_typeᵤ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
   simp only [type2_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -8612,19 +8597,19 @@ namespace COVERAGE.UP.T0I
   /- Lemma: Collapse Moves Towards Unique Premise -/
   theorem Above_Left_T0I {U0 V0 U1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
-    ( type0_introduction (get_rule U0 G) ) →
+    ( type0_introduction (DLDS.get_neighborhood G U0) ) →
     ( V0.id > 0 ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
                          ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
-  ∧ ( type0_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
-  ∧ ( type0_introduction (get_rule U1 G) → type2_introduction (get_rule U1 CLPS) )
-  ∧ ( type0_hypothesis (get_rule U1 G) → type2_hypothesis (get_rule U1 CLPS) ) := by
+  ∧ ( type0_elimination (DLDS.get_neighborhood G U1) → type2_elimination (DLDS.get_neighborhood CLPS U1) )
+  ∧ ( type0_introduction (DLDS.get_neighborhood G U1) → type2_introduction (DLDS.get_neighborhood CLPS U1) )
+  ∧ ( type0_hypothesis (DLDS.get_neighborhood G U1) → type2_hypothesis (DLDS.get_neighborhood CLPS U1) ) := by
   intro prop_collapse;
   --
   intro prop_typeᵤ₀;
-  simp only [get_rule] at prop_typeᵤ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₀;
   simp only [type0_introduction] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
@@ -8657,13 +8642,13 @@ namespace COVERAGE.UP.T0I
                                                        cases prop_mem_incomingᵤ₀ with | head _ => trivial;
                                                                                       | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵤ; );
-  /- Unfold "get_rule U1 CLPS" -/
+  /- Unfold "DLDS.get_neighborhood CLPS U1" -/
   rewrite [←Prop_Edge_Origᵤ];
   rewrite [COLLAPSE.Simp_Rule_Above_Left prop_colᵤ₀ prop_collapse prop_mem_incomingᵤ₀];
   rewrite [Prop_Edge_Origᵤ];
   /- type0_elimination U1 → type2_elimination U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type0_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -8714,9 +8699,9 @@ namespace COVERAGE.UP.T0I
                                             simp only [Nat.zero_add, ←Nat.add_assoc];
                                             simp only [Nat.sub_add_cancel prop_lvlᵤ₀]; );
                        apply And.intro ( by exact List.Mem.head (V0.id :: U0.past); );     /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by rewrite [prop_pstᵤ₀];                              /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by rewrite [prop_pstᵤ₀];                              /- := check_nonempty_and_nonzero (past::pasts) -/
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵤ₀; );   /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵤ₀; );   /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵤ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8741,7 +8726,7 @@ namespace COVERAGE.UP.T0I
                        exact prop_indirectᵤ₁; );
   /- type0_introduction U1 → type2_introduction U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type0_introduction] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -8790,9 +8775,9 @@ namespace COVERAGE.UP.T0I
                                             simp only [Nat.zero_add, ←Nat.add_assoc];
                                             simp only [Nat.sub_add_cancel prop_lvlᵤ₀]; );
                        apply And.intro ( by exact List.Mem.head (V0.id :: U0.past); );     /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by rewrite [prop_pstᵤ₀];                              /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by rewrite [prop_pstᵤ₀];                              /- := check_nonempty_and_nonzero (past::pasts) -/
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵤ₀; );   /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵤ₀; );   /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵤ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8817,7 +8802,7 @@ namespace COVERAGE.UP.T0I
                        exact prop_indirectᵤ₁; );
   /- type0_hypothesis U1 → type2_hypothesis U1 -/
   intro prop_typeᵤ₁;
-  simp only [get_rule] at prop_typeᵤ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
   simp only [type0_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -8854,9 +8839,9 @@ namespace COVERAGE.UP.T0I
                        simp only [Nat.zero_add, ←Nat.add_assoc];
                        simp only [Nat.sub_add_cancel prop_lvlᵤ₀]; );
   apply And.intro ( by exact List.Mem.head (V0.id :: U0.past); );     /- := color ∈ (out_nbr::past::pasts) -/
-  apply And.intro ( by rewrite [prop_pstᵤ₀];                              /- := check_numbers (past::pasts) -/
+  apply And.intro ( by rewrite [prop_pstᵤ₀];                              /- := check_nonempty_and_nonzero (past::pasts) -/
                        exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );
-  apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵤ₀; );   /- := check_numbers (color::colors) -/
+  apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵤ₀; );   /- := check_nonempty_and_nonzero (color::colors) -/
   /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by exact prop_incomingᵤ₁; );
   /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8884,15 +8869,15 @@ namespace COVERAGE.UP.T0I
   theorem Above_Right_T0I {U0 V0 V1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
-    ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
-    ( type0_introduction (get_rule V0 G) ) →
+    ( U0.id > 0 ) → ( check_nonempty_and_nonzero (U0.id::U0.past) ) →
+    ( type0_introduction (DLDS.get_neighborhood G V0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges V1 )
                          ∧ ( edge ∈ G.get_inc_dedges V0 ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
-  ∧ ( type0_elimination (get_rule V1 G) → type2_elimination (get_rule V1 CLPS) )
-  ∧ ( type0_introduction (get_rule V1 G) → type2_introduction (get_rule V1 CLPS) )
-  ∧ ( type0_hypothesis (get_rule V1 G) → type2_hypothesis (get_rule V1 CLPS) ) := by
+  ∧ ( type0_elimination (DLDS.get_neighborhood G V1) → type2_elimination (DLDS.get_neighborhood CLPS V1) )
+  ∧ ( type0_introduction (DLDS.get_neighborhood G V1) → type2_introduction (DLDS.get_neighborhood CLPS V1) )
+  ∧ ( type0_hypothesis (DLDS.get_neighborhood G V1) → type2_hypothesis (DLDS.get_neighborhood CLPS V1) ) := by
   intro prop_collapse;
   --
   intro prop_eq_lvl prop_eq_fml;
@@ -8900,7 +8885,7 @@ namespace COVERAGE.UP.T0I
   intro prop_nbrᵤ₀ prop_pstᵤ₀;
   --
   intro prop_typeᵥ₀;
-  simp only [get_rule] at prop_typeᵥ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵥ₀;
   simp only [type0_introduction] at prop_typeᵥ₀;
   cases prop_typeᵥ₀ with | intro prop_nbrᵥ₀ prop_typeᵥ₀ =>
   cases prop_typeᵥ₀ with | intro prop_lvlᵥ₀ prop_typeᵥ₀ =>
@@ -8931,13 +8916,13 @@ namespace COVERAGE.UP.T0I
                                                        cases prop_mem_incomingᵥ₀ with | head _ => trivial;
                                                                                       | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵥ; );
-  /- Unfold "get_rule U1 CLPS" -/
+  /- Unfold "DLDS.get_neighborhood CLPS U1" -/
   rewrite [←Prop_Edge_Origᵥ];
   rewrite [COLLAPSE.Simp_Rule_Above_Right prop_collapse prop_mem_incomingᵥ₀];
   rewrite [Prop_Edge_Origᵥ];
   /- type0_elimination V1 → type2_elimination V1 -/
   apply And.intro ( by intro prop_typeᵥ₁;
-                       simp only [get_rule] at prop_typeᵥ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵥ₁;
                        simp only [type0_elimination] at prop_typeᵥ₁;
                        cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
@@ -8988,7 +8973,7 @@ namespace COVERAGE.UP.T0I
                                             simp only [Nat.zero_add, ←Nat.add_assoc];
                                             simp only [Nat.sub_add_cancel prop_lvlᵥ₀]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );   /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by simp only [check_numbers] at prop_pstᵤ₀ ⊢;                  /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;                  /- := check_nonempty_and_nonzero (past::pasts) -/
                                             apply And.intro ( by simp only [ne_eq];
                                                                  simp only [List.cons_ne_nil];
                                                                  trivial; );
@@ -8997,7 +8982,7 @@ namespace COVERAGE.UP.T0I
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
                                             | tail _ mem_cases => exact prop_pstᵤ₀ (List.Mem.tail U0.id mem_cases); );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );            /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );            /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵥ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -9023,7 +9008,7 @@ namespace COVERAGE.UP.T0I
                        exact prop_indirectᵥ₁; );
   /- type0_introduction V1 → type2_introduction V1 -/
   apply And.intro ( by intro prop_typeᵥ₁;
-                       simp only [get_rule] at prop_typeᵥ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵥ₁;
                        simp only [type0_introduction] at prop_typeᵥ₁;
                        cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
@@ -9072,7 +9057,7 @@ namespace COVERAGE.UP.T0I
                                             simp only [Nat.zero_add, ←Nat.add_assoc];
                                             simp only [Nat.sub_add_cancel prop_lvlᵥ₀]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );   /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by simp only [check_numbers] at prop_pstᵤ₀ ⊢;                  /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;                  /- := check_nonempty_and_nonzero (past::pasts) -/
                                             apply And.intro ( by simp only [ne_eq];
                                                                  simp only [List.cons_ne_nil];
                                                                  trivial; );
@@ -9081,7 +9066,7 @@ namespace COVERAGE.UP.T0I
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
                                             | tail _ mem_cases => exact prop_pstᵤ₀ (List.Mem.tail U0.id mem_cases); );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );            /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );            /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵥ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -9107,7 +9092,7 @@ namespace COVERAGE.UP.T0I
                        exact prop_indirectᵥ₁; );
   /- type0_hypothesis V1 → type2_hypothesis V1 -/
   intro prop_typeᵥ₁;
-  simp only [get_rule] at prop_typeᵥ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵥ₁;
   simp only [type0_hypothesis] at prop_typeᵥ₁;
   cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
@@ -9144,7 +9129,7 @@ namespace COVERAGE.UP.T0I
                        simp only [Nat.zero_add, ←Nat.add_assoc];
                        simp only [Nat.sub_add_cancel prop_lvlᵥ₀]; );
   apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );   /- := color ∈ (out_nbr::past::pasts) -/
-  apply And.intro ( by simp only [check_numbers] at prop_pstᵤ₀ ⊢;                  /- := check_numbers (past::pasts) -/
+  apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;                  /- := check_nonempty_and_nonzero (past::pasts) -/
                        apply And.intro ( by simp only [ne_eq];
                                             simp only [List.cons_ne_nil];
                                             trivial; );
@@ -9153,7 +9138,7 @@ namespace COVERAGE.UP.T0I
                        cases mem_cases with
                        | head => exact prop_nbrᵥ₀;
                        | tail _ mem_cases => exact prop_pstᵤ₀ (List.Mem.tail U0.id mem_cases); );
-  apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );            /- := check_numbers (color::colors) -/
+  apply And.intro ( by exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );            /- := check_nonempty_and_nonzero (color::colors) -/
   /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by exact prop_incomingᵥ₁; );
   /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -9183,11 +9168,11 @@ end COVERAGE.UP.T0I
 namespace COVERAGE.UP.T2H
   /- Lemma: Collapse stops at the Top Formulas -/
   theorem Not_Above_T2H {NODE : Node} {G : DLDS} :
-    ( type2_hypothesis (get_rule NODE G) ) →
+    ( type2_hypothesis (DLDS.get_neighborhood G NODE) ) →
     ---------------------------
     ( G.get_inc_dedges NODE = [] ) := by
   intro prop_type;
-  simp only [get_rule] at prop_type;
+  simp only [DLDS.get_neighborhood] at prop_type;
   simp only [type2_hypothesis] at prop_type;
   cases prop_type with | intro _ prop_type =>
   cases prop_type with | intro _ prop_type =>
@@ -9217,15 +9202,15 @@ end COVERAGE.UP.T2H
 namespace COVERAGE.UP.T2E
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T2E {U0 U1 : Node} {G : DLDS} :
-    ( type2_elimination (get_rule U0 G) ) →
+    ( type2_elimination (DLDS.get_neighborhood G U0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
                          ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
-    ( ¬type2_elimination (get_rule U1 G) )
-  ∧ ( ¬type2_introduction (get_rule U1 G) )
-  ∧ ( ¬type2_hypothesis (get_rule U1 G) ) := by
+    ( ¬type2_elimination (DLDS.get_neighborhood G U1) )
+  ∧ ( ¬type2_introduction (DLDS.get_neighborhood G U1) )
+  ∧ ( ¬type2_hypothesis (DLDS.get_neighborhood G U1) ) := by
   intro prop_typeᵤ₀;
-  simp only [get_rule] at prop_typeᵤ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₀;
   simp only [type2_elimination] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
@@ -9270,7 +9255,7 @@ namespace COVERAGE.UP.T2E
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
                        apply absurd Prop_Directᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type2_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -9311,7 +9296,7 @@ namespace COVERAGE.UP.T2E
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
                        apply absurd Prop_Directᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type2_introduction] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -9350,7 +9335,7 @@ namespace COVERAGE.UP.T2E
   rewrite [←imp_false];
   intro prop_typeᵤ₁;
   apply absurd Prop_Directᵤ₁;
-  simp only [get_rule] at prop_typeᵤ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
   simp only [type2_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -9383,19 +9368,19 @@ namespace COVERAGE.UP.T2E
   /- Lemma: Collapse Moves Towards Minor & Major Premises -/
   theorem Above_Left_T2E {U0 V0 U1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
-    ( type2_elimination (get_rule U0 G) ) →
+    ( type2_elimination (DLDS.get_neighborhood G U0) ) →
     ( V0.id > 0 ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
                          ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
-  ∧ ( type0_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
-  ∧ ( type0_introduction (get_rule U1 G) → type2_introduction (get_rule U1 CLPS) )
-  ∧ ( type0_hypothesis (get_rule U1 G) → type2_hypothesis (get_rule U1 CLPS) ) := by
+  ∧ ( type0_elimination (DLDS.get_neighborhood G U1) → type2_elimination (DLDS.get_neighborhood CLPS U1) )
+  ∧ ( type0_introduction (DLDS.get_neighborhood G U1) → type2_introduction (DLDS.get_neighborhood CLPS U1) )
+  ∧ ( type0_hypothesis (DLDS.get_neighborhood G U1) → type2_hypothesis (DLDS.get_neighborhood CLPS U1) ) := by
   intro prop_collapse;
   --
   intro prop_typeᵤ₀;
-  simp only [get_rule] at prop_typeᵤ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₀;
   simp only [type2_elimination] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
@@ -9444,13 +9429,13 @@ namespace COVERAGE.UP.T2E
                                                                                                             | head _ => trivial;
                                                                                                             | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵤ; );
-  /- Unfold "get_rule U1 CLPS" -/
+  /- Unfold "DLDS.get_neighborhood CLPS U1" -/
   rewrite [←Prop_Edge_Origᵤ];
   rewrite [COLLAPSE.Simp_Rule_Above_Left prop_colᵤ₀ prop_collapse prop_mem_incomingᵤ₀];
   rewrite [Prop_Edge_Origᵤ];
   /- type0_elimination U1 → type2_elimination U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type0_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -9500,9 +9485,9 @@ namespace COVERAGE.UP.T2E
                                             rewrite [←prop_anc_lvlᵤ₀];
                                             simp only [List.length, Nat.add_assoc]; );
                        apply And.intro ( by exact List.Mem.head (V0.id :: U0.past); );                    /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by rewrite [prop_pstᵤ₀];                                             /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by rewrite [prop_pstᵤ₀];                                             /- := check_nonempty_and_nonzero (past::pasts) -/
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵤ₀ prop_colorsᵤ₀; );   /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵤ₀ prop_colorsᵤ₀; );   /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵤ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -9530,7 +9515,7 @@ namespace COVERAGE.UP.T2E
                        exact prop_indirectᵤ₁; );
   /- type0_introduction U1 → type2_introduction U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type0_introduction] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -9578,9 +9563,9 @@ namespace COVERAGE.UP.T2E
                                             rewrite [←prop_anc_lvlᵤ₀];
                                             simp only [List.length, Nat.add_assoc]; );
                        apply And.intro ( by exact List.Mem.head (V0.id :: U0.past); );                    /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by rewrite [prop_pstᵤ₀];                                             /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by rewrite [prop_pstᵤ₀];                                             /- := check_nonempty_and_nonzero (past::pasts) -/
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵤ₀ prop_colorsᵤ₀; );   /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵤ₀ prop_colorsᵤ₀; );   /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵤ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -9608,7 +9593,7 @@ namespace COVERAGE.UP.T2E
                        exact prop_indirectᵤ₁; );
   /- type0_hypothesis U1 → type2_hypothesis U1 -/
   intro prop_typeᵤ₁;
-  simp only [get_rule] at prop_typeᵤ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
   simp only [type0_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -9644,9 +9629,9 @@ namespace COVERAGE.UP.T2E
                        rewrite [←prop_anc_lvlᵤ₀];
                        simp only [List.length, Nat.add_assoc]; );
   apply And.intro ( by exact List.Mem.head (V0.id :: U0.past); );                    /- := color ∈ (out_nbr::past::pasts) -/
-  apply And.intro ( by rewrite [prop_pstᵤ₀];                                             /- := check_numbers (past::pasts) -/
+  apply And.intro ( by rewrite [prop_pstᵤ₀];                                             /- := check_nonempty_and_nonzero (past::pasts) -/
                        exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );
-  apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵤ₀ prop_colorsᵤ₀; );   /- := check_numbers (color::colors) -/
+  apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵤ₀ prop_colorsᵤ₀; );   /- := check_nonempty_and_nonzero (color::colors) -/
   /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by exact prop_incomingᵤ₁; );
   /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -9677,15 +9662,15 @@ namespace COVERAGE.UP.T2E
   theorem Above_Right_T2E {U0 V0 V1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
-    ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
-    ( type2_elimination (get_rule V0 G) ) →
+    ( U0.id > 0 ) → ( check_nonempty_and_nonzero (U0.id::U0.past) ) →
+    ( type2_elimination (DLDS.get_neighborhood G V0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges V1 )
                          ∧ ( edge ∈ G.get_inc_dedges V0 ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
-  ∧ ( type0_elimination (get_rule V1 G) → type2_elimination (get_rule V1 CLPS) )
-  ∧ ( type0_introduction (get_rule V1 G) → type2_introduction (get_rule V1 CLPS) )
-  ∧ ( type0_hypothesis (get_rule V1 G) → type2_hypothesis (get_rule V1 CLPS) ) := by
+  ∧ ( type0_elimination (DLDS.get_neighborhood G V1) → type2_elimination (DLDS.get_neighborhood CLPS V1) )
+  ∧ ( type0_introduction (DLDS.get_neighborhood G V1) → type2_introduction (DLDS.get_neighborhood CLPS V1) )
+  ∧ ( type0_hypothesis (DLDS.get_neighborhood G V1) → type2_hypothesis (DLDS.get_neighborhood CLPS V1) ) := by
   intro prop_collapse;
   --
   intro prop_eq_lvl prop_eq_fml;
@@ -9693,7 +9678,7 @@ namespace COVERAGE.UP.T2E
   intro prop_nbrᵤ₀ prop_pstᵤ₀;
   --
   intro prop_typeᵥ₀;
-  simp only [get_rule] at prop_typeᵥ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵥ₀;
   simp only [type2_elimination] at prop_typeᵥ₀;
   cases prop_typeᵥ₀ with | intro prop_nbrᵥ₀ prop_typeᵥ₀ =>
   cases prop_typeᵥ₀ with | intro prop_lvlᵥ₀ prop_typeᵥ₀ =>
@@ -9740,13 +9725,13 @@ namespace COVERAGE.UP.T2E
                                                                                                             | head _ => trivial;
                                                                                                             | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵥ; );
-  /- Unfold "get_rule U1 CLPS" -/
+  /- Unfold "DLDS.get_neighborhood CLPS U1" -/
   rewrite [←Prop_Edge_Origᵥ];
   rewrite [COLLAPSE.Simp_Rule_Above_Right prop_collapse prop_mem_incomingᵥ₀];
   rewrite [Prop_Edge_Origᵥ];
   /- type0_elimination V1 → type2_elimination V1 -/
   apply And.intro ( by intro prop_typeᵥ₁;
-                       simp only [get_rule] at prop_typeᵥ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵥ₁;
                        simp only [type0_elimination] at prop_typeᵥ₁;
                        cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
@@ -9796,7 +9781,7 @@ namespace COVERAGE.UP.T2E
                                             rewrite [←prop_anc_lvlᵥ₀];
                                             simp only [List.length, Nat.add_assoc]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );                  /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by simp only [check_numbers] at prop_pstᵤ₀ ⊢;                                 /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;                                 /- := check_nonempty_and_nonzero (past::pasts) -/
                                             apply And.intro ( by simp only [ne_eq];
                                                                  simp only [List.cons_ne_nil];
                                                                  trivial; );
@@ -9805,7 +9790,7 @@ namespace COVERAGE.UP.T2E
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
                                             | tail _ mem_cases => exact prop_pstᵤ₀ (List.Mem.tail U0.id mem_cases); );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_colorsᵥ₀; );            /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_colorsᵥ₀; );            /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵥ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -9834,7 +9819,7 @@ namespace COVERAGE.UP.T2E
                        exact prop_indirectᵥ₁; );
   /- type0_introduction V1 → type2_introduction V1 -/
   apply And.intro ( by intro prop_typeᵥ₁;
-                       simp only [get_rule] at prop_typeᵥ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵥ₁;
                        simp only [type0_introduction] at prop_typeᵥ₁;
                        cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
@@ -9882,7 +9867,7 @@ namespace COVERAGE.UP.T2E
                                             rewrite [←prop_anc_lvlᵥ₀];
                                             simp only [List.length, Nat.add_assoc]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );                  /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by simp only [check_numbers] at prop_pstᵤ₀ ⊢;                                 /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;                                 /- := check_nonempty_and_nonzero (past::pasts) -/
                                             apply And.intro ( by simp only [ne_eq];
                                                                  simp only [List.cons_ne_nil];
                                                                  trivial; );
@@ -9891,7 +9876,7 @@ namespace COVERAGE.UP.T2E
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
                                             | tail _ mem_cases => exact prop_pstᵤ₀ (List.Mem.tail U0.id mem_cases); );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_colorsᵥ₀; );            /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_colorsᵥ₀; );            /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵥ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -9920,7 +9905,7 @@ namespace COVERAGE.UP.T2E
                        exact prop_indirectᵥ₁; );
   /- type0_hypothesis V1 → type2_hypothesis V1 -/
   intro prop_typeᵥ₁;
-  simp only [get_rule] at prop_typeᵥ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵥ₁;
   simp only [type0_hypothesis] at prop_typeᵥ₁;
   cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
@@ -9956,7 +9941,7 @@ namespace COVERAGE.UP.T2E
                        rewrite [←prop_anc_lvlᵥ₀];
                        simp only [List.length, Nat.add_assoc]; );
   apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );                  /- := color ∈ (out_nbr::past::pasts) -/
-  apply And.intro ( by simp only [check_numbers] at prop_pstᵤ₀ ⊢;                                 /- := check_numbers (past::pasts) -/
+  apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;                                 /- := check_nonempty_and_nonzero (past::pasts) -/
                        apply And.intro ( by simp only [ne_eq];
                                             simp only [List.cons_ne_nil];
                                             trivial; );
@@ -9965,7 +9950,7 @@ namespace COVERAGE.UP.T2E
                        cases mem_cases with
                        | head => exact prop_nbrᵥ₀;
                        | tail _ mem_cases => exact prop_pstᵤ₀ (List.Mem.tail U0.id mem_cases); );
-  apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_colorsᵥ₀; );            /- := check_numbers (color::colors) -/
+  apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_colorsᵥ₀; );            /- := check_nonempty_and_nonzero (color::colors) -/
   /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by exact prop_incomingᵥ₁; );
   /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -9997,15 +9982,15 @@ end COVERAGE.UP.T2E
 namespace COVERAGE.UP.T2I
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T2I {U0 U1 : Node} {G : DLDS} :
-    ( type2_introduction (get_rule U0 G) ) →
+    ( type2_introduction (DLDS.get_neighborhood G U0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
                          ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
-    ( ¬type2_elimination (get_rule U1 G) )
-  ∧ ( ¬type2_introduction (get_rule U1 G) )
-  ∧ ( ¬type2_hypothesis (get_rule U1 G) ) := by
+    ( ¬type2_elimination (DLDS.get_neighborhood G U1) )
+  ∧ ( ¬type2_introduction (DLDS.get_neighborhood G U1) )
+  ∧ ( ¬type2_hypothesis (DLDS.get_neighborhood G U1) ) := by
   intro prop_typeᵤ₀;
-  simp only [get_rule] at prop_typeᵤ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₀;
   simp only [type2_introduction] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
@@ -10049,7 +10034,7 @@ namespace COVERAGE.UP.T2I
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
                        apply absurd Prop_Directᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type2_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -10090,7 +10075,7 @@ namespace COVERAGE.UP.T2I
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
                        apply absurd Prop_Directᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type2_introduction] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -10129,7 +10114,7 @@ namespace COVERAGE.UP.T2I
   rewrite [←imp_false];
   intro prop_typeᵤ₁;
   apply absurd Prop_Directᵤ₁;
-  simp only [get_rule] at prop_typeᵤ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
   simp only [type2_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -10162,19 +10147,19 @@ namespace COVERAGE.UP.T2I
   /- Lemma: Collapse Moves Towards Unique Premise -/
   theorem Above_Left_T2I {U0 V0 U1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
-    ( type2_introduction (get_rule U0 G) ) →
+    ( type2_introduction (DLDS.get_neighborhood G U0) ) →
     ( V0.id > 0 ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
                          ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
-  ∧ ( type0_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
-  ∧ ( type0_introduction (get_rule U1 G) → type2_introduction (get_rule U1 CLPS) )
-  ∧ ( type0_hypothesis (get_rule U1 G) → type2_hypothesis (get_rule U1 CLPS) ) := by
+  ∧ ( type0_elimination (DLDS.get_neighborhood G U1) → type2_elimination (DLDS.get_neighborhood CLPS U1) )
+  ∧ ( type0_introduction (DLDS.get_neighborhood G U1) → type2_introduction (DLDS.get_neighborhood CLPS U1) )
+  ∧ ( type0_hypothesis (DLDS.get_neighborhood G U1) → type2_hypothesis (DLDS.get_neighborhood CLPS U1) ) := by
   intro prop_collapse;
   --
   intro prop_typeᵤ₀;
-  simp only [get_rule] at prop_typeᵤ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₀;
   simp only [type2_introduction] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
@@ -10220,13 +10205,13 @@ namespace COVERAGE.UP.T2I
                                                        cases prop_mem_incomingᵤ₀ with | head _ => trivial;
                                                                                       | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵤ; );
-  /- Unfold "get_rule U1 CLPS" -/
+  /- Unfold "DLDS.get_neighborhood CLPS U1" -/
   rewrite [←Prop_Edge_Origᵤ];
   rewrite [COLLAPSE.Simp_Rule_Above_Left prop_colᵤ₀ prop_collapse prop_mem_incomingᵤ₀];
   rewrite [Prop_Edge_Origᵤ];
   /- type0_elimination U1 → type2_elimination U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type0_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -10276,9 +10261,9 @@ namespace COVERAGE.UP.T2I
                                             rewrite [←prop_anc_lvlᵤ₀];
                                             simp only [List.length, Nat.add_assoc]; );
                        apply And.intro ( by exact List.Mem.head (V0.id :: U0.past); );                    /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by rewrite [prop_pstᵤ₀];                                             /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by rewrite [prop_pstᵤ₀];                                             /- := check_nonempty_and_nonzero (past::pasts) -/
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵤ₀ prop_colorsᵤ₀; );   /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵤ₀ prop_colorsᵤ₀; );   /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵤ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -10303,7 +10288,7 @@ namespace COVERAGE.UP.T2I
                        exact prop_indirectᵤ₁; );
   /- type0_introduction U1 → type2_introduction U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type0_introduction] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -10351,9 +10336,9 @@ namespace COVERAGE.UP.T2I
                                             rewrite [←prop_anc_lvlᵤ₀];
                                             simp only [List.length, Nat.add_assoc]; );
                        apply And.intro ( by exact List.Mem.head (V0.id :: U0.past); );                    /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by rewrite [prop_pstᵤ₀];                                             /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by rewrite [prop_pstᵤ₀];                                             /- := check_nonempty_and_nonzero (past::pasts) -/
                                             exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵤ₀ prop_colorsᵤ₀; );   /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵤ₀ prop_colorsᵤ₀; );   /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵤ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -10378,7 +10363,7 @@ namespace COVERAGE.UP.T2I
                        exact prop_indirectᵤ₁; );
   /- type0_hypothesis U1 → type2_hypothesis U1 -/
   intro prop_typeᵤ₁;
-  simp only [get_rule] at prop_typeᵤ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
   simp only [type0_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -10414,9 +10399,9 @@ namespace COVERAGE.UP.T2I
                        rewrite [←prop_anc_lvlᵤ₀];
                        simp only [List.length, Nat.add_assoc]; );
   apply And.intro ( by exact List.Mem.head (V0.id :: U0.past); );                    /- := color ∈ (out_nbr::past::pasts) -/
-  apply And.intro ( by rewrite [prop_pstᵤ₀];                                             /- := check_numbers (past::pasts) -/
+  apply And.intro ( by rewrite [prop_pstᵤ₀];                                             /- := check_nonempty_and_nonzero (past::pasts) -/
                        exact COLLAPSE.Check_Numbers_Unit prop_nbrᵥ₀; );
-  apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵤ₀ prop_colorsᵤ₀; );   /- := check_numbers (color::colors) -/
+  apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵤ₀ prop_colorsᵤ₀; );   /- := check_nonempty_and_nonzero (color::colors) -/
   /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by exact prop_incomingᵤ₁; );
   /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -10444,15 +10429,15 @@ namespace COVERAGE.UP.T2I
   theorem Above_Right_T2I {U0 V0 V1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
-    ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
-    ( type2_introduction (get_rule V0 G) ) →
+    ( U0.id > 0 ) → ( check_nonempty_and_nonzero (U0.id::U0.past) ) →
+    ( type2_introduction (DLDS.get_neighborhood G V0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges V1 )
                          ∧ ( edge ∈ G.get_inc_dedges V0 ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
-  ∧ ( type0_elimination (get_rule V1 G) → type2_elimination (get_rule V1 CLPS) )
-  ∧ ( type0_introduction (get_rule V1 G) → type2_introduction (get_rule V1 CLPS) )
-  ∧ ( type0_hypothesis (get_rule V1 G) → type2_hypothesis (get_rule V1 CLPS) ) := by
+  ∧ ( type0_elimination (DLDS.get_neighborhood G V1) → type2_elimination (DLDS.get_neighborhood CLPS V1) )
+  ∧ ( type0_introduction (DLDS.get_neighborhood G V1) → type2_introduction (DLDS.get_neighborhood CLPS V1) )
+  ∧ ( type0_hypothesis (DLDS.get_neighborhood G V1) → type2_hypothesis (DLDS.get_neighborhood CLPS V1) ) := by
   intro prop_collapse;
   --
   intro prop_eq_lvl prop_eq_fml;
@@ -10460,7 +10445,7 @@ namespace COVERAGE.UP.T2I
   intro prop_nbrᵤ₀ prop_pstᵤ₀;
   --
   intro prop_typeᵥ₀;
-  simp only [get_rule] at prop_typeᵥ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵥ₀;
   simp only [type2_introduction] at prop_typeᵥ₀;
   cases prop_typeᵥ₀ with | intro prop_nbrᵥ₀ prop_typeᵥ₀ =>
   cases prop_typeᵥ₀ with | intro prop_lvlᵥ₀ prop_typeᵥ₀ =>
@@ -10504,13 +10489,13 @@ namespace COVERAGE.UP.T2I
                                                        cases prop_mem_incomingᵥ₀ with | head _ => trivial;
                                                                                       | tail _ mem_cases => trivial;
   apply And.intro ( by exact Prop_Upper_LVLᵥ; );
-  /- Unfold "get_rule U1 CLPS" -/
+  /- Unfold "DLDS.get_neighborhood CLPS U1" -/
   rewrite [←Prop_Edge_Origᵥ];
   rewrite [COLLAPSE.Simp_Rule_Above_Right prop_collapse prop_mem_incomingᵥ₀];
   rewrite [Prop_Edge_Origᵥ];
   /- type0_elimination V1 → type2_elimination V1 -/
   apply And.intro ( by intro prop_typeᵥ₁;
-                       simp only [get_rule] at prop_typeᵥ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵥ₁;
                        simp only [type0_elimination] at prop_typeᵥ₁;
                        cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
@@ -10560,7 +10545,7 @@ namespace COVERAGE.UP.T2I
                                             rewrite [←prop_anc_lvlᵥ₀];
                                             simp only [List.length, Nat.add_assoc]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );                  /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by simp only [check_numbers] at prop_pstᵤ₀ ⊢;                                 /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;                                 /- := check_nonempty_and_nonzero (past::pasts) -/
                                             apply And.intro ( by simp only [ne_eq];
                                                                  simp only [List.cons_ne_nil];
                                                                  trivial; );
@@ -10569,7 +10554,7 @@ namespace COVERAGE.UP.T2I
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
                                             | tail _ mem_cases => exact prop_pstᵤ₀ (List.Mem.tail U0.id mem_cases); );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_colorsᵥ₀; );            /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_colorsᵥ₀; );            /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵥ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -10595,7 +10580,7 @@ namespace COVERAGE.UP.T2I
                        exact prop_indirectᵥ₁; );
   /- type0_introduction V1 → type2_introduction V1 -/
   apply And.intro ( by intro prop_typeᵥ₁;
-                       simp only [get_rule] at prop_typeᵥ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵥ₁;
                        simp only [type0_introduction] at prop_typeᵥ₁;
                        cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
@@ -10643,7 +10628,7 @@ namespace COVERAGE.UP.T2I
                                             rewrite [←prop_anc_lvlᵥ₀];
                                             simp only [List.length, Nat.add_assoc]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );                  /- := color ∈ (out_nbr::past::pasts) -/
-                       apply And.intro ( by simp only [check_numbers] at prop_pstᵤ₀ ⊢;                                 /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;                                 /- := check_nonempty_and_nonzero (past::pasts) -/
                                             apply And.intro ( by simp only [ne_eq];
                                                                  simp only [List.cons_ne_nil];
                                                                  trivial; );
@@ -10652,7 +10637,7 @@ namespace COVERAGE.UP.T2I
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
                                             | tail _ mem_cases => exact prop_pstᵤ₀ (List.Mem.tail U0.id mem_cases); );
-                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_colorsᵥ₀; );            /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_colorsᵥ₀; );            /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵥ₁; );
                        /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -10678,7 +10663,7 @@ namespace COVERAGE.UP.T2I
                        exact prop_indirectᵥ₁; );
   /- type0_hypothesis V1 → type2_hypothesis V1 -/
   intro prop_typeᵥ₁;
-  simp only [get_rule] at prop_typeᵥ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵥ₁;
   simp only [type0_hypothesis] at prop_typeᵥ₁;
   cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
@@ -10714,7 +10699,7 @@ namespace COVERAGE.UP.T2I
                        rewrite [←prop_anc_lvlᵥ₀];
                        simp only [List.length, Nat.add_assoc]; );
   apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );                  /- := color ∈ (out_nbr::past::pasts) -/
-  apply And.intro ( by simp only [check_numbers] at prop_pstᵤ₀ ⊢;                                 /- := check_numbers (past::pasts) -/
+  apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;                                 /- := check_nonempty_and_nonzero (past::pasts) -/
                        apply And.intro ( by simp only [ne_eq];
                                             simp only [List.cons_ne_nil];
                                             trivial; );
@@ -10723,7 +10708,7 @@ namespace COVERAGE.UP.T2I
                        cases mem_cases with
                        | head => exact prop_nbrᵥ₀;
                        | tail _ mem_cases => exact prop_pstᵤ₀ (List.Mem.tail U0.id mem_cases); );
-  apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_colorsᵥ₀; );            /- := check_numbers (color::colors) -/
+  apply And.intro ( by exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_colorsᵥ₀; );            /- := check_nonempty_and_nonzero (color::colors) -/
   /- Incoming Edges -/------------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by exact prop_incomingᵥ₁; );
   /- Outgoing Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -10753,15 +10738,15 @@ end COVERAGE.UP.T2I
 namespace COVERAGE.UP.T1X
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T1X {U0 U1 : Node} {G : DLDS} :
-    ( type1_collapse (get_rule U0 G) ) →
+    ( type1_collapse (DLDS.get_neighborhood G U0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
                          ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
-    ( ¬type0_elimination (get_rule U1 G) )
-  ∧ ( ¬type0_introduction (get_rule U1 G) )
-  ∧ ( ¬type0_hypothesis (get_rule U1 G) ) := by
+    ( ¬type0_elimination (DLDS.get_neighborhood G U1) )
+  ∧ ( ¬type0_introduction (DLDS.get_neighborhood G U1) )
+  ∧ ( ¬type0_hypothesis (DLDS.get_neighborhood G U1) ) := by
   intro prop_typeᵤ₀;
-  simp only [get_rule] at prop_typeᵤ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₀;
   simp only [type1_collapse] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
@@ -10797,7 +10782,7 @@ namespace COVERAGE.UP.T1X
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
                        apply absurd Prop_Directᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type0_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -10823,7 +10808,7 @@ namespace COVERAGE.UP.T1X
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
                        apply absurd Prop_Directᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type0_introduction] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -10848,7 +10833,7 @@ namespace COVERAGE.UP.T1X
   rewrite [←imp_false];
   intro prop_typeᵤ₁;
   apply absurd Prop_Directᵤ₁;
-  simp only [get_rule] at prop_typeᵤ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
   simp only [type0_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -10867,19 +10852,19 @@ namespace COVERAGE.UP.T1X
   /- Lemma: Upper Nodes Unaffected by Further Collapses -/
   theorem Above_Left_T1X {U0 V0 U1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
-    ( type1_collapse (get_rule U0 G) ) →
+    ( type1_collapse (DLDS.get_neighborhood G U0) ) →
     ( V0.id > 0 ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
                          ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
-  ∧ ( type2_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
-  ∧ ( type2_introduction (get_rule U1 G) → type2_introduction (get_rule U1 CLPS) )
-  ∧ ( type2_hypothesis (get_rule U1 G) → type2_hypothesis (get_rule U1 CLPS) ) := by
+  ∧ ( type2_elimination (DLDS.get_neighborhood G U1) → type2_elimination (DLDS.get_neighborhood CLPS U1) )
+  ∧ ( type2_introduction (DLDS.get_neighborhood G U1) → type2_introduction (DLDS.get_neighborhood CLPS U1) )
+  ∧ ( type2_hypothesis (DLDS.get_neighborhood G U1) → type2_hypothesis (DLDS.get_neighborhood CLPS U1) ) := by
   intro prop_collapse;
   --
   intro prop_typeᵤ₀;
-  simp only [get_rule] at prop_typeᵤ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₀;
   simp only [type1_collapse] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
@@ -10906,16 +10891,16 @@ namespace COVERAGE.UP.T1X
                                                        cases prop_incomingᵤ₀ prop_mem_incomingᵤ₀ with | intro Prop_Origᵤ₀ _ =>
                                                        cases Prop_Origᵤ₀ with | intro _ Prop_Origᵤ₀ =>
                                                        cases Prop_Origᵤ₀ with | intro Prop_Orig_LVLᵤ₀ _ =>
-                                                       simp only [get_rule] at Prop_Orig_LVLᵤ₀;
+                                                       simp only [DLDS.get_neighborhood] at Prop_Orig_LVLᵤ₀;
                                                        exact Prop_Orig_LVLᵤ₀;
   apply And.intro ( by exact Prop_Upper_LVLᵤ; );
-  /- Unfold "get_rule U1 CLPS" -/
+  /- Unfold "DLDS.get_neighborhood CLPS U1" -/
   rewrite [←Prop_Edge_Origᵤ];
   rewrite [COLLAPSE.Simp_Rule_Above_Collapse prop_colᵤ₀ prop_collapse prop_mem_incomingᵤ₀];
   rewrite [Prop_Edge_Origᵤ];
   /- type2_elimination U1 → type2_elimination U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type2_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -10983,12 +10968,12 @@ namespace COVERAGE.UP.T1X
                                                                                        | tail _ prop_colorᵤ₁ => exact List.Mem.tail ( out_nbrᵤ₁ )
                                                                                                                                      ( List.Mem.tail V0.id prop_colorᵤ₁ );
                                                                            | tail _ mem_cases => trivial; );
-                       apply And.intro ( by cases prop_pstᵤ₀ with | intro pastᵤ₀ prop_pstᵤ₀ =>                    /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by cases prop_pstᵤ₀ with | intro pastᵤ₀ prop_pstᵤ₀ =>                    /- := check_nonempty_and_nonzero (past::pasts) -/
                                             cases prop_pstᵤ₀ with | intro pastsᵤ₀ prop_pstᵤ₀ =>
                                             cases prop_pstᵤ₀ with | intro prop_check_pstᵤ₀ prop_pstᵤ₀ =>
                                             rewrite [prop_pstᵤ₀];
                                             exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_check_pstᵤ₀; );
-                       apply And.intro ( by exact prop_colorsᵤ₁; );                                              /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact prop_colorsᵤ₁; );                                              /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/--------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵤ₁; );
                        /- Outgoing Edges -/--------------------------------------------------------------------------------------------------------------------------
@@ -11006,7 +10991,7 @@ namespace COVERAGE.UP.T1X
                        exact prop_indirectᵤ₁; );
   /- type2_introduction U1 → type2_introduction U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type2_introduction] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -11072,12 +11057,12 @@ namespace COVERAGE.UP.T1X
                                                                                        | tail _ prop_colorᵤ₁ => exact List.Mem.tail ( out_nbrᵤ₁ )
                                                                                                                                      ( List.Mem.tail V0.id prop_colorᵤ₁ );
                                                                            | tail _ mem_cases => trivial; );
-                       apply And.intro ( by cases prop_pstᵤ₀ with | intro pastᵤ₀ prop_pstᵤ₀ =>                    /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by cases prop_pstᵤ₀ with | intro pastᵤ₀ prop_pstᵤ₀ =>                    /- := check_nonempty_and_nonzero (past::pasts) -/
                                             cases prop_pstᵤ₀ with | intro pastsᵤ₀ prop_pstᵤ₀ =>
                                             cases prop_pstᵤ₀ with | intro prop_check_pstᵤ₀ prop_pstᵤ₀ =>
                                             rewrite [prop_pstᵤ₀];
                                             exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_check_pstᵤ₀; );
-                       apply And.intro ( by exact prop_colorsᵤ₁; );                                              /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact prop_colorsᵤ₁; );                                              /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/--------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵤ₁; );
                        /- Outgoing Edges -/--------------------------------------------------------------------------------------------------------------------------
@@ -11095,7 +11080,7 @@ namespace COVERAGE.UP.T1X
                        exact prop_indirectᵤ₁; );
   /- type2_hypothesis U1 → type2_hypothesis U1 -/
   intro prop_typeᵤ₁;
-  simp only [get_rule] at prop_typeᵤ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
   simp only [type2_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -11149,12 +11134,12 @@ namespace COVERAGE.UP.T1X
                                                                   | tail _ prop_colorᵤ₁ => exact List.Mem.tail ( out_nbrᵤ₁ )
                                                                                                                 ( List.Mem.tail V0.id prop_colorᵤ₁ );
                                                       | tail _ mem_cases => trivial; );
-  apply And.intro ( by cases prop_pstᵤ₀ with | intro pastᵤ₀ prop_pstᵤ₀ =>                    /- := check_numbers (past::pasts) -/
+  apply And.intro ( by cases prop_pstᵤ₀ with | intro pastᵤ₀ prop_pstᵤ₀ =>                    /- := check_nonempty_and_nonzero (past::pasts) -/
                        cases prop_pstᵤ₀ with | intro pastsᵤ₀ prop_pstᵤ₀ =>
                        cases prop_pstᵤ₀ with | intro prop_check_pstᵤ₀ prop_pstᵤ₀ =>
                        rewrite [prop_pstᵤ₀];
                        exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_check_pstᵤ₀; );
-  apply And.intro ( by exact prop_colorsᵤ₁; );                                              /- := check_numbers (color::colors) -/
+  apply And.intro ( by exact prop_colorsᵤ₁; );                                              /- := check_nonempty_and_nonzero (color::colors) -/
   /- Incoming Edges -/--------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by exact prop_incomingᵤ₁; );
   /- Outgoing Edges -/--------------------------------------------------------------------------------------------------------------------------
@@ -11176,15 +11161,15 @@ end COVERAGE.UP.T1X
 namespace COVERAGE.UP.T3X
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T3X {U0 U1 : Node} {G : DLDS} :
-    ( type3_collapse (get_rule U0 G) ) →
+    ( type3_collapse (DLDS.get_neighborhood G U0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
                          ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
-    ( ¬type0_elimination (get_rule U1 G) )
-  ∧ ( ¬type0_introduction (get_rule U1 G) )
-  ∧ ( ¬type0_hypothesis (get_rule U1 G) ) := by
+    ( ¬type0_elimination (DLDS.get_neighborhood G U1) )
+  ∧ ( ¬type0_introduction (DLDS.get_neighborhood G U1) )
+  ∧ ( ¬type0_hypothesis (DLDS.get_neighborhood G U1) ) := by
   intro prop_typeᵤ₀;
-  simp only [get_rule] at prop_typeᵤ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₀;
   simp only [type3_collapse] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
@@ -11221,7 +11206,7 @@ namespace COVERAGE.UP.T3X
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
                        apply absurd Prop_Directᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type0_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -11247,7 +11232,7 @@ namespace COVERAGE.UP.T3X
   apply And.intro ( by rewrite [←imp_false];
                        intro prop_typeᵤ₁;
                        apply absurd Prop_Directᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type0_introduction] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -11272,7 +11257,7 @@ namespace COVERAGE.UP.T3X
   rewrite [←imp_false];
   intro prop_typeᵤ₁;
   apply absurd Prop_Directᵤ₁;
-  simp only [get_rule] at prop_typeᵤ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
   simp only [type0_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -11291,19 +11276,19 @@ namespace COVERAGE.UP.T3X
   /- Lemma: Upper Nodes Unaffected by Further Collapses -/
   theorem Above_Left_T3X {U0 V0 U1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
-    ( type3_collapse (get_rule U0 G) ) →
+    ( type3_collapse (DLDS.get_neighborhood G U0) ) →
     ( V0.id > 0 ) →
     ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
                          ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
-  ∧ ( type2_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
-  ∧ ( type2_introduction (get_rule U1 G) → type2_introduction (get_rule U1 CLPS) )
-  ∧ ( type2_hypothesis (get_rule U1 G) → type2_hypothesis (get_rule U1 CLPS) ) := by
+  ∧ ( type2_elimination (DLDS.get_neighborhood G U1) → type2_elimination (DLDS.get_neighborhood CLPS U1) )
+  ∧ ( type2_introduction (DLDS.get_neighborhood G U1) → type2_introduction (DLDS.get_neighborhood CLPS U1) )
+  ∧ ( type2_hypothesis (DLDS.get_neighborhood G U1) → type2_hypothesis (DLDS.get_neighborhood CLPS U1) ) := by
   intro prop_collapse;
   --
   intro prop_typeᵤ₀;
-  simp only [get_rule] at prop_typeᵤ₀;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₀;
   simp only [type3_collapse] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
@@ -11331,16 +11316,16 @@ namespace COVERAGE.UP.T3X
                                                        cases prop_incomingᵤ₀ prop_mem_incomingᵤ₀ with | intro Prop_Origᵤ₀ _ =>
                                                        cases Prop_Origᵤ₀ with | intro _ Prop_Origᵤ₀ =>
                                                        cases Prop_Origᵤ₀ with | intro Prop_Orig_LVLᵤ₀ _ =>
-                                                       simp only [get_rule] at Prop_Orig_LVLᵤ₀;
+                                                       simp only [DLDS.get_neighborhood] at Prop_Orig_LVLᵤ₀;
                                                        exact Prop_Orig_LVLᵤ₀;
   apply And.intro ( by exact Prop_Upper_LVLᵤ; );
-  /- Unfold "get_rule U1 CLPS" -/
+  /- Unfold "DLDS.get_neighborhood CLPS U1" -/
   rewrite [←Prop_Edge_Origᵤ];
   rewrite [COLLAPSE.Simp_Rule_Above_Collapse prop_colᵤ₀ prop_collapse prop_mem_incomingᵤ₀];
   rewrite [Prop_Edge_Origᵤ];
   /- type2_elimination U1 → type2_elimination U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type2_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -11408,12 +11393,12 @@ namespace COVERAGE.UP.T3X
                                                                                        | tail _ prop_colorᵤ₁ => exact List.Mem.tail ( out_nbrᵤ₁ )
                                                                                                                                      ( List.Mem.tail V0.id prop_colorᵤ₁ );
                                                                            | tail _ mem_cases => trivial; );
-                       apply And.intro ( by cases prop_pstᵤ₀ with | intro pastᵤ₀ prop_pstᵤ₀ =>                    /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by cases prop_pstᵤ₀ with | intro pastᵤ₀ prop_pstᵤ₀ =>                    /- := check_nonempty_and_nonzero (past::pasts) -/
                                             cases prop_pstᵤ₀ with | intro pastsᵤ₀ prop_pstᵤ₀ =>
                                             cases prop_pstᵤ₀ with | intro prop_check_pstᵤ₀ prop_pstᵤ₀ =>
                                             rewrite [prop_pstᵤ₀];
                                             exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_check_pstᵤ₀; );
-                       apply And.intro ( by exact prop_colorsᵤ₁; );                                              /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact prop_colorsᵤ₁; );                                              /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/--------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵤ₁; );
                        /- Outgoing Edges -/--------------------------------------------------------------------------------------------------------------------------
@@ -11431,7 +11416,7 @@ namespace COVERAGE.UP.T3X
                        exact prop_indirectᵤ₁; );
   /- type2_introduction U1 → type2_introduction U1 -/
   apply And.intro ( by intro prop_typeᵤ₁;
-                       simp only [get_rule] at prop_typeᵤ₁;
+                       simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
                        simp only [type2_introduction] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -11497,12 +11482,12 @@ namespace COVERAGE.UP.T3X
                                                                                        | tail _ prop_colorᵤ₁ => exact List.Mem.tail ( out_nbrᵤ₁ )
                                                                                                                                      ( List.Mem.tail V0.id prop_colorᵤ₁ );
                                                                            | tail _ mem_cases => trivial; );
-                       apply And.intro ( by cases prop_pstᵤ₀ with | intro pastᵤ₀ prop_pstᵤ₀ =>                    /- := check_numbers (past::pasts) -/
+                       apply And.intro ( by cases prop_pstᵤ₀ with | intro pastᵤ₀ prop_pstᵤ₀ =>                    /- := check_nonempty_and_nonzero (past::pasts) -/
                                             cases prop_pstᵤ₀ with | intro pastsᵤ₀ prop_pstᵤ₀ =>
                                             cases prop_pstᵤ₀ with | intro prop_check_pstᵤ₀ prop_pstᵤ₀ =>
                                             rewrite [prop_pstᵤ₀];
                                             exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_check_pstᵤ₀; );
-                       apply And.intro ( by exact prop_colorsᵤ₁; );                                              /- := check_numbers (color::colors) -/
+                       apply And.intro ( by exact prop_colorsᵤ₁; );                                              /- := check_nonempty_and_nonzero (color::colors) -/
                        /- Incoming Edges -/--------------------------------------------------------------------------------------------------------------------------
                        apply And.intro ( by exact prop_incomingᵤ₁; );
                        /- Outgoing Edges -/--------------------------------------------------------------------------------------------------------------------------
@@ -11520,7 +11505,7 @@ namespace COVERAGE.UP.T3X
                        exact prop_indirectᵤ₁; );
   /- type2_hypothesis U1 → type2_hypothesis U1 -/
   intro prop_typeᵤ₁;
-  simp only [get_rule] at prop_typeᵤ₁;
+  simp only [DLDS.get_neighborhood] at prop_typeᵤ₁;
   simp only [type2_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
@@ -11574,12 +11559,12 @@ namespace COVERAGE.UP.T3X
                                                                   | tail _ prop_colorᵤ₁ => exact List.Mem.tail ( out_nbrᵤ₁ )
                                                                                                                 ( List.Mem.tail V0.id prop_colorᵤ₁ );
                                                       | tail _ mem_cases => trivial; );
-  apply And.intro ( by cases prop_pstᵤ₀ with | intro pastᵤ₀ prop_pstᵤ₀ =>                    /- := check_numbers (past::pasts) -/
+  apply And.intro ( by cases prop_pstᵤ₀ with | intro pastᵤ₀ prop_pstᵤ₀ =>                    /- := check_nonempty_and_nonzero (past::pasts) -/
                        cases prop_pstᵤ₀ with | intro pastsᵤ₀ prop_pstᵤ₀ =>
                        cases prop_pstᵤ₀ with | intro prop_check_pstᵤ₀ prop_pstᵤ₀ =>
                        rewrite [prop_pstᵤ₀];
                        exact COLLAPSE.Check_Numbers_Cons prop_nbrᵥ₀ prop_check_pstᵤ₀; );
-  apply And.intro ( by exact prop_colorsᵤ₁; );                                              /- := check_numbers (color::colors) -/
+  apply And.intro ( by exact prop_colorsᵤ₁; );                                              /- := check_nonempty_and_nonzero (color::colors) -/
   /- Incoming Edges -/--------------------------------------------------------------------------------------------------------------------------
   apply And.intro ( by exact prop_incomingᵤ₁; );
   /- Outgoing Edges -/--------------------------------------------------------------------------------------------------------------------------
