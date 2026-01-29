@@ -1,0 +1,63 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage[dvipsnames]{xcolor}
+\usepackage[pdfencoding=auto,psdextra]{hyperref}
+\usepackage{fontspec}
+\setmonofont{Adwaita Mono}
+\usepackage{unicode-math}
+\usepackage{minted}
+\definecolor{bg}{rgb}{0.95,0.95,0.95}
+\definecolor{rl}{rgb}{0.5,0.5,0.5}
+% \usemintedstyle{bw}
+\newmintedfile{lean}{
+fontsize=\footnotesize,
+frame=single,
+rulecolor=rl,
+breaklines,
+numbersep=3pt,
+escapeinside=⟪⟫}
+\begin{document}
+\title{Horizontal Compression of DLDS's}
+\maketitle
+
+\section{Basic definitions}
+
+\subsection{Formulas}
+
+\leanfile[firstline=5,lastline=7]{hc.lean}
+%%
+Notation for formulas:
+%%
+\leanfile[firstline=24,lastline=27]{hc.lean}
+
+\subsection{DLDS}
+
+Nodes:
+%%
+\leanfile[firstline=44,lastline=50]{hc.lean}
+%%
+Deduction edges:
+%%
+\leanfile[firstline=81,lastline=85]{hc.lean}
+%%
+Ancestrality edges:
+%%
+\leanfile[firstline=110,lastline=113]{hc.lean}
+%%
+DLDS:
+%%
+\leanfile[firstline=135,lastline=138]{hc.lean}
+%%
+Neighborhood:
+%%
+\leanfile[firstline=181,lastline=186]{hc.lean}
+
+\end{document}
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-engine: xetex
+%%% TeX-master: t
+%%% eval: (activate-input-method 'math)
+%%% End:
