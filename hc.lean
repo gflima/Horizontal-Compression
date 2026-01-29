@@ -188,31 +188,27 @@ def DLDS.get_out_dedges (G : DLDS) (x : Node)  : List DEdge :=
     | [] => []
     | d :: ds => if d.orig = x then d :: loop ds else loop ds
 
-/- Get: Direct AEdges -/----------------------------------------------------------------------------------------------------
-def get_rule.direct (NODE : Node) (G : DLDS) : List AEdge :=
-    loop NODE G.aedges
-    where loop (NODE : Node) (PATHS : List AEdge) : List AEdge :=
-          match PATHS with
-          | [] => []
-          | (PATH::PATHS) => if   ( PATH.dest = NODE )
-                             then ( PATH :: loop NODE PATHS )
-                             else ( loop NODE PATHS )
-    ----------------------------------------------------------------------------------------------------------------------------
-/- Get: Indirect AEdges -/--------------------------------------------------------------------------------------------------
-def get_rule.indirect (NODE : Node) (G : DLDS) : List AEdge :=
-    loop (DLDS.get_inc_dedges G NODE) G.aedges
-    where loop (EDGES : List DEdge) (PATHS : List AEdge) : List AEdge :=
-          match EDGES with
-          | [] => []
-          | (EDGE::EDGES) => get_rule.direct.loop EDGE.orig PATHS ++ loop EDGES PATHS
-    ----------------------------------------------------------------------------------------------------------------------------
+def DLDS.get_dir_aedges (G : DLDS) (x : Node)  : List AEdge :=
+  loop x G.aedges
+  where loop (x : Node) (aedges : List AEdge) : List AEdge :=
+    match aedges with
+    | [] => []
+    | a :: as => if a.dest = x then a :: loop x as else loop x as
+
+def DLDS.get_ind_aedges (G : DLDS) (x : Node) : List AEdge :=
+  loop (G.get_inc_dedges x) G.aedges
+  where loop (dedges : List DEdge) (aedges : List AEdge) : List AEdge :=
+    match dedges with
+    | [] => []
+    | d :: ds => DLDS.get_dir_aedges.loop d.orig aedges ++ loop ds aedges
+
 /- Collapse: NODE × G → Neighborhood -/--------------------------------------------------------------------------------------
 def get_rule (NODE : Node) (G : DLDS) : Neighborhood :=
     Neighborhood.mk ( NODE )
-         ( DLDS.get_inc_dedges G NODE )
-         ( DLDS.get_out_dedges G NODE )
-         ( get_rule.direct NODE G )
-         ( get_rule.indirect NODE G )
+         ( G.get_inc_dedges NODE )
+         ( G.get_out_dedges NODE )
+         ( G.get_dir_aedges NODE )
+         ( G.get_ind_aedges NODE )
     ----------------------------------------------------------------------------------------------------------------------------
 
 namespace List
@@ -813,42 +809,42 @@ def DLDS.is_collapse (U V : Node) : DLDS → DLDS → Prop
                 /- Incoming Nodes -/-------------------------------------------------------------------------------------------------------------
                 /- Above & Right Side (Collapsed Child) -/---------------------------------------------------------------------------------------
 | CLPS, G => ( ∀{inc : DEdge}, ( U.isCollapsed = true ) →
-                                      ( inc ∈ DLDS.get_inc_dedges G U ) →
+                                      ( inc ∈ G.get_inc_dedges U ) →
                   ---------------------------------------------------------------------
                   ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
-                                                   ( DLDS.get_inc_dedges G inc.orig )
-                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (DLDS.get_out_dedges G inc.orig) )
-                /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct inc.orig G )
-                                                   ( get_rule.indirect inc.orig G ) ) )
+                                                   ( G.get_inc_dedges inc.orig )
+                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (G.get_out_dedges inc.orig) )
+                /- Direct Inc ∈ Indirect UV -/     ( G.get_dir_aedges inc.orig )
+                                                   ( G.get_ind_aedges inc.orig ) ) )
                 ---------------------------------------------------------------------------------------------------------------------------------
                 /- Aboce & Right Side (Non-Collapsed Child) -/-----------------------------------------------------------------------------------
               ∧ ( ∀{inc : DEdge}, ( U.isCollapsed = false ) →
-                                      ( inc ∈ DLDS.get_inc_dedges G U ) →
+                                      ( inc ∈ G.get_inc_dedges U ) →
                   ---------------------------------------------------------------------
                   ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
-                                                   ( DLDS.get_inc_dedges G inc.orig )
-                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (DLDS.get_out_dedges G inc.orig) )
-                /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.orig )
+                                                   ( G.get_inc_dedges inc.orig )
+                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (G.get_out_dedges inc.orig) )
+                /- Direct Inc ∈ Indirect UV -/     ( DLDS.get_dir_aedges.loop ( inc.orig )
                                                                           ( pre_collapse.indirect ( U.id )
                                                                                                   ( U.isHypothesis )
-                                                                                                  ( DLDS.get_inc_dedges G U )
-                                                                                                  ( DLDS.get_out_dedges G U )
-                                                                                                  ( get_rule.direct U G ) ) )
-                                                   ( get_rule.indirect inc.orig G ) ) )
+                                                                                                  ( G.get_inc_dedges U )
+                                                                                                  ( G.get_out_dedges U )
+                                                                                                  ( G.get_dir_aedges U ) ) )
+                                                   ( G.get_ind_aedges inc.orig ) ) )
                 ---------------------------------------------------------------------------------------------------------------------------------
                 /- Above & Left Side -/----------------------------------------------------------------------------------------------------------
-              ∧ ( ∀{inc : DEdge}, ( inc ∈ DLDS.get_inc_dedges G V ) →
+              ∧ ( ∀{inc : DEdge}, ( inc ∈ G.get_inc_dedges V ) →
                   ---------------------------------------------------------------------
                   ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
-                                                   ( DLDS.get_inc_dedges G inc.orig )
-                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (DLDS.get_out_dedges G inc.orig) )
-                /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.orig )
+                                                   ( G.get_inc_dedges inc.orig )
+                /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (G.get_out_dedges inc.orig) )
+                /- Direct Inc ∈ Indirect UV -/     ( DLDS.get_dir_aedges.loop ( inc.orig )
                                                                           ( pre_collapse.indirect ( V.id )
                                                                                                   ( V.isHypothesis )
-                                                                                                  ( DLDS.get_inc_dedges G V )
-                                                                                                  ( DLDS.get_out_dedges G V )
-                                                                                                  ( get_rule.direct V G ) ) )
-                                                   ( get_rule.indirect inc.orig G ) ) )
+                                                                                                  ( G.get_inc_dedges V )
+                                                                                                  ( G.get_out_dedges V )
+                                                                                                  ( G.get_dir_aedges V ) ) )
+                                                   ( G.get_ind_aedges inc.orig ) ) )
     ---------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -1000,7 +996,7 @@ namespace COLLAPSE
 
   /- Lemma: Simplify "dest" at "DLDS.get_inc_dedges" -/
   theorem Simp_Dest_Incoming {NODE : Node} {G : DLDS} {EDGE : DEdge} :
-    ( EDGE ∈ DLDS.get_inc_dedges G NODE ) →
+    ( EDGE ∈ G.get_inc_dedges NODE ) →
     ------------------------------------
     ( EDGE.dest = NODE ) := by
   simp only [DLDS.get_inc_dedges];
@@ -1017,7 +1013,7 @@ namespace COLLAPSE
                            case _ ne_head => exact LOOP mem_incoming;
   /- Lemma: Simplify "orig" at "DLDS.get_out_dedges" -/
   theorem Simp_Orig_Outgoing {NODE : Node} {G : DLDS} {EDGE : DEdge} :
-    ( EDGE ∈ DLDS.get_out_dedges G NODE ) →
+    ( EDGE ∈ G.get_out_dedges NODE ) →
     ------------------------------------
     ( EDGE.orig = NODE ) := by
   simp only [DLDS.get_out_dedges];
@@ -1032,60 +1028,60 @@ namespace COLLAPSE
                                              | head _ => exact eq_head;
                                              | tail _ mem_incoming => exact LOOP mem_incoming;
                            case _ ne_head => exact LOOP mem_incoming;
-  /- Lemma: Simplify "dest" at "get_rule.direct" -/
+  /- Lemma: Simplify "dest" at "DLDS.get_dir_aedges" -/
   theorem Simp_Dest_Direct {NODE : Node} {G : DLDS} {PATH : AEdge} :
-    ( PATH ∈ get_rule.direct NODE G ) →
+    ( PATH ∈ G.get_dir_aedges NODE ) →
     ------------------------------------
     ( PATH.dest = NODE ) := by
-  simp only [get_rule.direct];
+  simp only [DLDS.get_dir_aedges];
   induction G.aedges with
   | nil => intro mem_direct;
-           simp only [get_rule.direct.loop] at mem_direct;
+           simp only [DLDS.get_dir_aedges.loop] at mem_direct;
            trivial;
   | cons HEAD TAIL LOOP => intro mem_direct;
-                           simp only [get_rule.direct.loop] at mem_direct;
+                           simp only [DLDS.get_dir_aedges.loop] at mem_direct;
                            split at mem_direct;
                            case _ eq_head => cases mem_direct with
                                              | head _ => exact eq_head;
                                              | tail _ mem_direct => exact LOOP mem_direct;
                            case _ ne_head => exact LOOP mem_direct;
 
-  /- Lemma: Simplify "get_rule.direct" at "get_rule.indirect" -/
+  /- Lemma: Simplify "DLDS.get_dir_aedges" at "DLDS.get_ind_aedges" -/
   theorem Simp_Direct_Indirect₁₃ {NODE₀ NODE₁ : Node} {G : DLDS} :
-    ( AEdge.mk (Orig : Node) NODE₁ (Colors : List Nat) ∈ get_rule.indirect NODE₀ G ) →
+    ( AEdge.mk (Orig : Node) NODE₁ (Colors : List Nat) ∈ G.get_ind_aedges NODE₀ ) →
     ------------------------------------
-    ( AEdge.mk (Orig : Node) NODE₁ (Colors : List Nat) ∈ get_rule.direct NODE₁ G ) := by
-  simp only [get_rule.indirect];
-  induction DLDS.get_inc_dedges G NODE₀ with
+    ( AEdge.mk (Orig : Node) NODE₁ (Colors : List Nat) ∈ G.get_dir_aedges NODE₁ ) := by
+  simp only [DLDS.get_ind_aedges];
+  induction G.get_inc_dedges NODE₀ with
   | nil => intro prop_indirect₀;
-           simp only [get_rule.indirect.loop] at prop_indirect₀;
+           simp only [DLDS.get_ind_aedges.loop] at prop_indirect₀;
            trivial;
   | cons HEAD TAIL LOOP => intro prop_indirect₀;
-                           simp only [get_rule.indirect.loop] at prop_indirect₀;
+                           simp only [DLDS.get_ind_aedges.loop] at prop_indirect₀;
                            simp only [List.Mem_Or_Mem_Iff_Mem_Append] at prop_indirect₀;
                            cases prop_indirect₀ with
-                           | inl prop_head₀ => rewrite [←get_rule.direct] at prop_head₀;    /- Revert; Fold at "prop_head₀" -/
+                           | inl prop_head₀ => rewrite [←DLDS.get_dir_aedges] at prop_head₀;    /- Revert; Fold at "prop_head₀" -/
                                                rewrite [←COLLAPSE.Simp_Dest_Direct prop_head₀] at prop_head₀;
                                                exact prop_head₀;
                            | inr prop_tail₀ => exact LOOP prop_tail₀;
-  /- Lemma: Simplify "get_rule.direct" at "get_rule.indirect" -/
+  /- Lemma: Simplify "DLDS.get_dir_aedges" at "DLDS.get_ind_aedges" -/
   theorem Simp_Direct_Indirect₀₂ {NODE : Node} {G : DLDS} {EDGE : DEdge} :
-    ( EDGE ∈ DLDS.get_inc_dedges G NODE ) →
-    ( get_rule.indirect NODE G = [] ) →
+    ( EDGE ∈ G.get_inc_dedges NODE ) →
+    ( G.get_ind_aedges NODE = [] ) →
     ------------------------------------
-    ( get_rule.direct EDGE.orig G = [] ) := by
-  simp only [get_rule.indirect];
-  induction DLDS.get_inc_dedges G NODE with
+    ( G.get_dir_aedges EDGE.orig = [] ) := by
+  simp only [DLDS.get_ind_aedges];
+  induction G.get_inc_dedges NODE with
   | nil => intro _ prop_indirect;
-           simp only [get_rule.indirect.loop] at prop_indirect;
+           simp only [DLDS.get_ind_aedges.loop] at prop_indirect;
            trivial;
   | cons HEAD TAIL LOOP => intro prop_incoming prop_indirect;
-                           simp only [get_rule.indirect.loop] at prop_indirect;
+                           simp only [DLDS.get_ind_aedges.loop] at prop_indirect;
                            simp only [List.append_eq_nil_iff] at prop_indirect;
                            cases prop_indirect with | intro prop_indirect_head prop_indirect_tail =>
                            simp only [List.Eq_Or_Mem_Iff_Mem_Cons] at prop_incoming;
                            cases prop_incoming with
-                           | inl prop_incoming_head => rewrite [←get_rule.direct] at prop_indirect_head;    /- Revert; Fold at "prop_indirect_head" -/
+                           | inl prop_incoming_head => rewrite [←DLDS.get_dir_aedges] at prop_indirect_head;    /- Revert; Fold at "prop_indirect_head" -/
                                                        rewrite [←prop_incoming_head] at prop_indirect_head;
                                                        exact prop_indirect_head;
                            | inr prop_incoming_tail => exact LOOP prop_incoming_tail prop_indirect_tail;
@@ -1200,13 +1196,13 @@ namespace COLLAPSE
     ( U.isCollapsed = true ) →
     ( CLPS.is_collapse U V G ) →
     /- Incoming Nodes -/-------------------------------------------------------------
-    ( ∀{inc : DEdge}, ( inc ∈ DLDS.get_inc_dedges G U ) →
+    ( ∀{inc : DEdge}, ( inc ∈ G.get_inc_dedges U ) →
       -----------------------------------------------------------------------------
     ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
-                                     ( DLDS.get_inc_dedges G inc.orig )
-  /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (DLDS.get_out_dedges G inc.orig) )
-  /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct inc.orig G )
-                                     ( get_rule.indirect inc.orig G ) ) ) := by
+                                     ( G.get_inc_dedges inc.orig )
+  /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (G.get_out_dedges inc.orig) )
+  /- Direct Inc ∈ Indirect UV -/     ( G.get_dir_aedges inc.orig )
+                                     ( G.get_ind_aedges inc.orig ) ) ) := by
   intro prop_col prop_collapse;
   simp only [DLDS.is_collapse] at prop_collapse;
   cases prop_collapse with | intro prop_incoming _ =>
@@ -1217,18 +1213,18 @@ namespace COLLAPSE
     ( U.isCollapsed = false ) →
     ( CLPS.is_collapse U V G ) →
     /- Incoming Nodes -/-------------------------------------------------------------
-    ( ∀{inc : DEdge}, ( inc ∈ DLDS.get_inc_dedges G U ) →
+    ( ∀{inc : DEdge}, ( inc ∈ G.get_inc_dedges U ) →
       -----------------------------------------------------------------------------
       ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
-                                       ( DLDS.get_inc_dedges G inc.orig )
-    /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (DLDS.get_out_dedges G inc.orig) )
-    /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.orig )
+                                       ( G.get_inc_dedges inc.orig )
+    /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end U (collapse.center U V) (G.get_out_dedges inc.orig) )
+    /- Direct Inc ∈ Indirect UV -/     ( DLDS.get_dir_aedges.loop ( inc.orig )
                                                               ( pre_collapse.indirect ( U.id )
                                                                                       ( U.isHypothesis )
-                                                                                      ( DLDS.get_inc_dedges G U )
-                                                                                      ( DLDS.get_out_dedges G U )
-                                                                                      ( get_rule.direct U G ) ) )
-                                       ( get_rule.indirect inc.orig G ) ) ) := by
+                                                                                      ( G.get_inc_dedges U )
+                                                                                      ( G.get_out_dedges U )
+                                                                                      ( G.get_dir_aedges U ) ) )
+                                       ( G.get_ind_aedges inc.orig ) ) ) := by
   intro prop_col prop_collapse;
   simp only [DLDS.is_collapse] at prop_collapse;
   cases prop_collapse with | intro _ prop_collapse =>
@@ -1239,18 +1235,18 @@ namespace COLLAPSE
   theorem Simp_Rule_Above_Right {U V : Node} {G CLPS : DLDS} :
     ( CLPS.is_collapse U V G ) →
     /- Incoming Nodes -/-------------------------------------------------------------
-    ( ∀{inc : DEdge}, ( inc ∈ DLDS.get_inc_dedges G V ) →
+    ( ∀{inc : DEdge}, ( inc ∈ G.get_inc_dedges V ) →
       -----------------------------------------------------------------------------
       ( get_rule inc.orig CLPS = Neighborhood.mk ( inc.orig )
-                                       ( DLDS.get_inc_dedges G inc.orig )
-    /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (DLDS.get_out_dedges G inc.orig) )
-    /- Direct Inc ∈ Indirect UV -/     ( get_rule.direct.loop ( inc.orig )
+                                       ( G.get_inc_dedges inc.orig )
+    /- Outgoing Inc ∈ Incoming UV -/   ( is_collapse.update_edges_end V (collapse.center U V) (G.get_out_dedges inc.orig) )
+    /- Direct Inc ∈ Indirect UV -/     ( DLDS.get_dir_aedges.loop ( inc.orig )
                                                               ( pre_collapse.indirect ( V.id )
                                                                                       ( V.isHypothesis )
-                                                                                      ( DLDS.get_inc_dedges G V )
-                                                                                      ( DLDS.get_out_dedges G V )
-                                                                                      ( get_rule.direct V G ) ) )
-                                       ( get_rule.indirect inc.orig G ) ) ) := by
+                                                                                      ( G.get_inc_dedges V )
+                                                                                      ( G.get_out_dedges V )
+                                                                                      ( G.get_dir_aedges V ) ) )
+                                       ( G.get_ind_aedges inc.orig ) ) ) := by
   intro prop_collapse;
   simp only [DLDS.is_collapse] at prop_collapse;
   cases prop_collapse with | intro _ prop_collapse =>
@@ -7698,7 +7694,7 @@ namespace COVERAGE.UP.T0H
   theorem Not_Above_T0H {NODE : Node} {G : DLDS} :
     ( type0_hypothesis (get_rule NODE G) ) →
     ---------------------------
-    ( DLDS.get_inc_dedges G NODE = [] ) := by
+    ( G.get_inc_dedges NODE = [] ) := by
   intro prop_type;
   simp only [get_rule] at prop_type;
   simp only [type0_hypothesis] at prop_type;
@@ -7718,8 +7714,8 @@ namespace COVERAGE.UP.T0E
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T0E {U0 U1 : Node} {G : DLDS} :
     ( type0_elimination (get_rule U0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
+                         ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( ¬type2_elimination (get_rule U1 G) )
   ∧ ( ¬type2_introduction (get_rule U1 G) )
@@ -7872,8 +7868,8 @@ namespace COVERAGE.UP.T0E
     ( CLPS.is_collapse U0 V0 G ) →
     ( type0_elimination (get_rule U0 G) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
+                         ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
   ∧ ( type0_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
@@ -7995,10 +7991,10 @@ namespace COVERAGE.UP.T0E
                                             simp only [pre_collapse.indirect.create];
                                             rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
-                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => cases mem_cases with
-                                                                                                 | head _ => simp only [get_rule.direct.loop];
+                                                                                                 | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                                              simp +arith +decide;
                                                                                                  | tail _ mem_cases => trivial; );
                        /- Indirect Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8074,10 +8070,10 @@ namespace COVERAGE.UP.T0E
                                             simp only [pre_collapse.indirect.create];
                                             rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
-                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => cases mem_cases with
-                                                                                                 | head _ => simp only [get_rule.direct.loop];
+                                                                                                 | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                                              simp +arith +decide;
                                                                                                  | tail _ mem_cases => trivial; );
                        /- Indirect Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8141,10 +8137,10 @@ namespace COVERAGE.UP.T0E
                        simp only [pre_collapse.indirect.create];
                        rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
-                       cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
+                       cases prop_mem_incomingᵤ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                   simp +arith +decide;
                                                       | tail _ mem_cases => cases mem_cases with
-                                                                            | head _ => simp only [get_rule.direct.loop];
+                                                                            | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                         simp +arith +decide;
                                                                             | tail _ mem_cases => trivial; );
   /- Indirect Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8156,8 +8152,8 @@ namespace COVERAGE.UP.T0E
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
     ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
     ( type0_elimination (get_rule V0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G V1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G V0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges V1 )
+                         ∧ ( edge ∈ G.get_inc_dedges V0 ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
   ∧ ( type0_elimination (get_rule V1 G) → type2_elimination (get_rule V1 CLPS) )
@@ -8289,10 +8285,10 @@ namespace COVERAGE.UP.T0E
                                             simp only [pre_collapse.indirect.create];
                                             rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
-                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => cases mem_cases with
-                                                                                                 | head _ => simp only [get_rule.direct.loop];
+                                                                                                 | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                                              simp +arith +decide;
                                                                                                  | tail _ mem_cases => trivial; );
                        /- Indirect Paths -/------------------------------------------------------------------------------------------------------------------------------
@@ -8376,10 +8372,10 @@ namespace COVERAGE.UP.T0E
                                             simp only [pre_collapse.indirect.create];
                                             rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
-                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => cases mem_cases with
-                                                                                                 | head _ => simp only [get_rule.direct.loop];
+                                                                                                 | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                                              simp +arith +decide;
                                                                                                  | tail _ mem_cases => trivial; );
                        /- Indirect Paths -/------------------------------------------------------------------------------------------------------------------------------
@@ -8451,10 +8447,10 @@ namespace COVERAGE.UP.T0E
                        simp only [pre_collapse.indirect.create];
                        rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                        rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
-                       cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
+                       cases prop_mem_incomingᵥ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                   simp +arith +decide;
                                                       | tail _ mem_cases => cases mem_cases with
-                                                                            | head _ => simp only [get_rule.direct.loop];
+                                                                            | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                         simp +arith +decide;
                                                                             | tail _ mem_cases => trivial; );
   /- Indirect Paths -/------------------------------------------------------------------------------------------------------------------------------
@@ -8465,8 +8461,8 @@ namespace COVERAGE.UP.T0I
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T0I {U0 U1 : Node} {G : DLDS} :
     ( type0_introduction (get_rule U0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
+                         ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( ¬type2_elimination (get_rule U1 G) )
   ∧ ( ¬type2_introduction (get_rule U1 G) )
@@ -8618,8 +8614,8 @@ namespace COVERAGE.UP.T0I
     ( CLPS.is_collapse U0 V0 G ) →
     ( type0_introduction (get_rule U0 G) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
+                         ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
   ∧ ( type0_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
@@ -8738,7 +8734,7 @@ namespace COVERAGE.UP.T0I
                                             simp only [pre_collapse.indirect.create];
                                             rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
-                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => trivial; );
                        /- Indirect Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8814,7 +8810,7 @@ namespace COVERAGE.UP.T0I
                                             simp only [pre_collapse.indirect.create];
                                             rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
-                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => trivial; );
                        /- Indirect Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8878,7 +8874,7 @@ namespace COVERAGE.UP.T0I
                        simp only [pre_collapse.indirect.create];
                        rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
-                       cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
+                       cases prop_mem_incomingᵤ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                   simp +arith +decide;
                                                       | tail _ mem_cases => trivial; );
   /- Indirect Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -8890,8 +8886,8 @@ namespace COVERAGE.UP.T0I
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
     ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
     ( type0_introduction (get_rule V0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G V1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G V0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges V1 )
+                         ∧ ( edge ∈ G.get_inc_dedges V0 ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
   ∧ ( type0_elimination (get_rule V1 G) → type2_elimination (get_rule V1 CLPS) )
@@ -9020,7 +9016,7 @@ namespace COVERAGE.UP.T0I
                                             simp only [pre_collapse.indirect.create];
                                             rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
-                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => trivial; );
                        /- Indirect Paths -/------------------------------------------------------------------------------------------------------------------------------
@@ -9104,7 +9100,7 @@ namespace COVERAGE.UP.T0I
                                             simp only [pre_collapse.indirect.create];
                                             rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
-                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => trivial; );
                        /- Indirect Paths -/------------------------------------------------------------------------------------------------------------------------------
@@ -9176,7 +9172,7 @@ namespace COVERAGE.UP.T0I
                        simp only [pre_collapse.indirect.create];
                        rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                        rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
-                       cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
+                       cases prop_mem_incomingᵥ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                   simp +arith +decide;
                                                       | tail _ mem_cases => trivial; );
   /- Indirect Paths -/------------------------------------------------------------------------------------------------------------------------------
@@ -9189,7 +9185,7 @@ namespace COVERAGE.UP.T2H
   theorem Not_Above_T2H {NODE : Node} {G : DLDS} :
     ( type2_hypothesis (get_rule NODE G) ) →
     ---------------------------
-    ( DLDS.get_inc_dedges G NODE = [] ) := by
+    ( G.get_inc_dedges NODE = [] ) := by
   intro prop_type;
   simp only [get_rule] at prop_type;
   simp only [type2_hypothesis] at prop_type;
@@ -9222,8 +9218,8 @@ namespace COVERAGE.UP.T2E
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T2E {U0 U1 : Node} {G : DLDS} :
     ( type2_elimination (get_rule U0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
+                         ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( ¬type2_elimination (get_rule U1 G) )
   ∧ ( ¬type2_introduction (get_rule U1 G) )
@@ -9389,8 +9385,8 @@ namespace COVERAGE.UP.T2E
     ( CLPS.is_collapse U0 V0 G ) →
     ( type2_elimination (get_rule U0 G) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
+                         ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
   ∧ ( type0_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
@@ -9524,10 +9520,10 @@ namespace COVERAGE.UP.T2E
                                             simp only [pre_collapse.indirect.move_up];
                                             rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
-                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => cases mem_cases with
-                                                                                                 | head _ => simp only [get_rule.direct.loop];
+                                                                                                 | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                                              simp +arith +decide;
                                                                                                  | tail _ mem_cases => trivial; );
                        /- Indirect Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -9602,10 +9598,10 @@ namespace COVERAGE.UP.T2E
                                             simp only [pre_collapse.indirect.move_up];
                                             rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
-                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => cases mem_cases with
-                                                                                                 | head _ => simp only [get_rule.direct.loop];
+                                                                                                 | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                                              simp +arith +decide;
                                                                                                  | tail _ mem_cases => trivial; );
                        /- Indirect Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -9668,10 +9664,10 @@ namespace COVERAGE.UP.T2E
                        simp only [pre_collapse.indirect.move_up];
                        rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
-                       cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
+                       cases prop_mem_incomingᵤ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                   simp +arith +decide;
                                                       | tail _ mem_cases => cases mem_cases with
-                                                                            | head _ => simp only [get_rule.direct.loop];
+                                                                            | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                         simp +arith +decide;
                                                                             | tail _ mem_cases => trivial; );
   /- Indirect Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -9683,8 +9679,8 @@ namespace COVERAGE.UP.T2E
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
     ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
     ( type2_elimination (get_rule V0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G V1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G V0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges V1 )
+                         ∧ ( edge ∈ G.get_inc_dedges V0 ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
   ∧ ( type0_elimination (get_rule V1 G) → type2_elimination (get_rule V1 CLPS) )
@@ -9828,10 +9824,10 @@ namespace COVERAGE.UP.T2E
                                             simp only [pre_collapse.indirect.move_up];
                                             rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
-                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => cases mem_cases with
-                                                                                                 | head _ => simp only [get_rule.direct.loop];
+                                                                                                 | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                                              simp +arith +decide;
                                                                                                  | tail _ mem_cases => trivial; );
                        /- Indirect Paths -/------------------------------------------------------------------------------------------------------------------------------
@@ -9914,10 +9910,10 @@ namespace COVERAGE.UP.T2E
                                             simp only [pre_collapse.indirect.move_up];
                                             rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
-                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => cases mem_cases with
-                                                                                                 | head _ => simp only [get_rule.direct.loop];
+                                                                                                 | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                                              simp +arith +decide;
                                                                                                  | tail _ mem_cases => trivial; );
                        /- Indirect Paths -/------------------------------------------------------------------------------------------------------------------------------
@@ -9988,10 +9984,10 @@ namespace COVERAGE.UP.T2E
                        simp only [pre_collapse.indirect.move_up];
                        rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                        rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
-                       cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
+                       cases prop_mem_incomingᵥ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                   simp +arith +decide;
                                                       | tail _ mem_cases => cases mem_cases with
-                                                                            | head _ => simp only [get_rule.direct.loop];
+                                                                            | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                         simp +arith +decide;
                                                                             | tail _ mem_cases => trivial; );
   /- Indirect Paths -/------------------------------------------------------------------------------------------------------------------------------
@@ -10002,8 +9998,8 @@ namespace COVERAGE.UP.T2I
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T2I {U0 U1 : Node} {G : DLDS} :
     ( type2_introduction (get_rule U0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
+                         ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( ¬type2_elimination (get_rule U1 G) )
   ∧ ( ¬type2_introduction (get_rule U1 G) )
@@ -10168,8 +10164,8 @@ namespace COVERAGE.UP.T2I
     ( CLPS.is_collapse U0 V0 G ) →
     ( type2_introduction (get_rule U0 G) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
+                         ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
   ∧ ( type0_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
@@ -10300,7 +10296,7 @@ namespace COVERAGE.UP.T2I
                                             simp only [pre_collapse.indirect.move_up];
                                             rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
-                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => trivial; );
                        /- Indirect Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -10375,7 +10371,7 @@ namespace COVERAGE.UP.T2I
                                             simp only [pre_collapse.indirect.move_up];
                                             rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                                             rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
-                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵤ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => trivial; );
                        /- Indirect Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -10438,7 +10434,7 @@ namespace COVERAGE.UP.T2I
                        simp only [pre_collapse.indirect.move_up];
                        rewrite [←Prop_Edge_Origᵤ, ←Prop_Edge_Destᵤ];
                        rewrite [prop_incomingᵤ₀] at prop_mem_incomingᵤ₀;
-                       cases prop_mem_incomingᵤ₀ with | head _ => simp only [get_rule.direct.loop];
+                       cases prop_mem_incomingᵤ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                   simp +arith +decide;
                                                       | tail _ mem_cases => trivial; );
   /- Indirect Edges -/------------------------------------------------------------------------------------------------------------------------------
@@ -10450,8 +10446,8 @@ namespace COVERAGE.UP.T2I
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
     ( U0.id > 0 ) → ( check_numbers (U0.id::U0.past) ) →
     ( type2_introduction (get_rule V0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G V1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G V0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges V1 )
+                         ∧ ( edge ∈ G.get_inc_dedges V0 ) ) →
     ------------------------------------------------------
     ( V1.level = V0.level + 1 )
   ∧ ( type0_elimination (get_rule V1 G) → type2_elimination (get_rule V1 CLPS) )
@@ -10592,7 +10588,7 @@ namespace COVERAGE.UP.T2I
                                             simp only [pre_collapse.indirect.move_up];
                                             rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
-                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => trivial; );
                        /- Indirect Paths -/------------------------------------------------------------------------------------------------------------------------------
@@ -10675,7 +10671,7 @@ namespace COVERAGE.UP.T2I
                                             simp only [pre_collapse.indirect.move_up];
                                             rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                                             rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
-                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
+                                            cases prop_mem_incomingᵥ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                                        simp +arith +decide;
                                                                            | tail _ mem_cases => trivial; );
                        /- Indirect Paths -/------------------------------------------------------------------------------------------------------------------------------
@@ -10746,7 +10742,7 @@ namespace COVERAGE.UP.T2I
                        simp only [pre_collapse.indirect.move_up];
                        rewrite [←Prop_Edge_Origᵥ, ←Prop_Edge_Destᵥ];
                        rewrite [prop_incomingᵥ₀] at prop_mem_incomingᵥ₀;
-                       cases prop_mem_incomingᵥ₀ with | head _ => simp only [get_rule.direct.loop];
+                       cases prop_mem_incomingᵥ₀ with | head _ => simp only [DLDS.get_dir_aedges.loop];
                                                                   simp +arith +decide;
                                                       | tail _ mem_cases => trivial; );
   /- Indirect Paths -/------------------------------------------------------------------------------------------------------------------------------
@@ -10758,8 +10754,8 @@ namespace COVERAGE.UP.T1X
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T1X {U0 U1 : Node} {G : DLDS} :
     ( type1_collapse (get_rule U0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
+                         ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( ¬type0_elimination (get_rule U1 G) )
   ∧ ( ¬type0_introduction (get_rule U1 G) )
@@ -10873,8 +10869,8 @@ namespace COVERAGE.UP.T1X
     ( CLPS.is_collapse U0 V0 G ) →
     ( type1_collapse (get_rule U0 G) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
+                         ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
   ∧ ( type2_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
@@ -11181,8 +11177,8 @@ namespace COVERAGE.UP.T3X
   /- Lemma: Restrictions on Upper Nodes -/
   theorem Not_Above_T3X {U0 U1 : Node} {G : DLDS} :
     ( type3_collapse (get_rule U0 G) ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
+                         ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( ¬type0_elimination (get_rule U1 G) )
   ∧ ( ¬type0_introduction (get_rule U1 G) )
@@ -11297,8 +11293,8 @@ namespace COVERAGE.UP.T3X
     ( CLPS.is_collapse U0 V0 G ) →
     ( type3_collapse (get_rule U0 G) ) →
     ( V0.id > 0 ) →
-    ( ∃(edge : DEdge), ( edge ∈ DLDS.get_out_dedges G U1 )
-                         ∧ ( edge ∈ DLDS.get_inc_dedges G U0 ) ) →
+    ( ∃(edge : DEdge), ( edge ∈ G.get_out_dedges U1 )
+                         ∧ ( edge ∈ G.get_inc_dedges U0 ) ) →
     ------------------------------------------------------
     ( U1.level = U0.level + 1 )
   ∧ ( type2_elimination (get_rule U1 G) → type2_elimination (get_rule U1 CLPS) )
