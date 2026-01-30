@@ -234,10 +234,13 @@ namespace List
   notation:66 l₁:40 " − " l₂:40 => List.eraseDups (List.removeAll l₁ l₂)
 end List
 
+def Node.nonroot (x : Node) : Prop := x.id > 0 ∧ x.level > 0
+
 /- Neighborhood Type Hierarchy -/
 /- Neighborhood: Type 0 (Non-Collapsed Node Without Incoming AEdge Paths) ⊇-Elimination -/
 def type0_elimination (N : Neighborhood) : Prop :=
-    ( N.center.id > 0 ) ∧ ( N.center.level > 0 ) ∧ ( N.center.isHypothesis = false )
+    ( N.center.id > 0 ) ∧ ( N.center.level > 0 )
+  ∧ ( N.center.isHypothesis = false )
   ∧ ( N.center.isCollapsed = false ) ∧ ( N.center.past = [] )
   ∧ ( ∃(inc_nbr out_nbr : Nat),
       ∃(antecedent out_fml : Formula),
