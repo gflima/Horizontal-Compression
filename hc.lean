@@ -217,38 +217,38 @@ def type0_elimination (N : Neighborhood) : Prop :=
   X.isNonRoot ∧ X.isHypothesis = false ∧ X.isCollapsed = false ∧ X.past = []
   ∧ ∃ (i j : Nat) (A C : Formula)
       (AX_isH A_isH : Bool) (AX_deps A_deps : List Formula),
-      i > 0 ∧ j > 0
-      -- incoming dedges
-      ∧ N.din = [
-        {orig  := {id           := i + 1, -- major premise (A⊃X)
-                   level        := X.level + 1,
-                   formula      := A ⊃ X.formula,
-                   isHypothesis := AX_isH,
-                   isCollapsed  := false,
-                   past         := []},
-         dest  := X,
-         color := 0,
-         deps  := #AX_deps},
-        {orig  := {id           := i,     -- minor premise (A)
-                   level        := X.level + 1,
-                   formula      := A,
-                   isHypothesis := A_isH,
-                   isCollapsed  := false,
-                   past         := []},
-         dest  := X,                      -- conclusion (X)
-         color := 0,
-         deps  := #A_deps}]
+    i > 0 ∧ j > 0
+    -- incoming dedges
+    ∧ N.din = [
+      {orig  := {id           := i + 1, -- major premise (A⊃X)
+                 level        := X.level + 1,
+                 formula      := A ⊃ X.formula,
+                 isHypothesis := AX_isH,
+                 isCollapsed  := false,
+                 past         := []},
+       dest  := X,
+       color := 0,
+       deps  := #AX_deps},
+      {orig  := {id           := i,     -- minor premise (A)
+                 level        := X.level + 1,
+                 formula      := A,
+                 isHypothesis := A_isH,
+                 isCollapsed  := false,
+                 past         := []},
+       dest  := X,                      -- conclusion (X)
+       color := 0,
+       deps  := #A_deps}]
     -- outgoing dedges
     ∧ N.dout = [
-        {orig  := X,
-         dest  := {id           := j,
-                   level        := X.level - 1,
-                   formula      := C,
-                   isHypothesis := false,
-                   isCollapsed  := false,
-                   past         := []},
-         color := 0,
-         deps  := A_deps ∪ AX_deps}]
+      {orig  := X,
+       dest  := {id           := j,
+                 level        := X.level - 1,
+                 formula      := C,
+                 isHypothesis := false,
+                 isCollapsed  := false,
+                 past         := []},
+       color := 0,
+       deps  := A_deps ∪ AX_deps}]
     -- incoming aedges
     ∧ N.ain = []
     -- incoming aedges-up
@@ -260,49 +260,58 @@ def type0_introduction (N : Neighborhood) : Prop :=
   let X := N.center
   X.isNonRoot ∧ X.isHypothesis = false ∧ X.isCollapsed = false ∧ X.past = []
   ∧ ∃ (i j : Nat) (A B C : Formula) (B_deps : List Formula),
-      i > 0 ∧ j > 0 ∧ X.formula = A ⊃ B
-      -- incoming edges
-      ∧ N.din = [
-        {orig  := {id           := i, -- premise (B)
-                   level        := X.level + 1,
-                   formula      := B,
-                   isHypothesis := false,
-                   isCollapsed  := false,
-                   past         := []},
-         dest  := X,                 -- conclusion (X=A⊃B)
-         color := 0,
-         deps  := #B_deps}]
-      -- outgoing edges
-      ∧ N.dout = [
-        {orig  := X,
-         dest  := {id           := j,
-                   level        := X.level - 1,
-                   formula      := C,
-                   isHypothesis := false,
-                   isCollapsed  := false,
-                   past := []},
-         color := 0,
-         deps  := B_deps − [A]}]
-      -- incoming aedges
-      ∧ N.ain   = []
-      -- incoming aedges-up
-      ∧ N.ainUp = []
-
-def type0_hypothesis (N : Neighborhood) : Prop :=
-    ( N.center.id > 0 ) ∧ ( N.center.level > 0 ) ∧ ( N.center.isHypothesis = true )
-  ∧ ( N.center.isCollapsed = false ) ∧ ( N.center.past = [] )
-  ∧ ( ∃(out_nbr : Nat),
-      ∃(out_fml : Formula),
-    ------------------------------------------------------
-      ( out_nbr > 0 )
-    ∧ N.din = []
-    ∧ N.dout = [ DEdge.mk N.center
-                             (Node.mk out_nbr (N.center.level-1) out_fml false false [])
-                             0
-                             [N.center.formula] ]
+    i > 0 ∧ j > 0 ∧ X.formula = A ⊃ B
+    -- incoming edges
+    ∧ N.din = [
+      {orig  := {id           := i, -- premise (B)
+                 level        := X.level + 1,
+                 formula      := B,
+                 isHypothesis := false,
+                 isCollapsed  := false,
+                 past         := []},
+       dest  := X,                 -- conclusion (X=A⊃B)
+       color := 0,
+       deps  := #B_deps}]
+    -- outgoing edges
+    ∧ N.dout = [
+      {orig  := X,
+       dest  := {id           := j,
+                 level        := X.level - 1,
+                 formula      := C,
+                 isHypothesis := false,
+                 isCollapsed  := false,
+                 past         := []},
+       color := 0,
+       deps  := B_deps − [A]}]
+    -- incoming aedges
     ∧ N.ain   = []
-    ∧ N.ainUp = [] )
-    -----------------------------------------------------------------------------------------------------------------------------------------
+    -- incoming aedges-up
+    ∧ N.ainUp = []
+
+-- non-root, non-collapsed X is a hypothesis
+-- no incoming dedges, aedges / aedges-up
+def type0_hypothesis (N : Neighborhood) : Prop :=
+  let X := N.center
+  X.isNonRoot ∧ X.isHypothesis = true ∧ X.isCollapsed = false ∧ X.past = []
+  ∧ ∃ (j : Nat) (C : Formula),
+    j > 0
+    -- incoming edges
+    ∧ N.din = []
+    -- outgoing edges
+    ∧ N.dout = [
+      {orig  := X,
+       dest  := {id           := j,
+                 level        := X.level - 1,
+                 formula      := C,
+                 isHypothesis := false,
+                 isCollapsed  := false,
+                 past         := []},
+       color := 0,
+       deps  := [X.formula]}]
+    -- incoming aedges
+    ∧ N.ain   = []
+    -- incoming aedges-up
+    ∧ N.ainUp = []
 
 def check_nonempty_and_nonzero (ns : List Nat) : Prop :=
   ns ≠ [] ∧ ∀ {n : Nat}, n ∈ ns → n > 0
@@ -1976,7 +1985,7 @@ namespace COVERAGE.T1_Of_T0
     ( type1_pre_collapse (pre_collapse N) ) := by
   intro prop_type;
   cases prop_type with | intro prop_nbr prop_type =>
-  cases prop_type with | intro prop_lvl prop_type =>
+  cases prop_nbr with | intro prop_nbr prop_lvl =>
   cases prop_type with | intro prop_hpt prop_type =>
   cases prop_type with | intro prop_col prop_type =>
   cases prop_type with | intro prop_pst prop_type =>
@@ -7687,9 +7696,9 @@ namespace COVERAGE.UP.T0H
   cases prop_type with | intro _ prop_type =>
   cases prop_type with | intro _ prop_type =>
   cases prop_type with | intro _ prop_type =>
-  cases prop_type with | intro _ prop_type =>
+  -- cases prop_type with | intro _ prop_type =>
   cases prop_type with | intro prop_incoming _ =>
-  exact prop_incoming;
+  apply prop_incoming;
 end COVERAGE.UP.T0H
 
 namespace COVERAGE.UP.T0E
@@ -8063,7 +8072,7 @@ namespace COVERAGE.UP.T0E
   simp only [DLDS.neighborhood] at prop_typeᵤ₁;
   simp only [type0_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
-  cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
+  cases prop_nbrᵤ₁ with | intro prop_nbrᵤ₁ prop_lvlᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_hptᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_colᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_pstᵤ₁ prop_typeᵤ₁ =>
@@ -8365,7 +8374,7 @@ namespace COVERAGE.UP.T0E
   simp only [DLDS.neighborhood] at prop_typeᵥ₁;
   simp only [type0_hypothesis] at prop_typeᵥ₁;
   cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
-  cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
+  cases prop_nbrᵥ₁ with | intro prop_nbrᵥ₁ prop_lvlᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_hptᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_colᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_pstᵥ₁ prop_typeᵥ₁ =>
@@ -8800,7 +8809,7 @@ namespace COVERAGE.UP.T0I
   simp only [DLDS.neighborhood] at prop_typeᵤ₁;
   simp only [type0_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
-  cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
+  cases prop_nbrᵤ₁ with | intro prop_nbrᵤ₁ prop_lvlᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_hptᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_colᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_pstᵤ₁ prop_typeᵤ₁ =>
@@ -9090,7 +9099,7 @@ namespace COVERAGE.UP.T0I
   simp only [DLDS.neighborhood] at prop_typeᵥ₁;
   simp only [type0_hypothesis] at prop_typeᵥ₁;
   cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
-  cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
+  cases prop_nbrᵥ₁ with | intro prop_nbrᵥ₁ prop_lvlᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_hptᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_colᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_pstᵥ₁ prop_typeᵥ₁ =>
@@ -9591,7 +9600,7 @@ namespace COVERAGE.UP.T2E
   simp only [DLDS.neighborhood] at prop_typeᵤ₁;
   simp only [type0_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
-  cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
+  cases prop_nbrᵤ₁ with | intro prop_nbrᵤ₁ prop_lvlᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_hptᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_colᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_pstᵤ₁ prop_typeᵤ₁ =>
@@ -9903,7 +9912,7 @@ namespace COVERAGE.UP.T2E
   simp only [DLDS.neighborhood] at prop_typeᵥ₁;
   simp only [type0_hypothesis] at prop_typeᵥ₁;
   cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
-  cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
+  cases prop_nbrᵥ₁ with | intro prop_nbrᵥ₁ prop_lvlᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_hptᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_colᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_pstᵥ₁ prop_typeᵥ₁ =>
@@ -10361,7 +10370,7 @@ namespace COVERAGE.UP.T2I
   simp only [DLDS.neighborhood] at prop_typeᵤ₁;
   simp only [type0_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
-  cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
+  cases prop_nbrᵤ₁ with | intro prop_nbrᵤ₁ prop_lvlᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_hptᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_colᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_pstᵤ₁ prop_typeᵤ₁ =>
@@ -10661,7 +10670,7 @@ namespace COVERAGE.UP.T2I
   simp only [DLDS.neighborhood] at prop_typeᵥ₁;
   simp only [type0_hypothesis] at prop_typeᵥ₁;
   cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
-  cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
+  cases prop_nbrᵥ₁ with | intro prop_nbrᵥ₁ prop_lvlᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_hptᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_colᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_pstᵥ₁ prop_typeᵥ₁ =>
@@ -10831,7 +10840,6 @@ namespace COVERAGE.UP.T1X
   apply absurd Prop_Directᵤ₁;
   simp only [DLDS.neighborhood] at prop_typeᵤ₁;
   simp only [type0_hypothesis] at prop_typeᵤ₁;
-  cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -11255,7 +11263,6 @@ namespace COVERAGE.UP.T3X
   apply absurd Prop_Directᵤ₁;
   simp only [DLDS.neighborhood] at prop_typeᵤ₁;
   simp only [type0_hypothesis] at prop_typeᵤ₁;
-  cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
