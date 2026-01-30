@@ -78,9 +78,15 @@ theorem Node.mk.injEq' {x y : Node} :
   match x, y with
   | .mk _ _ _ _ _ _, .mk _ _ _ _ _ _ => simp only [Node.mk.injEq];
 
+def Node.isRoot (x : Node) : Prop :=
+  x.id = 0 ∧ x.level = 0
+
+def Node.isNonRoot (x : Node) : Prop :=
+  x.id > 0 ∧ x.level > 0
+
 structure DEdge where
-  orig  : Node                  -- origin
-  dest  : Node                  -- destination
+  orig  : Node
+  dest  : Node
   color : Nat
   deps  : List Formula
   deriving Repr
@@ -204,10 +210,10 @@ end
 
 structure Neighborhood where
   center      : Node        -- central node
-  din         : List DEdge  -- d-edges arriving at center
-  dout        : List DEdge  -- d-edges leaving center
-  ain         : List AEdge  -- a-edges arriving at center
-  ain_parent  : List AEdge  -- a-edges arriving at some parent of center
+  din         : List DEdge  -- dedges arriving at center
+  dout        : List DEdge  -- dedges leaving center
+  ain         : List AEdge  -- aedges arriving at center
+  ain_parent  : List AEdge  -- aedges arriving at some parent of center
   deriving Repr
 
 def Neighborhood.decEq (N₁ N₂ : Neighborhood) : Decidable (N₁ = N₂) :=
@@ -234,39 +240,46 @@ namespace List
   notation:66 l₁:40 " − " l₂:40 => List.eraseDups (List.removeAll l₁ l₂)
 end List
 
-def Node.nonroot (x : Node) : Prop := x.id > 0 ∧ x.level > 0
+/- Type 0 (Non-Collapsed Node Without Incoming AEdge Paths) ⊇-Elimination -/
 
-/- Neighborhood Type Hierarchy -/
-/- Neighborhood: Type 0 (Non-Collapsed Node Without Incoming AEdge Paths) ⊇-Elimination -/
 def type0_elimination (N : Neighborhood) : Prop :=
-    ( N.center.id > 0 ) ∧ ( N.center.level > 0 )
-  ∧ ( N.center.isHypothesis = false )
-  ∧ ( N.center.isCollapsed = false ) ∧ ( N.center.past = [] )
-  ∧ ( ∃(inc_nbr out_nbr : Nat),
-      ∃(antecedent out_fml : Formula),
-      ∃(major_hpt minor_hpt : Bool),
-      ∃(major_dep minor_dep : List Formula),
-      ------------------------------------------------------
-      ( inc_nbr > 0 ) ∧ ( out_nbr > 0 )
-    ∧ N.din = [ DEdge.mk (Node.mk (inc_nbr+1)
-                                   (N.center.level+1)
-                                   (antecedent⊃N.center.formula)
-                                   (major_hpt)
-                                   (false)
-                                   []) /- Left Child & Major Premise -/
-                             N.center
-                             0
-                             (List.eraseDups major_dep),
-                        DEdge.mk (Node.mk inc_nbr (N.center.level+1) antecedent minor_hpt false []) /- Right Child & Minor Premise -/
-                             N.center
-                             0
-                             (List.eraseDups minor_dep)]
-    ∧ N.dout = [ DEdge.mk N.center
-                             (Node.mk out_nbr (N.center.level-1) out_fml false false [])
-                             0
-                             (List.eraseDups (minor_dep ++ major_dep))]
-    ∧ N.ain   = []
-    ∧ N.ain_parent = [] )
+  let X := N.center
+  X.isNonRoot ∧ X.isHypothesis = false ∧ X.isCollapsed = false ∧ X.past = []
+  ∧ ∃ (inc_nbr out_nbr : Nat)
+      (antecedent out_fml : Formula)
+      (major_hpt minor_hpt : Bool)
+      (major_dep minor_dep : List Formula),
+      inc_nbr > 0 ∧ out_nbr > 0
+      -- incoming dedges
+      ∧ N.din = [
+        {orig  := {id           := inc_nbr + 1, -- major premise
+                   level        := X.level + 1,
+                   formula      := antecedent ⊃ X.formula,
+                   isHypothesis := major_hpt,
+                   isCollapsed  := false,
+                   past         := []},
+         dest  := X,
+         color := 0,
+         deps  := (List.eraseDups major_dep)},
+        {orig  := {id           := inc_nbr,     -- minor premise
+                   level        := X.level + 1,
+                   formula      := antecedent,
+                   isHypothesis := minor_hpt,
+                   isCollapsed  := false,
+                   past         := []},
+         dest  := X,
+         color := 0,
+         deps  := (List.eraseDups minor_dep)}]
+    -- outgoing dedges
+    ∧ N.dout = [
+        {orig  := X,
+         dest  := (Node.mk out_nbr (X.level-1) out_fml false false []),
+         color := 0,
+         deps  := (List.eraseDups (minor_dep ++ major_dep))}]
+    -- incoming dedges
+    ∧ N.ain = []
+    -- incoming parent dedges
+    ∧ N.ain_parent = []
 
 /- Neighborhood: Type 0 (Non-Collapsed Node Without Incoming AEdge Paths) ⊇-Introduction -/
 def type0_introduction (RULE : Neighborhood) : Prop :=
@@ -1678,9 +1691,8 @@ namespace COVERAGE.T1_Of_T0
     ---------------------------
     ( type1_pre_collapse (pre_collapse RULE) ) := by
   intro prop_type;
-  simp only [type0_elimination] at prop_type;
   cases prop_type with | intro prop_nbr prop_type =>
-  cases prop_type with | intro prop_lvl prop_type =>
+  cases prop_nbr  with | intro prop_nbr prop_lvl =>
   cases prop_type with | intro prop_hpt prop_type =>
   cases prop_type with | intro prop_col prop_type =>
   cases prop_type with | intro prop_pst prop_type =>
@@ -1697,7 +1709,7 @@ namespace COVERAGE.T1_Of_T0
   cases prop_type with | intro prop_incoming prop_type =>
   cases prop_type with | intro prop_outgoing prop_type =>
   cases prop_type with | intro prop_direct prop_indirect =>
-  /- Unfold Goal: -/
+/- Unfold Goal: -/
   simp only [pre_collapse];
   simp only [prop_hpt, prop_col];
   simp only [prop_incoming, prop_outgoing, prop_direct];
@@ -1854,7 +1866,6 @@ namespace COVERAGE.T1_Of_T0
     ---------------------------
     ( type1_pre_collapse (pre_collapse RULE) ) := by
   intro prop_type;
-  simp only [type0_introduction] at prop_type;
   cases prop_type with | intro prop_nbr prop_type =>
   cases prop_type with | intro prop_lvl prop_type =>
   cases prop_type with | intro prop_hpt prop_type =>
@@ -1979,7 +1990,6 @@ namespace COVERAGE.T1_Of_T0
     ---------------------------
     ( type1_pre_collapse (pre_collapse RULE) ) := by
   intro prop_type;
-  simp only [type0_hypothesis] at prop_type;
   cases prop_type with | intro prop_nbr prop_type =>
   cases prop_type with | intro prop_lvl prop_type =>
   cases prop_type with | intro prop_hpt prop_type =>
@@ -7685,7 +7695,6 @@ namespace COVERAGE.UP.T0H
     ( G.din NODE = [] ) := by
   intro prop_type;
   simp only [DLDS.neighborhood] at prop_type;
-  simp only [type0_hypothesis] at prop_type;
   cases prop_type with | intro _ prop_type =>
   cases prop_type with | intro _ prop_type =>
   cases prop_type with | intro _ prop_type =>
@@ -7709,10 +7718,8 @@ namespace COVERAGE.UP.T0E
   ∧ ( ¬type2_introduction (DLDS.neighborhood G U1) )
   ∧ ( ¬type2_hypothesis (DLDS.neighborhood G U1) ) := by
   intro prop_typeᵤ₀;
-  simp only [DLDS.neighborhood] at prop_typeᵤ₀;
-  simp only [type0_elimination] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
-  cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
+  cases prop_nbrᵤ₀ with | intro prop_nbrᵤ₀ prop_lvlᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_hptᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_colᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_pstᵤ₀ prop_typeᵤ₀ =>
@@ -7869,7 +7876,7 @@ namespace COVERAGE.UP.T0E
   simp only [DLDS.neighborhood] at prop_typeᵤ₀;
   simp only [type0_elimination] at prop_typeᵤ₀;
   cases prop_typeᵤ₀ with | intro prop_nbrᵤ₀ prop_typeᵤ₀ =>
-  cases prop_typeᵤ₀ with | intro prop_lvlᵤ₀ prop_typeᵤ₀ =>
+  cases prop_nbrᵤ₀ with | intro prop_nbrᵤ₀ prop_lvlᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_hptᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_colᵤ₀ prop_typeᵤ₀ =>
   cases prop_typeᵤ₀ with | intro prop_pstᵤ₀ prop_typeᵤ₀ =>
@@ -7911,7 +7918,7 @@ namespace COVERAGE.UP.T0E
                        simp only [DLDS.neighborhood] at prop_typeᵤ₁;
                        simp only [type0_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
-                       cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
+                       cases prop_nbrᵤ₁ with | intro prop_nbrᵤ₁ prop_lvlᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_hptᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_colᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_pstᵤ₁ prop_typeᵤ₁ =>
@@ -8157,7 +8164,7 @@ namespace COVERAGE.UP.T0E
   simp only [DLDS.neighborhood] at prop_typeᵥ₀;
   simp only [type0_elimination] at prop_typeᵥ₀;
   cases prop_typeᵥ₀ with | intro prop_nbrᵥ₀ prop_typeᵥ₀ =>
-  cases prop_typeᵥ₀ with | intro prop_lvlᵥ₀ prop_typeᵥ₀ =>
+  cases prop_nbrᵥ₀ with | intro prop_nbrᵥ₀ prop_lvlᵥ₀ =>
   cases prop_typeᵥ₀ with | intro prop_hptᵥ₀ prop_typeᵥ₀ =>
   cases prop_typeᵥ₀ with | intro prop_colᵥ₀ prop_typeᵥ₀ =>
   cases prop_typeᵥ₀ with | intro prop_pstᵥ₀ prop_typeᵥ₀ =>
@@ -8197,7 +8204,7 @@ namespace COVERAGE.UP.T0E
                        simp only [DLDS.neighborhood] at prop_typeᵥ₁;
                        simp only [type0_elimination] at prop_typeᵥ₁;
                        cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
-                       cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
+                       cases prop_nbrᵥ₁ with | intro prop_nbrᵥ₁ prop_lvlᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_hptᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_colᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_pstᵥ₁ prop_typeᵥ₁ =>
@@ -8654,7 +8661,7 @@ namespace COVERAGE.UP.T0I
                        simp only [DLDS.neighborhood] at prop_typeᵤ₁;
                        simp only [type0_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
-                       cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
+                       cases prop_nbrᵤ₁ with | intro prop_nbrᵤ₁ prop_lvlᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_hptᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_colᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_pstᵤ₁ prop_typeᵤ₁ =>
@@ -8928,7 +8935,7 @@ namespace COVERAGE.UP.T0I
                        simp only [DLDS.neighborhood] at prop_typeᵥ₁;
                        simp only [type0_elimination] at prop_typeᵥ₁;
                        cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
-                       cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
+                       cases prop_nbrᵥ₁ with | intro prop_nbrᵥ₁ prop_lvlᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_hptᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_colᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_pstᵥ₁ prop_typeᵥ₁ =>
@@ -9441,7 +9448,7 @@ namespace COVERAGE.UP.T2E
                        simp only [DLDS.neighborhood] at prop_typeᵤ₁;
                        simp only [type0_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
-                       cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
+                       cases prop_nbrᵤ₁ with | intro prop_nbrᵤ₁ prop_lvlᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_hptᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_colᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_pstᵤ₁ prop_typeᵤ₁ =>
@@ -9737,7 +9744,7 @@ namespace COVERAGE.UP.T2E
                        simp only [DLDS.neighborhood] at prop_typeᵥ₁;
                        simp only [type0_elimination] at prop_typeᵥ₁;
                        cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
-                       cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
+                       cases prop_nbrᵥ₁ with | intro prop_nbrᵥ₁ prop_lvlᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_hptᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_colᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_pstᵥ₁ prop_typeᵥ₁ =>
@@ -10217,7 +10224,7 @@ namespace COVERAGE.UP.T2I
                        simp only [DLDS.neighborhood] at prop_typeᵤ₁;
                        simp only [type0_elimination] at prop_typeᵤ₁;
                        cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
-                       cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
+                       cases prop_nbrᵤ₁ with | intro prop_nbrᵤ₁ prop_lvlᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_hptᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_colᵤ₁ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_pstᵤ₁ prop_typeᵤ₁ =>
@@ -10501,7 +10508,7 @@ namespace COVERAGE.UP.T2I
                        simp only [DLDS.neighborhood] at prop_typeᵥ₁;
                        simp only [type0_elimination] at prop_typeᵥ₁;
                        cases prop_typeᵥ₁ with | intro prop_nbrᵥ₁ prop_typeᵥ₁ =>
-                       cases prop_typeᵥ₁ with | intro prop_lvlᵥ₁ prop_typeᵥ₁ =>
+                       cases prop_nbrᵥ₁ with | intro prop_nbrᵥ₁ prop_lvlᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_hptᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_colᵥ₁ prop_typeᵥ₁ =>
                        cases prop_typeᵥ₁ with | intro prop_pstᵥ₁ prop_typeᵥ₁ =>
@@ -10803,7 +10810,8 @@ namespace COVERAGE.UP.T1X
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
-                       cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
+                       -- cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
+                       -- cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_directᵤ₁ _ =>
                        rewrite [prop_directᵤ₁];
                        simp +decide; ); --999 exact List.not_mem_nil _; );
@@ -11226,7 +11234,7 @@ namespace COVERAGE.UP.T3X
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
-                       cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
+                       -- cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
                        cases prop_typeᵤ₁ with | intro prop_directᵤ₁ _ =>
                        rewrite [prop_directᵤ₁];
