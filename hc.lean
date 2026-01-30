@@ -186,17 +186,7 @@ structure Neighborhood where
 
 def Neighborhood.decEq (N₁ N₂ : Neighborhood) : Decidable (N₁ = N₂) :=
   match N₁, N₂ with
-  | .mk c₁ inc₁ out₁ dir₁ ind₁, .mk c₂ inc₂ out₂ dir₂ ind₂ => by
-    rewrite [Neighborhood.mk.injEq];
-    have _ : Decidable (c₁ = c₂) := Node.decEq c₁ c₂;
-    have _ : Decidable (inc₁ = inc₂) := List.hasDecEq inc₁ inc₂;
-    have _ : Decidable (out₁ = out₂) := List.hasDecEq out₁ out₂;
-    have _ : Decidable (dir₁ = dir₂) := List.hasDecEq dir₁ dir₂;
-    have _ : Decidable (ind₁ = ind₂) := List.hasDecEq ind₁ ind₂;
-    have _₁ := @instDecidableAnd (dir₁ = dir₂) (ind₁ = ind₂) _ _;
-    have _₂ := @instDecidableAnd (out₁ = out₂) (dir₁ = dir₂ ∧ ind₁ = ind₂) _ _;
-    have _₃ := @instDecidableAnd (inc₁ = inc₂) (out₁ = out₂ ∧ dir₁ = dir₂ ∧ ind₁ = ind₂) _ _;
-    exact @instDecidableAnd (c₁ = c₂) (inc₁ = inc₂ ∧ out₁ = out₂ ∧ dir₁ = dir₂ ∧ ind₁ = ind₂) _ _;
+  | _, _ => by rewrite [Neighborhood.mk.injEq] <;> apply instDecidableAnd
 
 instance : DecidableEq Neighborhood := Neighborhood.decEq
 
