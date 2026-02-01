@@ -379,17 +379,18 @@ def type2_hypothesis (N : Neighborhood) : Prop :=
     ∧ N.ainUp = []
 
 /- Neighborhood: Check Incoming Edges (Type 1 & 3) -/
-def type_incoming (N : Neighborhood) : Prop := ∀{INC : DEdge}, ( INC ∈ N.din ) → ( check INC N.center N.ainUp )
-  where check (INC : DEdge) (center : Node) (INDIRECT : List AEdge) : Prop :=
-        /- Orig Node: -/
-        ( ( INC.orig.id > 0 ) ∧ ( INC.orig.level = center.level + 1 )
-        ∧ ( INC.orig.isCollapsed = false ) ∧ ( INC.orig.past = [] ) )
-        /- Dest Node: -/
-      ∧ ( INC.dest = center )
-        /- Colors: -/
-      ∧ ( INC.color = 0 )
-        /- DEdge-AEdge Duo: -/
-      ∧ ( ∃(color : Nat)(colors : List Nat)(anc : Node), ( AEdge.mk anc INC.orig (0::color::colors) ∈ INDIRECT ) )     /- => Indirect Path => -/
+
+def type_incoming (N : Neighborhood) : Prop :=
+  ∀ {d : DEdge}, d ∈ N.din → check d N.center N.ainUp
+  where check (d : DEdge) (X : Node) (ainUp : List AEdge) : Prop :=
+    (d.orig.id > 0
+    ∧ d.orig.level = X.level + 1
+    ∧ d.orig.isCollapsed = false
+    ∧ d.orig.past = [])
+    ∧ d.dest = X
+    ∧ d.color = 0
+    ∧ ∃ (c : Nat) (cs : List Nat) (anc : Node),
+        {orig := anc, dest := d.orig, colors := 0 :: c :: cs} ∈ ainUp
 
 /- Neighborhood: Check Outgoing Edges (Type 1) -/
 def type_outgoing₁ (N : Neighborhood) : Prop := ∀{OUT : DEdge}, ( OUT ∈ N.dout ) → ( type_outgoing₁.check_h₁ OUT N.center
