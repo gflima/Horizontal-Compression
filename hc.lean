@@ -130,6 +130,9 @@ namespace List
   notation:66 l₁:40 " − " l₂:40 => List.eraseDups (List.removeAll l₁ l₂)
 end List
 
+-- Zero does not occur in `l`.
+abbrev zeroNotIn (l : List Nat) : Prop := ∀ {n : Nat}, n ∈ l → n > 0
+
 -- non-root, non-hypothesis, non-collapsed X is the conclusion of ⊃E
 -- no incoming a-edges, a-edges up
 def type0_elimination (N : Neighborhood) : Prop :=
@@ -233,9 +236,6 @@ def type0_hypothesis (N : Neighborhood) : Prop :=
     -- incoming a-edges up
     ∧ N.ainUp = []
 
-def check_nonempty_and_nonzero (ns : List Nat) : Prop :=
-  ns ≠ [] ∧ ∀ {n : Nat}, n ∈ ns → n > 0
-
 /- Neighborhood: Type 2 (Non-Collapsed Node With Incoming AEdge Paths) ⊇-Elimination -/
 
 def type2_elimination (N : Neighborhood) : Prop :=
@@ -243,12 +243,10 @@ def type2_elimination (N : Neighborhood) : Prop :=
   X.isNonRoot ∧ X.isHypothesis = false ∧ X.isCollapsed = false ∧ X.past = []
   ∧ ∃ (i j k l : Nat) (A C F : Formula)
       (AX_isH A_isH C_isH : Bool) (AX_deps A_deps : List Formula)
-      (past color : Nat) (pasts colors : List Nat),
+      (p c : Nat) (ps cs : List Nat),
     i > 0 ∧ j > 0 ∧ k > 0
-    ∧ l + List.length (0 :: color :: colors) = X.level
-    ∧ color ∈ (j :: past :: pasts)
-    ∧ check_nonempty_and_nonzero (past::pasts)
-    ∧ check_nonempty_and_nonzero (color::colors)
+    ∧ l + (0 :: c :: cs).length = X.level  -- (*)
+    ∧ c ∈ (j :: p :: ps) ∧ zeroNotIn (p :: ps) ∧ zeroNotIn (c :: cs)
     -- incoming d-edges
     ∧ N.din = [
       {orig  := {id           := i + 1, -- major premise (A⊃X)
@@ -277,19 +275,19 @@ def type2_elimination (N : Neighborhood) : Prop :=
                  formula      := C,
                  isHypothesis := C_isH,
                  isCollapsed  := true,
-                 past         := past :: pasts},
+                 past         := p :: ps},
        color := 0,
        deps  := A_deps ∪ AX_deps}]
     -- incoming a-edges
     ∧ N.ain = [
       {orig  := {id           := k,
-                 level        := l,
-                 formula      := F,
+                 level        := l,     -- by (*), F is (c::cs).length+1
+                 formula      := F,     --   levels below X
                  isHypothesis := false,
                  isCollapsed  := false,
                  past         := []},
        dest  := X,
-       colors := 0 :: color :: colors}]
+       colors := 0 :: c :: cs}]
     -- incoming a-edges up
     ∧ N.ainUp = []
 
@@ -307,7 +305,7 @@ def type2_introduction (N : Neighborhood) : Prop :=
       ( N.center.formula = antecedent⊃consequent )
     ∧ ( inc_nbr > 0 ) ∧ ( out_nbr > 0 )
     ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = N.center.level )
-    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( check_nonempty_and_nonzero (past::pasts) ) ∧ ( check_nonempty_and_nonzero (color::colors) )
+    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( zeroNotIn (past::pasts) ) ∧ ( zeroNotIn (color::colors) )
     ∧ N.din = [ DEdge.mk (Node.mk inc_nbr (N.center.level+1) consequent false false [])  /- Unique Child & Sole Premise -/
                              N.center
                              0
@@ -332,7 +330,7 @@ def type2_hypothesis (N : Neighborhood) : Prop :=
     --
       ( out_nbr > 0 )
     ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = N.center.level )
-    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( check_nonempty_and_nonzero (past::pasts) ) ∧ ( check_nonempty_and_nonzero (color::colors) )
+    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( zeroNotIn (past::pasts) ) ∧ ( zeroNotIn (color::colors) )
     ∧ N.din = []
     ∧ N.dout = [ DEdge.mk N.center
                              (Node.mk out_nbr (N.center.level-1) out_fml out_hpt true (past::pasts))
@@ -397,7 +395,7 @@ def type_outgoing₃ (N : Neighborhood) : Prop := ∀{OUT : DEdge}, ( OUT ∈ N.
       ∧ ( OUT.orig = center )
         /- Dest Node: -/
       ∧ ( ( OUT.dest.id > 0 ) ∧ ( OUT.dest.level = center.level - 1 )
-        ∧ ( OUT.dest.isCollapsed = true ) ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_nonempty_and_nonzero (past::pasts) )
+        ∧ ( OUT.dest.isCollapsed = true ) ∧ ( ∃(past : Nat)(pasts : List Nat), ( zeroNotIn (past::pasts) )
                                                                           ∧ ( OUT.dest.past = (past::pasts) ) ) )
         /- Colors: -/
       ∧ ( OUT.color ∈ (center.id::center.past) )
@@ -411,7 +409,7 @@ def type_outgoing₃ (N : Neighborhood) : Prop := ∀{OUT : DEdge}, ( OUT ∈ N.
       ∧ ( OUT.orig = center )
         /- Dest Node: -/
       ∧ ( ( OUT.dest.id > 0 ) ∧ ( OUT.dest.level = center.level - 1 )
-        ∧ ( OUT.dest.isCollapsed = true ) ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_nonempty_and_nonzero (past::pasts) )
+        ∧ ( OUT.dest.isCollapsed = true ) ∧ ( ∃(past : Nat)(pasts : List Nat), ( zeroNotIn (past::pasts) )
                                                                           ∧ ( OUT.dest.past = (past::pasts) ) ) )
         /- Colors: -/
       ∧ ( OUT.color ∈ (center.id::center.past) )
@@ -430,7 +428,7 @@ def type_direct (N : Neighborhood) : Prop := ∀{DIR : AEdge}, ( DIR ∈ N.ain )
         /- Colors: -/
       ∧ ( DIR.orig.level + List.length (DIR.colors) = center.level )
       ∧ ( ∃(color₁ color₂ : Nat),
-          ∃(colors : List Nat), ( check_nonempty_and_nonzero (color₁::color₂::colors) )
+          ∃(colors : List Nat), ( zeroNotIn (color₁::color₂::colors) )
                                ∧ ( color₁ ∈ (center.id::center.past) )
                                ∧ ( DIR.colors = (color₁::color₂::colors) )
                                  /- DEdge-AEdge Duo: -/
@@ -454,7 +452,7 @@ def type_indirect (N : Neighborhood) : Prop := ∀{IND : AEdge}, ( IND ∈ N.ain
         /- Colors: -/
       ∧ ( IND.orig.level + List.length (IND.colors) = center.level + 1 )
       ∧ ( ∃(color : Nat),
-          ∃(colors : List Nat), ( check_nonempty_and_nonzero (color::colors) )
+          ∃(colors : List Nat), ( zeroNotIn (color::colors) )
                                ∧ ( color ∈ (center.id::center.past) )
                                ∧ ( IND.colors = (0::color::colors) )
                                  /- DEdge-AEdge Trio: -/
@@ -497,7 +495,7 @@ def type1_collapse (N : Neighborhood) : Prop :=
     /- Check Center -/
     ( ( N.center.id > 0 ) ∧ ( N.center.level > 0 )
     ∧ ( N.center.isCollapsed = true )
-    ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_nonempty_and_nonzero (past::pasts) )
+    ∧ ( ∃(past : Nat)(pasts : List Nat), ( zeroNotIn (past::pasts) )
                                        ∧ ( N.center.past = (past::pasts) ) )
     /- Check DEdge Edges -/
     ∧ ( ( N.din = [] ) → ( N.center.isHypothesis = true ) )
@@ -545,7 +543,7 @@ def type3_collapse (N : Neighborhood) : Prop :=
     /- Check Center -/
     ( ( N.center.id > 0 ) ∧ ( N.center.level > 0 )
     ∧ ( N.center.isCollapsed = true )
-    ∧ ( ∃(past : Nat)(pasts : List Nat), ( check_nonempty_and_nonzero (past::pasts) )
+    ∧ ( ∃(past : Nat)(pasts : List Nat), ( zeroNotIn (past::pasts) )
                                        ∧ ( N.center.past = (past::pasts) ) )
     /- Check DEdge Edges -/
     ∧ ( ( N.din = [] ) → ( N.center.isHypothesis = true ) )
@@ -896,34 +894,43 @@ end List
 
 
 namespace COLLAPSE
-  /- Lemma: Simplify "check_nonempty_and_nonzero [UNIT]" -/
+  /- Lemma: Simplify "zeroNotIn [UNIT]" -/
   theorem Check_Numbers_Unit {UNIT : Nat} :
     ( UNIT > 0 ) →
     --
-    ( check_nonempty_and_nonzero [UNIT] ) := by
+    ( zeroNotIn [UNIT] ) := by
   intro prop_unit;
-  simp only [check_nonempty_and_nonzero];
-  exact And.intro ( by rewrite [ne_eq];
-                       simp only [List.cons_ne_self];
-                       exact not_false; )
-                  ( by intro color mem_cases;
+  simp only [zeroNotIn];
+  -- exact And.intro ( by rewrite [ne_eq];
+  --                      simp only [List.cons_ne_self];
+  --                      exact not_false; )
+  --                 ( by intro color mem_cases;
+  --                      cases mem_cases with
+  --                      | head _ => exact prop_unit;
+  --                      | tail _ mem_cases => trivial; );
+  intro color mem_cases;
                        cases mem_cases with
                        | head _ => exact prop_unit;
-                       | tail _ mem_cases => trivial; );
-  /- Lemma: Simplify "check_nonempty_and_nonzero (HEAD::TAIL)" -/
+                       | tail _ mem_cases => trivial;
+
+/- Lemma: Simplify "zeroNotIn (HEAD::TAIL)" -/
   theorem Check_Numbers_Cons {HEAD : Nat} {TAIL : List Nat} :
     ( HEAD > 0 ) →
-    ( check_nonempty_and_nonzero TAIL ) →
+    ( zeroNotIn TAIL ) →
     --
-    ( check_nonempty_and_nonzero (HEAD::TAIL) ) := by
+    ( zeroNotIn (HEAD::TAIL) ) := by
   intro prop_head prop_tail;
-  simp only [check_nonempty_and_nonzero] at prop_tail ⊢;
-  cases prop_tail with | intro prop_nil prop_mem =>
-  exact And.intro ( by simp; )
-                  ( by intro color mem_cases;
-                       cases mem_cases with
-                       | head _ => exact prop_head;
-                       | tail _ mem_cases => exact prop_mem mem_cases; );
+  simp only [zeroNotIn] at prop_tail ⊢;
+  intro color mem_cases;
+  cases mem_cases with
+  | head _ => exact prop_head;
+  | tail _ mem_cases => apply prop_tail; trivial
+  -- cases prop_tail with | intro prop_nil prop_mem =>
+  --   exact And.intro ( by simp; )
+  --                   ( by intro color mem_cases;
+  --                        cases mem_cases with
+  --                        | head _ => exact prop_head;
+  --                        | tail _ mem_cases => exact prop_mem mem_cases; );
 
   /- Lemma: Simplify "dest" at "DLDS.din" -/
   theorem Simp_Dest_Incoming {NODE : Node} {G : DLDS} {EDGE : DEdge} :
@@ -3452,8 +3459,8 @@ namespace COVERAGE.T1_Of_T1.NODES
                                                                                                                   exact And.intro ( by exact Nat.ne_of_lt prop_nbrᵤ; )
                                                                                                                                   ( by rewrite [←imp_false];
                                                                                                                                        intro Past_Zero;
-                                                                                                                                       simp only [check_nonempty_and_nonzero] at prop_check_pastᵤ;
-                                                                                                                                       cases prop_check_pastᵤ with | intro _ prop_check_pastᵤ =>
+                                                                                                                                       simp only [zeroNotIn] at prop_check_pastᵤ;
+                                                                                                                                       --cases prop_check_pastᵤ with | intro _ prop_check_pastᵤ =>
                                                                                                                                        apply absurd (prop_check_pastᵤ Past_Zero);
                                                                                                                                        trivial; );
                                                                                                  | inr GT_Zero => rewrite [←EQ_Color, GT_Zero];
@@ -4784,8 +4791,8 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                                                         exact And.intro ( by exact Nat.ne_of_lt prop_nbrᵤ; )
                                                                                                                                                         ( by rewrite [←imp_false];
                                                                                                                                                              intro Past_Zero;
-                                                                                                                                                             simp only [check_nonempty_and_nonzero] at prop_check_pastᵤ;
-                                                                                                                                                             cases prop_check_pastᵤ with | intro _ prop_check_pastᵤ =>
+                                                                                                                                                             simp only [zeroNotIn] at prop_check_pastᵤ;
+                                                                                                                                                             --cases prop_check_pastᵤ with | intro _ prop_check_pastᵤ =>
                                                                                                                                                              apply absurd (prop_check_pastᵤ Past_Zero);
                                                                                                                                                              trivial; );
                                                                                                                        | inr GT_Zero => rewrite [←EQ_Color, GT_Zero];
@@ -4980,8 +4987,8 @@ namespace COVERAGE.T3_Of_T3.NODES
                                                                                                                   exact And.intro ( by exact Nat.ne_of_lt prop_nbrᵤ; )
                                                                                                                                   ( by rewrite [←imp_false];
                                                                                                                                        intro Past_Zero;
-                                                                                                                                       simp only [check_nonempty_and_nonzero] at prop_check_pastᵤ;
-                                                                                                                                       cases prop_check_pastᵤ with | intro _ prop_check_pastᵤ =>
+                                                                                                                                       simp only [zeroNotIn] at prop_check_pastᵤ;
+                                                                                                                                       --cases prop_check_pastᵤ with | intro _ prop_check_pastᵤ =>
                                                                                                                                        apply absurd (prop_check_pastᵤ Past_Zero);
                                                                                                                                        trivial; );
                                                                                                  | inr GT_Zero => rewrite [←EQ_Color, GT_Zero];
@@ -8058,7 +8065,7 @@ namespace COVERAGE.UP.T0E
   theorem Above_Right_T0E {U0 V0 V1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
-    ( U0.id > 0 ) → ( check_nonempty_and_nonzero (U0.id::U0.past) ) →
+    ( U0.id > 0 ) → ( zeroNotIn (U0.id::U0.past) ) →
     ( type0_elimination (DLDS.neighborhood G V0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.dout V1 )
                          ∧ ( edge ∈ G.din V0 ) ) →
@@ -8164,11 +8171,12 @@ namespace COVERAGE.UP.T0E
                                             simp only [Nat.zero_add, ←Nat.add_assoc];
                                             simp only [Nat.sub_add_cancel prop_lvlᵥ₀]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );
-                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;
-                                            apply And.intro ( by simp only [ne_eq];
-                                                                 simp only [List.cons_ne_nil];
-                                                                 trivial; );
-                                            cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
+                       apply And.intro ( by simp only [zeroNotIn] at prop_pstᵤ₀ ⊢;
+                                            -- apply And.intro ( by simp only [ne_eq];
+                                            --                      simp only [List.cons_ne_nil];
+                                            --                      trivial; );
+                                            -- intro; apply prop_pstᵤ₀;
+                                            -- cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
                                             intro nbr mem_cases;
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
@@ -8251,11 +8259,11 @@ namespace COVERAGE.UP.T0E
                                             simp only [Nat.zero_add, ←Nat.add_assoc];
                                             simp only [Nat.sub_add_cancel prop_lvlᵥ₀]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );
-                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;
-                                            apply And.intro ( by simp only [ne_eq];
-                                                                 simp only [List.cons_ne_nil];
-                                                                 trivial; );
-                                            cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
+                       apply And.intro ( by simp only [zeroNotIn] at prop_pstᵤ₀ ⊢;
+                                            -- apply And.intro ( by simp only [ne_eq];
+                                            --                      simp only [List.cons_ne_nil];
+                                            --                      trivial; );
+                                            -- cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
                                             intro nbr mem_cases;
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
@@ -8326,11 +8334,11 @@ namespace COVERAGE.UP.T0E
                        simp only [Nat.zero_add, ←Nat.add_assoc];
                        simp only [Nat.sub_add_cancel prop_lvlᵥ₀]; );
   apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );
-  apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;
-                       apply And.intro ( by simp only [ne_eq];
-                                            simp only [List.cons_ne_nil];
-                                            trivial; );
-                       cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
+  apply And.intro ( by simp only [zeroNotIn] at prop_pstᵤ₀ ⊢;
+                       -- apply And.intro ( by simp only [ne_eq];
+                       --                      simp only [List.cons_ne_nil];
+                       --                      trivial; );
+                       -- cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
                        intro nbr mem_cases;
                        cases mem_cases with
                        | head => exact prop_nbrᵥ₀;
@@ -8789,7 +8797,7 @@ namespace COVERAGE.UP.T0I
   theorem Above_Right_T0I {U0 V0 V1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
-    ( U0.id > 0 ) → ( check_nonempty_and_nonzero (U0.id::U0.past) ) →
+    ( U0.id > 0 ) → ( zeroNotIn (U0.id::U0.past) ) →
     ( type0_introduction (DLDS.neighborhood G V0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.dout V1 )
                          ∧ ( edge ∈ G.din V0 ) ) →
@@ -8892,11 +8900,11 @@ namespace COVERAGE.UP.T0I
                                             simp only [Nat.zero_add, ←Nat.add_assoc];
                                             simp only [Nat.sub_add_cancel prop_lvlᵥ₀]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );
-                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;
-                                            apply And.intro ( by simp only [ne_eq];
-                                                                 simp only [List.cons_ne_nil];
-                                                                 trivial; );
-                                            cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
+                       apply And.intro ( by simp only [zeroNotIn] at prop_pstᵤ₀ ⊢;
+                                            -- apply And.intro ( by simp only [ne_eq];
+                                            --                      simp only [List.cons_ne_nil];
+                                            --                      trivial; );
+                                            -- cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
                                             intro nbr mem_cases;
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
@@ -8976,11 +8984,11 @@ namespace COVERAGE.UP.T0I
                                             simp only [Nat.zero_add, ←Nat.add_assoc];
                                             simp only [Nat.sub_add_cancel prop_lvlᵥ₀]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );
-                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;
-                                            apply And.intro ( by simp only [ne_eq];
-                                                                 simp only [List.cons_ne_nil];
-                                                                 trivial; );
-                                            cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
+                       apply And.intro ( by simp only [zeroNotIn] at prop_pstᵤ₀ ⊢;
+                                            -- apply And.intro ( by simp only [ne_eq];
+                                            --                      simp only [List.cons_ne_nil];
+                                            --                      trivial; );
+                                            -- cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
                                             intro nbr mem_cases;
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
@@ -9048,11 +9056,11 @@ namespace COVERAGE.UP.T0I
                        simp only [Nat.zero_add, ←Nat.add_assoc];
                        simp only [Nat.sub_add_cancel prop_lvlᵥ₀]; );
   apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );
-  apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;
-                       apply And.intro ( by simp only [ne_eq];
-                                            simp only [List.cons_ne_nil];
-                                            trivial; );
-                       cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
+  apply And.intro ( by simp only [zeroNotIn] at prop_pstᵤ₀ ⊢;
+                       -- apply And.intro ( by simp only [ne_eq];
+                       --                      simp only [List.cons_ne_nil];
+                       --                      trivial; );
+                       -- cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
                        intro nbr mem_cases;
                        cases mem_cases with
                        | head => exact prop_nbrᵥ₀;
@@ -9579,7 +9587,7 @@ namespace COVERAGE.UP.T2E
   theorem Above_Right_T2E {U0 V0 V1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
-    ( U0.id > 0 ) → ( check_nonempty_and_nonzero (U0.id::U0.past) ) →
+    ( U0.id > 0 ) → ( zeroNotIn (U0.id::U0.past) ) →
     ( type2_elimination (DLDS.neighborhood G V0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.dout V1 )
                          ∧ ( edge ∈ G.din V0 ) ) →
@@ -9697,11 +9705,11 @@ namespace COVERAGE.UP.T2E
                                             rewrite [←prop_anc_lvlᵥ₀];
                                             simp only [List.length, Nat.add_assoc]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );
-                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;
-                                            apply And.intro ( by simp only [ne_eq];
-                                                                 simp only [List.cons_ne_nil];
-                                                                 trivial; );
-                                            cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
+                       apply And.intro ( by simp only [zeroNotIn] at prop_pstᵤ₀ ⊢;
+                                            -- apply And.intro ( by simp only [ne_eq];
+                                            --                      simp only [List.cons_ne_nil];
+                                            --                      trivial; );
+                                            -- cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
                                             intro nbr mem_cases;
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
@@ -9783,11 +9791,11 @@ namespace COVERAGE.UP.T2E
                                             rewrite [←prop_anc_lvlᵥ₀];
                                             simp only [List.length, Nat.add_assoc]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );
-                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;
-                                            apply And.intro ( by simp only [ne_eq];
-                                                                 simp only [List.cons_ne_nil];
-                                                                 trivial; );
-                                            cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
+                       apply And.intro ( by simp only [zeroNotIn] at prop_pstᵤ₀ ⊢;
+                                            -- apply And.intro ( by simp only [ne_eq];
+                                            --                      simp only [List.cons_ne_nil];
+                                            --                      trivial; );
+                                            -- cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
                                             intro nbr mem_cases;
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
@@ -9857,11 +9865,11 @@ namespace COVERAGE.UP.T2E
                        rewrite [←prop_anc_lvlᵥ₀];
                        simp only [List.length, Nat.add_assoc]; );
   apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );
-  apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;
-                       apply And.intro ( by simp only [ne_eq];
-                                            simp only [List.cons_ne_nil];
-                                            trivial; );
-                       cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
+  apply And.intro ( by simp only [zeroNotIn] at prop_pstᵤ₀ ⊢;
+                       -- apply And.intro ( by simp only [ne_eq];
+                       --                      simp only [List.cons_ne_nil];
+                       --                      trivial; );
+                       -- cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
                        intro nbr mem_cases;
                        cases mem_cases with
                        | head => exact prop_nbrᵥ₀;
@@ -10343,7 +10351,7 @@ namespace COVERAGE.UP.T2I
   theorem Above_Right_T2I {U0 V0 V1 : Node} {G : DLDS} :
     ( CLPS.is_collapse U0 V0 G ) →
     ( U0.level = V0.level ) → ( U0.formula = V0.formula ) →
-    ( U0.id > 0 ) → ( check_nonempty_and_nonzero (U0.id::U0.past) ) →
+    ( U0.id > 0 ) → ( zeroNotIn (U0.id::U0.past) ) →
     ( type2_introduction (DLDS.neighborhood G V0) ) →
     ( ∃(edge : DEdge), ( edge ∈ G.dout V1 )
                          ∧ ( edge ∈ G.din V0 ) ) →
@@ -10458,11 +10466,11 @@ namespace COVERAGE.UP.T2I
                                             rewrite [←prop_anc_lvlᵥ₀];
                                             simp only [List.length, Nat.add_assoc]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );
-                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;
-                                            apply And.intro ( by simp only [ne_eq];
-                                                                 simp only [List.cons_ne_nil];
-                                                                 trivial; );
-                                            cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
+                       apply And.intro ( by simp only [zeroNotIn] at prop_pstᵤ₀ ⊢;
+                                            -- apply And.intro ( by simp only [ne_eq];
+                                            --                      simp only [List.cons_ne_nil];
+                                            --                      trivial; );
+                                            -- cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
                                             intro nbr mem_cases;
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
@@ -10541,11 +10549,11 @@ namespace COVERAGE.UP.T2I
                                             rewrite [←prop_anc_lvlᵥ₀];
                                             simp only [List.length, Nat.add_assoc]; );
                        apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );
-                       apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;
-                                            apply And.intro ( by simp only [ne_eq];
-                                                                 simp only [List.cons_ne_nil];
-                                                                 trivial; );
-                                            cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
+                       apply And.intro ( by simp only [zeroNotIn] at prop_pstᵤ₀ ⊢;
+                                            -- apply And.intro ( by simp only [ne_eq];
+                                            --                      simp only [List.cons_ne_nil];
+                                            --                      trivial; );
+                                            -- cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
                                             intro nbr mem_cases;
                                             cases mem_cases with
                                             | head => exact prop_nbrᵥ₀;
@@ -10612,11 +10620,11 @@ namespace COVERAGE.UP.T2I
                        rewrite [←prop_anc_lvlᵥ₀];
                        simp only [List.length, Nat.add_assoc]; );
   apply And.intro ( by exact List.Mem.tail U0.id (List.Mem.head U0.past); );
-  apply And.intro ( by simp only [check_nonempty_and_nonzero] at prop_pstᵤ₀ ⊢;
-                       apply And.intro ( by simp only [ne_eq];
-                                            simp only [List.cons_ne_nil];
-                                            trivial; );
-                       cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
+  apply And.intro ( by simp only [zeroNotIn] at prop_pstᵤ₀ ⊢;
+                       -- apply And.intro ( by simp only [ne_eq];
+                       --                      simp only [List.cons_ne_nil];
+                       --                      trivial; );
+                       -- cases prop_pstᵤ₀ with | intro _ prop_pstᵤ₀ =>
                        intro nbr mem_cases;
                        cases mem_cases with
                        | head => exact prop_nbrᵥ₀;
