@@ -291,32 +291,34 @@ def type2_elimination (N : Neighborhood) : Prop :=
     -- incoming a-edges up
     ∧ N.ainUp = []
 
-
 def type2_introduction (N : Neighborhood) : Prop :=
   let X := N.center
-  X.isNonRoot ∧ ( X.isHypothesis = false )
-  ∧ ( X.isCollapsed = false ) ∧ ( X.past = [] )
-  ∧ ( ∃(inc_nbr out_nbr anc_nbr anc_lvl : Nat),
-      ∃(antecedent consequent out_fml anc_fml : Formula),
-      ∃(out_hpt : Bool),
-      ∃(inc_dep : List Formula),
-      ∃(past color : Nat)(pasts colors : List Nat),
-      ( X.formula = antecedent⊃consequent )
-    ∧ ( inc_nbr > 0 ) ∧ ( out_nbr > 0 )
-    ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = X.level )
-    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( zeroNotIn (past::pasts) ) ∧ ( zeroNotIn (color::colors) )
-    ∧ N.din = [ DEdge.mk (Node.mk inc_nbr (X.level+1) consequent false false [])
-                             X
-                             0
-                             (List.eraseDups inc_dep)]
-    ∧ N.dout = [ DEdge.mk X
-                             (Node.mk out_nbr (X.level-1) out_fml out_hpt true (past::pasts))
-                             0
-                             (inc_dep − [antecedent]) ]
-    ∧ N.ain   = [ AEdge.mk (Node.mk anc_nbr anc_lvl anc_fml false false [])
-                             X
-                             (0::color::colors) ]
-    ∧ N.ainUp = [] )
+  X.isNonRoot ∧ X.isHypothesis = false ∧ X.isCollapsed = false ∧ X.past = []
+  ∧ ∃ (i j k l : Nat) (A B C F : Formula)
+      (C_isH : Bool) (B_deps : List Formula)
+      (p c : Nat) (ps cs : List Nat),
+    X.formula = A⊃B ∧ i > 0 ∧ j > 0 ∧ k > 0
+    ∧ l + (0 :: c:: cs).length = X.level
+    ∧ c ∈ (j :: p:: ps) ∧ zeroNotIn (p :: ps) ∧ zeroNotIn (c::cs)
+    -- incoming d-edges
+    ∧ N.din = [
+      {orig  := (Node.mk i (X.level+1) B false false []),
+       dest  := X,
+       color := 0,
+       deps  := #B_deps}]
+    -- outgoing d-edges
+    ∧ N.dout = [
+      {orig  := X,
+       dest  := (Node.mk j (X.level-1) C C_isH true (p::ps)),
+       color := 0,
+       deps  := B_deps − [A]}]
+    -- incoming a-edges
+    ∧ N.ain = [
+      {orig  := (Node.mk k l F false false []),
+       dest  := X,
+       colors := 0 :: c :: cs}]
+    -- incoming a-edges up
+    ∧ N.ainUp = []
 
 
 /- Neighborhood: Type 2 (Non-Collapsed Node With Incoming AEdge Paths) Hypothesis (Top Formula) -/
