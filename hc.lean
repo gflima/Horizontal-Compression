@@ -33,37 +33,24 @@ abbrev Formula.decEq := instDecidableEqFormula.decEq
 -- DLDS --
 
 structure Node where
-  id           : Nat
-  level        : Nat
-  formula      : Formula
-  isHypothesis : Bool
-  isCollapsed  : Bool
+  id           : Nat            -- node id (root has id 0)
+  level        : Nat            -- node level (root is at level 0)
+  formula      : Formula        -- labeled formula
+  isHypothesis : Bool           -- whether node is a hypothesis (leaf)
+  isCollapsed  : Bool           -- whether node is the result of a collapse
   past         : List Nat       -- temporary collapse metadata
   deriving DecidableEq, Repr
 
 abbrev Node.decEq := instDecidableEqNode.decEq
 
-theorem Node.mk.injEq' {x y : Node} :
-  x = y ↔ x.id = y.id
-          ∧ x.level = y.level
-          ∧ x.formula = y.formula
-          ∧ x.isHypothesis = y.isHypothesis
-          ∧ x.isCollapsed = y.isCollapsed
-          ∧ x.past = y.past := by
-  match x, y with
-  | .mk _ _ _ _ _ _, .mk _ _ _ _ _ _ => simp;
-
-def Node.isRoot (x : Node) : Prop :=
-  x.id = 0 ∧ x.level = 0
-
-def Node.isNonRoot (x : Node) : Prop :=
-  x.id > 0 ∧ x.level > 0
+abbrev Node.isRoot    (x : Node) : Prop := x.id = 0 ∧ x.level = 0
+abbrev Node.isNonRoot (x : Node) : Prop := x.id > 0 ∧ x.level > 0
 
 structure DEdge where
-  orig  : Node
-  dest  : Node
-  color : Nat
-  deps  : List Formula
+  orig  : Node                  -- origin
+  dest  : Node                  -- destination
+  color : Nat                   -- color
+  deps  : List Formula          -- dependencies
   deriving DecidableEq, Repr
 
 abbrev DEdge.decEq := instDecidableEqDEdge.decEq
@@ -73,33 +60,25 @@ theorem DEdge.mk.injEq' {d₁ d₂ : DEdge} :
             ∧ d₁.dest = d₂.dest
             ∧ d₁.color = d₂.color
             ∧ d₁.deps = d₂.deps := by
-  match d₁, d₂ with
-  | .mk _ _ _ _, .mk _ _ _ _ => simp;
+  match d₁, d₂ with | .mk _ _ _ _, .mk _ _ _ _ => simp;
 
 structure AEdge where
-  orig   : Node
-  dest   : Node
-  colors : List Nat
+  orig   : Node                 -- origin
+  dest   : Node                 -- destination
+  colors : List Nat             -- color sequence
   deriving DecidableEq, Repr
 
 abbrev AEdge.decEq := instDecidableEqAEdge.decEq
 
-theorem AEdge.mk.injEq' {a₁ a₂ : AEdge} :
-  a₁ = a₂ ↔ a₁.orig = a₂.orig
-            ∧ a₁.dest = a₂.dest
-            ∧ a₁.colors = a₂.colors := by
-  match a₁, a₂ with
-  | .mk _ _ _, .mk _ _ _ => simp
-
 structure DLDS where
-  nodes  : List Node
-  dedges : List DEdge
-  aedges : List AEdge
+  nodes  : List Node            -- nodes
+  dedges : List DEdge           -- deduction edges (d-edges)
+  aedges : List AEdge           -- ancestrality edges (a-edges)
   deriving DecidableEq, Repr
 
 abbrev DLDS.decEq := instDecidableEqDLDS.decEq
 
--- Gets the deduction edges arriving at `x` in `G`.
+-- Gets the d-edges arriving at `x` in `G`.
 def DLDS.din (G : DLDS) (x : Node) : List DEdge :=
   loop G.dedges
   where loop (dedges : List DEdge) : List DEdge :=
@@ -107,7 +86,7 @@ def DLDS.din (G : DLDS) (x : Node) : List DEdge :=
     | [] => []
     | d :: ds => if d.dest = x then d :: loop ds else loop ds
 
--- Gets the deduction edges leaving `x` in `G`.
+-- Gets the d-edges leaving `x` in `G`.
 def DLDS.dout (G : DLDS) (x : Node) : List DEdge :=
   loop G.dedges
   where loop (dedges : List DEdge) : List DEdge :=
@@ -115,7 +94,7 @@ def DLDS.dout (G : DLDS) (x : Node) : List DEdge :=
     | [] => []
     | d :: ds => if d.orig = x then d :: loop ds else loop ds
 
--- Gets the ancestrality edges arriving at `x` in `G`.
+-- Gets the a-edges arriving at `x` in `G`.
 def DLDS.ain (G : DLDS) (x : Node) : List AEdge :=
   loop x G.aedges
   where loop (x : Node) (aedges : List AEdge) : List AEdge :=
@@ -123,7 +102,7 @@ def DLDS.ain (G : DLDS) (x : Node) : List AEdge :=
     | [] => []
     | a :: as => if a.dest = x then a :: loop x as else loop x as
 
--- Gets the ancestrality edges arriving at a parent of `x` in G.
+-- Gets the a-edges arriving at a parent of `x` in G.
 def DLDS.ainUp (G : DLDS) (x : Node) : List AEdge :=
   loop (G.din x)
   where loop (din : List DEdge) : List AEdge :=
@@ -131,34 +110,12 @@ def DLDS.ainUp (G : DLDS) (x : Node) : List AEdge :=
     | [] => []
     | d :: ds => G.ain d.orig ++ loop ds
 
-section
-def x1 : Node := .mk 1 2 0 false false []
-def x2 : Node := .mk 2 1 0 false false []
-def x3 : Node := .mk 3 1 0 false false []
-def x4 : Node := .mk 4 0 0 false false []
-def d1 : DEdge := .mk x1 x2 0 []
-def d2 : DEdge := .mk x2 x4 0 []
-def d3 : DEdge := .mk x3 x4 0 []
-def a1 : AEdge := .mk x2 x1 []
-def a2 : AEdge := .mk x4 x1 []
-def G : DLDS := .mk [x1, x2, x3, x4] [d1, d2, d3] [a1, a2]
-#eval G.din x1 = []
-#eval G.din x2 = [d1]
-#eval G.din x4 = [d2, d3]
-#eval G.dout x1 = [d1]
-#eval G.dout x2 = [d2]
-#eval G.dout x4 = []
-#eval G.ain x1 = [a1, a2]
-#eval G.ainUp x2 = [a1, a2]
-#eval G.ainUp x4 = []
-end
-
 structure Neighborhood where
-  center : Node        -- central node
-  din    : List DEdge  -- dedges arriving at center
-  dout   : List DEdge  -- dedges leaving center
-  ain    : List AEdge  -- aedges arriving at center
-  ainUp  : List AEdge  -- aedges arriving at some parent of center
+  center : Node                 -- center
+  din    : List DEdge           -- d-edges arriving at center
+  dout   : List DEdge           -- d-edges leaving center
+  ain    : List AEdge           -- a-edges arriving at center
+  ainUp  : List AEdge           -- a-edges arriving at a parent of center
   deriving DecidableEq, Repr
 
 abbrev Neighborhood.decEq := instDecidableEqNeighborhood.decEq
@@ -2570,7 +2527,7 @@ namespace COVERAGE.T1_Of_T1.NODES
                        simp only [collapse.rewrite_outgoing] at out_mem₁ out_mem₂;
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at out_mem₁ out_mem₂;
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
-                       simp only [DEdge.mk.injEq'];
+                       rw [DEdge.mk.injEq];
                        --
                        simp only [type_outgoing₁] at prop_outgoingᵤ prop_outgoingᵥ;
                        rewrite [prop_out_unitᵥ] at prop_outgoingᵥ;
@@ -3068,7 +3025,7 @@ namespace COVERAGE.T1_Of_T1.NODES
                        simp only [collapse.rewrite_outgoing] at out_mem₁ out_mem₂;
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at out_mem₁ out_mem₂;
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
-                       simp only [DEdge.mk.injEq'];
+                       rw [DEdge.mk.injEq];
                        --
                        simp only [type_outgoing₁] at prop_outgoingᵤ prop_outgoingᵥ;
                        rewrite [prop_out_unitᵥ] at prop_outgoingᵥ;
@@ -3575,7 +3532,7 @@ namespace COVERAGE.T3_Of_T3.NODES
                        simp only [collapse.rewrite_outgoing] at out_mem₁ out_mem₂;
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at out_mem₁ out_mem₂;
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
-                       simp only [DEdge.mk.injEq'];
+                       rw [DEdge.mk.injEq];
                        --
                        simp only [type_outgoing₃] at prop_outgoingᵤ prop_outgoingᵥ;
                        rewrite [prop_out_unitᵥ] at prop_outgoingᵥ;
@@ -4332,7 +4289,7 @@ namespace COVERAGE.T3_Of_T3.NODES
                        simp only [collapse.rewrite_outgoing] at out_mem₁ out_mem₂;
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at out_mem₁ out_mem₂;
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
-                       simp only [DEdge.mk.injEq'];
+                       rw [DEdge.mk.injEq];
                        --
                        simp only [type_outgoing₃] at prop_outgoingᵤ prop_outgoingᵥ;
                        rewrite [prop_out_unitᵥ] at prop_outgoingᵥ;
@@ -5120,7 +5077,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
                        simp only [collapse.rewrite_outgoing] at out_mem₁ out_mem₂;
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at out_mem₁ out_mem₂;
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
-                       simp only [DEdge.mk.injEq'];
+                       rw [DEdge.mk.injEq];
                        --
                        simp only [type_outgoing₃] at prop_outgoingᵤ;
                        have Eq_Out_Colorᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ eq_out_memᵤ);
@@ -5884,7 +5841,7 @@ namespace COVERAGE.T3_Of_T3.EDGES
                        simp only [collapse.rewrite_outgoing] at out_mem₁ out_mem₂;
                        simp only [List.Mem_Or_Mem_Iff_Mem_Append] at out_mem₁ out_mem₂;
                        simp only [List.Eq_Iff_Mem_Unit] at out_mem₁ out_mem₂;
-                       simp only [DEdge.mk.injEq'];
+                       rw [DEdge.mk.injEq];
                        --
                        simp only [type_outgoing₃] at prop_outgoingᵤ;
                        have Eq_Out_Colorᵤ := COLLAPSE.Simp_Out_Orig₃ (prop_outgoingᵤ eq_out_memᵤ);
