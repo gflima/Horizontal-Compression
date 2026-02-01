@@ -3,18 +3,10 @@
 inductive Formula where
 | atom (n : Nat)
 | imp (a b : Formula)
-deriving BEq, ReflBEq, LawfulBEq, DecidableEq
+deriving BEq, ReflBEq, LawfulBEq, DecidableEq, Inhabited
 
 instance : OfNat Formula n where
   ofNat := Formula.atom n
-
--- @[simp] def Formula.beq : Formula → Formula → Bool
---   | .atom n,  .atom m    => Nat.beq n m
---   | .atom _,  .imp _ _   => false
---   | .imp _ _, .atom _    => false
---   | .imp a b, .imp a' b' => beq a a' && beq b b'
--- instance : BEq Formula where
---   beq := Formula.beq
 
 def Formula.toString : Formula → String
 | .atom n => n.repr
@@ -34,8 +26,15 @@ infixr:66 "⊃" => Formula.imp
 #eval (0⊃1⊃2 : Formula)         -- (0⊃(1⊃2))
 #eval ((0⊃1)⊃2 : Formula)       -- ((0⊃1)⊃2)
 
-@[simp] def List.delete [BEq α] (l : List α) (a : α) : List α :=
-  l.filter (λ x ↦ !(x == a))
+#check List.filter
+
+@[reducible, simp] def List.delete [BEq α] (a : α) : (l : List α) → List α
+  | [] => []
+  | x :: xs => match x == a with
+    | true => List.delete a xs
+    | false => x :: List.delete a xs
+
+theorem List.delete_nil [BEq α] (a : α) : List.delete a [] = [] := rfl
 
 -- Derivation
 
@@ -43,7 +42,7 @@ inductive Derivation : List Formula → Formula → Prop where
 
 | hypo {a : Formula} : Derivation [a] a
 
-| impI (π : Derivation Γ b) (a : Formula) (_ : List.elem a Γ)
+| impI (π : Derivation Γ b) (a : Formula) {_ : a ∈ Γ}
                      : Derivation (Γ.delete a) (a⊃b)
 
 | impE (π₁ : Derivation Γ₁ a) (π₂ : Derivation Γ₂ (a⊃b))
@@ -51,11 +50,12 @@ inductive Derivation : List Formula → Formula → Prop where
 
 export Derivation (hypo impI impE)
 
-example (a : Formula) : List.elem a [a] := by
-  simp
-
 example (a : Formula) : Derivation [] (a⊃a) := by
-  have π : Derivation [a] a := hypo;
-  have h : List.elem a [a] := by simp;
-  have X := (impI π a h);
-  simp at X; trivial
+  have d₀ : Derivation [a] a := hypo;
+  -- apply (impI d₀ a); trivial
+  have d₁ := (@impI _ _ d₀);
+  simp at d₁; trivial
+
+example : Derivation [] (0⊃0) := by
+  have d₀ : Derivation [0] 0 := hypo;
+  apply (impI d₀ 0); trivial
