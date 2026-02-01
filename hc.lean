@@ -316,24 +316,18 @@ def type2_elimination (N : Neighborhood) : Prop :=
     (major_hpt minor_hpt out_hpt : Bool)
     (major_dep minor_dep : List Formula)
     (past color : Nat)(pasts colors : List Nat),
-    ( inc_nbr > 0 ) ∧ ( out_nbr > 0 )
-    ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = X.level )
-    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( check_nonempty_and_nonzero (past::pasts) ) ∧ ( check_nonempty_and_nonzero (color::colors) )
-    ∧ N.din = [ DEdge.mk (Node.mk (inc_nbr+1) (X.level+1) (antecedent⊃X.formula) major_hpt false []) /- Right Child & Major Premise -/
-                             X
-                             0
-                             (List.eraseDups major_dep),
-                        DEdge.mk (Node.mk inc_nbr (X.level+1) antecedent minor_hpt false [])                            /- Left Child & Minor Premise -/
-                             X
-                             0
-                             (List.eraseDups minor_dep)]
-    ∧ N.dout = [ DEdge.mk X
-                             (Node.mk out_nbr (X.level-1) out_fml out_hpt true (past::pasts))
-                             0
-                             (List.eraseDups (minor_dep ++ major_dep))]
-    ∧ N.ain   = [ AEdge.mk (Node.mk anc_nbr anc_lvl anc_fml false false [])
-                             X
-                             (0::color::colors) ]
+    inc_nbr > 0 ∧ out_nbr > 0 ∧ anc_nbr > 0
+    ∧ anc_lvl + List.length (0::color::colors) = X.level
+    ∧ color ∈ (out_nbr::past::pasts)
+    ∧ check_nonempty_and_nonzero (past::pasts)
+    ∧ check_nonempty_and_nonzero (color::colors)
+    ∧ N.din = [
+      DEdge.mk (Node.mk (inc_nbr+1) (X.level+1) (antecedent⊃X.formula) major_hpt false []) X 0 (List.eraseDups major_dep),
+      DEdge.mk (Node.mk inc_nbr (X.level+1) antecedent minor_hpt false []) X 0 (List.eraseDups minor_dep)]
+    ∧ N.dout = [
+      DEdge.mk X (Node.mk out_nbr (X.level-1) out_fml out_hpt true (past::pasts)) 0 (List.eraseDups (minor_dep ++ major_dep))]
+    ∧ N.ain = [
+      AEdge.mk (Node.mk anc_nbr anc_lvl anc_fml false false []) X (0::color::colors)]
     ∧ N.ainUp = []
 
 
