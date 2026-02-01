@@ -5,6 +5,7 @@ set_option linter.unusedSimpArgs false
 inductive Formula where
 | atom (n : Nat)
 | imp (a b : Formula)
+deriving DecidableEq
 
 instance : OfNat Formula n where
   ofNat := Formula.atom n
@@ -14,7 +15,8 @@ def Formula.toString : Formula → String
 | .imp a b => "(" ++ a.toString ++ "⊃" ++ b.toString ++ ")"
 
 instance : ToString Formula where
-  toString f := f.toString
+  toString := Formula.toString
+
 instance : Repr Formula where
   reprPrec f _ := f.toString
 
@@ -26,18 +28,7 @@ infixr:66 "⊃" => Formula.imp
 #eval (0⊃1⊃2 : Formula)         -- (0⊃(1⊃2))
 #eval ((0⊃1)⊃2 : Formula)       -- ((0⊃1)⊃2)
 
-def Formula.decEq (f₁ f₂ : Formula) : Decidable (f₁ = f₂) :=
-  match f₁, f₂ with
-  | .atom n₁, .atom n₂ => by rewrite [Formula.atom.injEq]; apply Nat.decEq;
-  | .atom _, .imp _ _ => by apply isFalse; intro; contradiction;
-  | .imp _ _, .atom _ => by apply isFalse; intro; contradiction;
-  | .imp a₁ b₁, .imp a₂ b₂ => by
-    rewrite [Formula.imp.injEq];
-    have _ := Formula.decEq a₁ a₂;
-    have _ := Formula.decEq b₁ b₂;
-    apply instDecidableAnd
-
-instance : DecidableEq Formula := Formula.decEq
+abbrev Formula.decEq := instDecidableEqFormula.decEq
 
 -- DLDS --
 
@@ -48,13 +39,9 @@ structure Node where
   isHypothesis : Bool
   isCollapsed  : Bool
   past         : List Nat       -- temporary collapse metadata
-  deriving Repr
+  deriving DecidableEq, Repr
 
-def Node.decEq (x₁ x₂ : Node) : Decidable (x₁ = x₂) :=
-  match x₁, x₂ with
-  | _, _ => by rewrite [Node.mk.injEq] <;> apply instDecidableAnd
-
-instance : DecidableEq Node := Node.decEq
+abbrev Node.decEq := instDecidableEqNode.decEq
 
 theorem Node.mk.injEq' {x y : Node} :
   x = y ↔ x.id = y.id
@@ -77,13 +64,9 @@ structure DEdge where
   dest  : Node
   color : Nat
   deps  : List Formula
-  deriving Repr
+  deriving DecidableEq, Repr
 
-def DEdge.decEq (d₁ d₂ : DEdge) : Decidable (d₁ = d₂) :=
-  match d₁, d₂ with
-  | _, _ => by rewrite [DEdge.mk.injEq] <;> apply instDecidableAnd
-
-instance : DecidableEq DEdge := DEdge.decEq
+abbrev DEdge.decEq := instDecidableEqDEdge.decEq
 
 theorem DEdge.mk.injEq' {d₁ d₂ : DEdge} :
   d₁ = d₂ ↔ d₁.orig = d₂.orig
@@ -97,13 +80,9 @@ structure AEdge where
   orig   : Node
   dest   : Node
   colors : List Nat
-  deriving Repr
+  deriving DecidableEq, Repr
 
-def AEdge.decEq (a₁ a₂ : @& AEdge) : Decidable (a₁ = a₂) :=
-  match a₁, a₂ with
-  | _, _ => by rewrite [AEdge.mk.injEq] <;> apply instDecidableAnd
-
-instance : DecidableEq AEdge := AEdge.decEq
+abbrev AEdge.decEq := instDecidableEqAEdge.decEq
 
 theorem AEdge.mk.injEq' {a₁ a₂ : AEdge} :
   a₁ = a₂ ↔ a₁.orig = a₂.orig
@@ -116,11 +95,9 @@ structure DLDS where
   nodes  : List Node
   dedges : List DEdge
   aedges : List AEdge
-  deriving Repr
+  deriving DecidableEq, Repr
 
-def DLDS.decEq (G₁ G₂ : DLDS) : Decidable (G₁ = G₂) :=
-  match G₁, G₂ with
-  | _, _ => by rewrite [DLDS.mk.injEq] <;> apply instDecidableAnd
+abbrev DLDS.decEq := instDecidableEqDLDS.decEq
 
 -- Gets the deduction edges arriving at `x` in `G`.
 def DLDS.din (G : DLDS) (x : Node) : List DEdge :=
@@ -182,13 +159,9 @@ structure Neighborhood where
   dout   : List DEdge  -- dedges leaving center
   ain    : List AEdge  -- aedges arriving at center
   ainUp  : List AEdge  -- aedges arriving at some parent of center
-  deriving Repr
+  deriving DecidableEq, Repr
 
-def Neighborhood.decEq (N₁ N₂ : Neighborhood) : Decidable (N₁ = N₂) :=
-  match N₁, N₂ with
-  | _, _ => by rewrite [Neighborhood.mk.injEq] <;> apply instDecidableAnd
-
-instance : DecidableEq Neighborhood := Neighborhood.decEq
+abbrev Neighborhood.decEq := instDecidableEqNeighborhood.decEq
 
 def DLDS.neighborhood (G : DLDS) (x : Node) : Neighborhood :=
   .mk x (G.din x) (G.dout x) (G.ain x) (G.ainUp x)
