@@ -321,22 +321,23 @@ def type2_introduction (N : Neighborhood) : Prop :=
 
 /- Neighborhood: Type 2 (Non-Collapsed Node With Incoming AEdge Paths) Hypothesis (Top Formula) -/
 def type2_hypothesis (N : Neighborhood) : Prop :=
-    ( N.center.id > 0 ) ∧ ( N.center.level > 0 ) ∧ ( N.center.isHypothesis = true )
-  ∧ ( N.center.isCollapsed = false ) ∧ ( N.center.past = [] )
+  let X := N.center
+  X.isNonRoot ∧ ( X.isHypothesis = true )
+  ∧ ( X.isCollapsed = false ) ∧ ( X.past = [] )
   ∧ ( ∃(out_nbr anc_nbr anc_lvl : Nat),
       ∃(out_fml anc_fml : Formula),
       ∃(out_hpt : Bool),
       ∃(past color : Nat)(pasts colors : List Nat),
       ( out_nbr > 0 )
-    ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = N.center.level )
+    ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = X.level )
     ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( zeroNotIn (past::pasts) ) ∧ ( zeroNotIn (color::colors) )
     ∧ N.din = []
-    ∧ N.dout = [ DEdge.mk N.center
-                             (Node.mk out_nbr (N.center.level-1) out_fml out_hpt true (past::pasts))
+    ∧ N.dout = [ DEdge.mk X
+                             (Node.mk out_nbr (X.level-1) out_fml out_hpt true (past::pasts))
                              0
-                             [N.center.formula] ]
+                             [X.formula] ]
     ∧ N.ain   = [ AEdge.mk (Node.mk anc_nbr anc_lvl anc_fml false false [])
-                             N.center
+                             X
                              (0::color::colors) ]
     ∧ N.ainUp = [] )
 
@@ -2258,7 +2259,7 @@ namespace COVERAGE.T3_Of_T2
   intro prop_type;
   simp only [type2_hypothesis] at prop_type;
   cases prop_type with | intro prop_nbr prop_type =>
-  cases prop_type with | intro prop_lvl prop_type =>
+  cases prop_nbr with | intro prop_nbr prop_lvl =>
   cases prop_type with | intro prop_hpt prop_type =>
   cases prop_type with | intro prop_col prop_type =>
   cases prop_type with | intro prop_pst prop_type =>
@@ -7192,7 +7193,6 @@ namespace COVERAGE.UP.T0E
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
-  cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_directᵤ₁ _ =>
   rewrite [prop_directᵤ₁];
   simp only [List.cons_ne_nil];
@@ -7414,11 +7414,7 @@ namespace COVERAGE.UP.T0E
   cases prop_typeᵤ₁ with | intro prop_outgoingᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_directᵤ₁ prop_indirectᵤ₁ =>
   simp only [type2_hypothesis];
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
+  repeat (apply And.intro ( by trivial; ));
   apply Exists.intro U0.id;
   apply Exists.intro out_nbrᵤ₀;
   apply Exists.intro (U0.level - 1);
@@ -7694,11 +7690,7 @@ namespace COVERAGE.UP.T0E
   cases prop_typeᵥ₁ with | intro prop_outgoingᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_directᵥ₁ prop_indirectᵥ₁ =>
   simp only [type2_hypothesis];
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
+  repeat (apply And.intro ( by trivial; ));
   apply Exists.intro U0.id;
   apply Exists.intro out_nbrᵥ₀;
   apply Exists.intro (V0.level - 1);
@@ -7869,7 +7861,6 @@ namespace COVERAGE.UP.T0I
   apply absurd Prop_Directᵤ₁;
   simp only [DLDS.neighborhood] at prop_typeᵤ₁;
   simp only [type2_hypothesis] at prop_typeᵤ₁;
-  cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -8104,11 +8095,7 @@ namespace COVERAGE.UP.T0I
   cases prop_typeᵤ₁ with | intro prop_outgoingᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_directᵤ₁ prop_indirectᵤ₁ =>
   simp only [type2_hypothesis];
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
+  repeat (apply And.intro ( by trivial; ));
   apply Exists.intro U0.id;
   apply Exists.intro out_nbrᵤ₀;
   apply Exists.intro (U0.level - 1);
@@ -8371,11 +8358,7 @@ namespace COVERAGE.UP.T0I
   cases prop_typeᵥ₁ with | intro prop_outgoingᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_directᵥ₁ prop_indirectᵥ₁ =>
   simp only [type2_hypothesis];
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
+  repeat (apply And.intro ( by trivial; ));
   apply Exists.intro U0.id;
   apply Exists.intro out_nbrᵥ₀;
   apply Exists.intro (V0.level - 1);
@@ -8433,7 +8416,6 @@ namespace COVERAGE.UP.T2H
   intro prop_type;
   simp only [DLDS.neighborhood] at prop_type;
   simp only [type2_hypothesis] at prop_type;
-  cases prop_type with | intro _ prop_type =>
   cases prop_type with | intro _ prop_type =>
   cases prop_type with | intro _ prop_type =>
   cases prop_type with | intro _ prop_type =>
@@ -8591,7 +8573,6 @@ namespace COVERAGE.UP.T2E
   apply absurd Prop_Directᵤ₁;
   simp only [DLDS.neighborhood] at prop_typeᵤ₁;
   simp only [type2_hypothesis] at prop_typeᵤ₁;
-  cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -8846,11 +8827,7 @@ namespace COVERAGE.UP.T2E
   cases prop_typeᵤ₁ with | intro prop_outgoingᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_directᵤ₁ prop_indirectᵤ₁ =>
   simp only [type2_hypothesis];
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
+  repeat (apply And.intro ( by trivial; ));
   apply Exists.intro U0.id;
   apply Exists.intro anc_nbrᵤ₀;
   apply Exists.intro anc_lvlᵤ₀;
@@ -9135,11 +9112,7 @@ namespace COVERAGE.UP.T2E
   cases prop_typeᵥ₁ with | intro prop_outgoingᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_directᵥ₁ prop_indirectᵥ₁ =>
   simp only [type2_hypothesis];
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
+  repeat (apply And.intro ( by trivial; ));
   apply Exists.intro U0.id;
   apply Exists.intro anc_nbrᵥ₀;
   apply Exists.intro anc_lvlᵥ₀;
@@ -9322,7 +9295,6 @@ namespace COVERAGE.UP.T2I
   apply absurd Prop_Directᵤ₁;
   simp only [DLDS.neighborhood] at prop_typeᵤ₁;
   simp only [type2_hypothesis] at prop_typeᵤ₁;
-  cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro _ prop_typeᵤ₁ =>
@@ -9568,11 +9540,7 @@ namespace COVERAGE.UP.T2I
   cases prop_typeᵤ₁ with | intro prop_outgoingᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_directᵤ₁ prop_indirectᵤ₁ =>
   simp only [type2_hypothesis];
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
+  repeat (apply And.intro ( by trivial; ));
   apply Exists.intro U0.id;
   apply Exists.intro anc_nbrᵤ₀;
   apply Exists.intro anc_lvlᵤ₀;
@@ -9845,11 +9813,7 @@ namespace COVERAGE.UP.T2I
   cases prop_typeᵥ₁ with | intro prop_outgoingᵥ₁ prop_typeᵥ₁ =>
   cases prop_typeᵥ₁ with | intro prop_directᵥ₁ prop_indirectᵥ₁ =>
   simp only [type2_hypothesis];
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
+  repeat (apply And.intro ( by trivial; ));
   apply Exists.intro U0.id;
   apply Exists.intro anc_nbrᵥ₀;
   apply Exists.intro anc_lvlᵥ₀;
@@ -10223,7 +10187,7 @@ namespace COVERAGE.UP.T1X
   simp only [DLDS.neighborhood] at prop_typeᵤ₁;
   simp only [type2_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
-  cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
+  cases prop_nbrᵤ₁ with | intro prop_nbrᵤ₁ prop_lvlᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_hptᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_colᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_pstᵤ₁ prop_typeᵤ₁ =>
@@ -10247,11 +10211,7 @@ namespace COVERAGE.UP.T1X
   cases prop_typeᵤ₁ with | intro prop_outgoingᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_directᵤ₁ prop_indirectᵤ₁ =>
   simp only [type2_hypothesis];
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
+  repeat (apply And.intro ( by trivial; ));
   apply Exists.intro U0.id;
   apply Exists.intro anc_nbrᵤ₁;
   apply Exists.intro anc_lvlᵤ₁;
@@ -10619,7 +10579,7 @@ namespace COVERAGE.UP.T3X
   simp only [DLDS.neighborhood] at prop_typeᵤ₁;
   simp only [type2_hypothesis] at prop_typeᵤ₁;
   cases prop_typeᵤ₁ with | intro prop_nbrᵤ₁ prop_typeᵤ₁ =>
-  cases prop_typeᵤ₁ with | intro prop_lvlᵤ₁ prop_typeᵤ₁ =>
+  cases prop_nbrᵤ₁ with | intro prop_nbrᵤ₁ prop_lvlᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_hptᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_colᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_pstᵤ₁ prop_typeᵤ₁ =>
@@ -10643,11 +10603,7 @@ namespace COVERAGE.UP.T3X
   cases prop_typeᵤ₁ with | intro prop_outgoingᵤ₁ prop_typeᵤ₁ =>
   cases prop_typeᵤ₁ with | intro prop_directᵤ₁ prop_indirectᵤ₁ =>
   simp only [type2_hypothesis];
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
-  apply And.intro ( by trivial; );
+  repeat (apply And.intro ( by trivial; ));
   apply Exists.intro U0.id;
   apply Exists.intro anc_nbrᵤ₁;
   apply Exists.intro anc_lvlᵤ₁;
