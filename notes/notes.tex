@@ -1,10 +1,16 @@
 \documentclass[12pt]{article}
+\usepackage{geometry}
+\geometry{a4paper,top=20mm,left=20mm,bottom=20mm,right=20mm}
 \usepackage{amsmath}
+\usepackage{unicode-math}
 \usepackage[dvipsnames]{xcolor}
 \usepackage[pdfencoding=auto,psdextra]{hyperref}
 \usepackage{fontspec}
+\setmainfont{FreeSerif}
+\setmathfont{STIX Two Math}
+\setsansfont{FreeSans}
+%\setmonofont{FreeMono}
 \setmonofont{Adwaita Mono}
-\usepackage{unicode-math}
 \usepackage{minted}
 \definecolor{bg}{rgb}{0.95,0.95,0.95}
 \definecolor{rl}{rgb}{0.5,0.5,0.5}
@@ -20,7 +26,7 @@ escapeinside=⟪⟫}
 \title{Horizontal Compression of DLDS's}
 \maketitle
 
-\section{Basic definitions}
+\section{Basic Definitions}
 
 \subsection{Formulas}
 
@@ -28,29 +34,118 @@ escapeinside=⟪⟫}
 %%
 Notation for formulas:
 %%
-\leanfile[firstline=24,lastline=27]{hc.lean}
+\leanfile[firstline=23,lastline=29]{hc.lean}
 
 \subsection{DLDS}
 
 Nodes:
 %%
-\leanfile[firstline=44,lastline=50]{hc.lean}
+\leanfile[firstline=35,lastline=41]{hc.lean}
 %%
-Deduction edges:
+Root/non-root node:
 %%
-\leanfile[firstline=81,lastline=85]{hc.lean}
+\leanfile[firstline=46,lastline=47]{hc.lean}
 %%
-Ancestrality edges:
+Deduction edges (d-edges):
 %%
-\leanfile[firstline=110,lastline=113]{hc.lean}
+\leanfile[firstline=49,lastline=53]{hc.lean}
+%%
+Ancestrality edges (a-edges):
+%%
+\leanfile[firstline=65,lastline=68]{hc.lean}
 %%
 DLDS:
 %%
-\leanfile[firstline=135,lastline=138]{hc.lean}
+\leanfile[firstline=73,lastline=76]{hc.lean}
 %%
+Incoming d-edges and a-edges:
+%%
+\leanfile[firstline=81,lastline=111]{hc.lean}
+
+\section{Neighborhood}
+
 Neighborhood:
 %%
-\leanfile[firstline=181,lastline=186]{hc.lean}
+\leanfile[firstline=113,lastline=118]{hc.lean}
+%%
+Neighborhood of a node in a DLDS:
+%%
+\leanfile[firstline=123,lastline=125]{hc.lean}
+
+\subsection{Type-0 Neighborhood}
+
+\paragraph{Type-0 Elimination}
+%%
+The center $X$ of the neighborhood is such that:
+%%
+\begin{itemize}
+\item $X$ is non-root, non-hypothesis, and non-collapsed;
+\item $X$ is the conclusion of $⊃$E;
+\item $X$'s incoming and outgoing d-edges have color 0;
+\item $X$ has no incoming a-edges;
+\item $X$ has no parents with an incoming a-edge (i.e., ``no a-edges up'').
+\end{itemize}
+%%
+\leanfile[firstline=137,lastline=179]{hc.lean}
+
+\paragraph{Type-0 Introduction}
+%%
+The center $X$ of the neighborhood is such that:
+%%
+\begin{itemize}
+\item $X$ is non-root, non-hypothesis, and non-collapsed;
+\item $X$ is the conclusion of $⊃$I;
+\item $X$'s incoming and outgoing d-edges have color 0;
+\item $X$ has no incoming a-edges or a-edges up.
+\end{itemize}
+%%
+\leanfile[firstline=181,lastline=213]{hc.lean}
+
+\paragraph{Type-0 Hypothesis}
+%%
+The center $X$ of the neighborhood is such that:
+%%
+\begin{itemize}
+\item $X$ is non-root and non-collapsed;
+\item $X$ is a hypothesis;
+\item $X$ has no incoming d-edges;
+\item $X$'s single outgoing d-edge has color 0;
+\item $X$ has no incoming a-edges or a-edges up.
+\end{itemize}
+%%
+\leanfile[firstline=215,lastline=238]{hc.lean}
+
+\subsection{Type-2 Neighborhood}
+
+\paragraph{Type-2 Elimination}
+%%
+The center $X$ of the neighborhood is such that:
+%%
+\begin{itemize}
+\item $X$ is non-root, non-hypothesis, non-collapsed;
+\item $X$ is the conclusion of $⊃$E;
+\item $X$'s incoming and outgoing d-edges have color 0;
+\item $X$ outgoing d-edge goes to a collapsed node;
+\item $X$ has one incoming a-edge, but no incoming a-edges up.
+\end{itemize}
+%%
+\leanfile[firstline=240,lastline=294]{hc.lean}
+
+\paragraph{Type-2 Introduction}
+%%
+The center $X$ of the neighborhood is such that:
+%%
+\begin{itemize}
+\item $X$ is non-root, non-hypothesis, non-collapsed;
+\item $X$ is the conclusion of $⊃$I;
+\item $X$'s incoming and outgoing d-edges have color 0;
+\item $X$ outgoing d-edge goes to a collapsed node;
+\item $X$ has one incoming a-edge, but no incoming a-edges up.
+\end{itemize}
+%%
+\leanfile[firstline=296,lastline=341]{hc.lean}
+
+\paragraph{Type-2 Hypothesis}
 
 \end{document}
 
