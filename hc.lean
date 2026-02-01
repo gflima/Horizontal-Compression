@@ -131,14 +131,14 @@ namespace List
 end List
 
 -- non-root, non-hypothesis, non-collapsed X is the conclusion of ⊃E
--- no incoming aedges / aedges-up
+-- no incoming a-edges, a-edges up
 def type0_elimination (N : Neighborhood) : Prop :=
   let X := N.center
   X.isNonRoot ∧ X.isHypothesis = false ∧ X.isCollapsed = false ∧ X.past = []
   ∧ ∃ (i j : Nat) (A C : Formula)
       (AX_isH A_isH : Bool) (AX_deps A_deps : List Formula),
     i > 0 ∧ j > 0
-    -- incoming dedges
+    -- incoming d-edges
     ∧ N.din = [
       {orig  := {id           := i + 1, -- major premise (A⊃X)
                  level        := X.level + 1,
@@ -158,7 +158,7 @@ def type0_elimination (N : Neighborhood) : Prop :=
        dest  := X,                      -- conclusion (X)
        color := 0,
        deps  := #A_deps}]
-    -- outgoing dedges
+    -- outgoing d-edges
     ∧ N.dout = [
       {orig  := X,
        dest  := {id           := j,
@@ -169,19 +169,19 @@ def type0_elimination (N : Neighborhood) : Prop :=
                  past         := []},
        color := 0,
        deps  := A_deps ∪ AX_deps}]
-    -- incoming aedges
+    -- incoming a-edges
     ∧ N.ain = []
-    -- incoming aedges-up
+    -- incoming a-edges up
     ∧ N.ainUp = []
 
 -- non-root, non-hypothesis, non-collapsed X is the conclusion of ⊃I
--- no incoming aedges / aedges-up
+-- no incoming a-edges, a-edges up
 def type0_introduction (N : Neighborhood) : Prop :=
   let X := N.center
   X.isNonRoot ∧ X.isHypothesis = false ∧ X.isCollapsed = false ∧ X.past = []
   ∧ ∃ (i j : Nat) (A B C : Formula) (B_deps : List Formula),
     i > 0 ∧ j > 0 ∧ X.formula = A ⊃ B
-    -- incoming edges
+    -- incoming d-edges
     ∧ N.din = [
       {orig  := {id           := i, -- premise (B)
                  level        := X.level + 1,
@@ -192,7 +192,7 @@ def type0_introduction (N : Neighborhood) : Prop :=
        dest  := X,                 -- conclusion (X=A⊃B)
        color := 0,
        deps  := #B_deps}]
-    -- outgoing edges
+    -- outgoing d-edges
     ∧ N.dout = [
       {orig  := X,
        dest  := {id           := j,
@@ -203,21 +203,21 @@ def type0_introduction (N : Neighborhood) : Prop :=
                  past         := []},
        color := 0,
        deps  := B_deps − [A]}]
-    -- incoming aedges
+    -- incoming a-edges
     ∧ N.ain   = []
-    -- incoming aedges-up
+    -- incoming a-edges up
     ∧ N.ainUp = []
 
 -- non-root, non-collapsed X is a hypothesis
--- no incoming dedges, aedges / aedges-up
+-- no incoming d-edges, a-edges, aedges up
 def type0_hypothesis (N : Neighborhood) : Prop :=
   let X := N.center
   X.isNonRoot ∧ X.isHypothesis = true ∧ X.isCollapsed = false ∧ X.past = []
   ∧ ∃ (j : Nat) (C : Formula),
     j > 0
-    -- incoming edges
+    -- incoming d-edges
     ∧ N.din = []
-    -- outgoing edges
+    -- outgoing d-edges
     ∧ N.dout = [
       {orig  := X,
        dest  := {id           := j,
@@ -228,9 +228,9 @@ def type0_hypothesis (N : Neighborhood) : Prop :=
                  past         := []},
        color := 0,
        deps  := [X.formula]}]
-    -- incoming aedges
+    -- incoming a-edges
     ∧ N.ain   = []
-    -- incoming aedges-up
+    -- incoming a-edges up
     ∧ N.ainUp = []
 
 def check_nonempty_and_nonzero (ns : List Nat) : Prop :=
