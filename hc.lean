@@ -340,28 +340,43 @@ def type2_introduction (N : Neighborhood) : Prop :=
     -- incoming a-edges up
     ∧ N.ainUp = []
 
-
-/- Neighborhood: Type 2 (Non-Collapsed Node With Incoming AEdge Paths) Hypothesis (Top Formula) -/
+-- non-root, non-colors X is a hypothesis
+-- no incoming d-edges
+-- one outgoing d-edge to a previously collapsed node
+-- one incoming a-edge, no incoming a-edges up
 def type2_hypothesis (N : Neighborhood) : Prop :=
   let X := N.center
-  X.isNonRoot ∧ ( X.isHypothesis = true )
-  ∧ ( X.isCollapsed = false ) ∧ ( X.past = [] )
-  ∧ ( ∃(out_nbr anc_nbr anc_lvl : Nat),
-      ∃(out_fml anc_fml : Formula),
-      ∃(out_hpt : Bool),
-      ∃(past color : Nat)(pasts colors : List Nat),
-      ( out_nbr > 0 )
-    ∧ ( anc_nbr > 0 ) ∧ ( anc_lvl + List.length (0::color::colors) = X.level )
-    ∧ ( color ∈ (out_nbr::past::pasts) ) ∧ ( zeroNotIn (past::pasts) ) ∧ ( zeroNotIn (color::colors) )
+  X.isNonRoot ∧ X.isHypothesis = true ∧ X.isCollapsed = false ∧ X.past = []
+  ∧ ∃ (j k l : Nat) (C F : Formula) (C_isH : Bool)
+      (p c : Nat) (ps cs : List Nat),
+    j > 0 ∧ k > 0
+    ∧ l + (0 :: c:: cs).length = X.level  -- (*)
+    ∧ c ∈ (j :: p :: ps) ∧ zeroNotIn (p :: ps) ∧ zeroNotIn (c :: cs)
+    -- incoming d-edges
     ∧ N.din = []
-    ∧ N.dout = [ DEdge.mk X
-                             (Node.mk out_nbr (X.level-1) out_fml out_hpt true (past::pasts))
-                             0
-                             [X.formula] ]
-    ∧ N.ain   = [ AEdge.mk (Node.mk anc_nbr anc_lvl anc_fml false false [])
-                             X
-                             (0::color::colors) ]
-    ∧ N.ainUp = [] )
+    -- outgoing d-edges
+    ∧ N.dout = [
+      {orig  := X,
+       dest  := {id           := j,
+                 level        := X.level - 1,
+                 formula      := C,
+                 isHypothesis := C_isH,
+                 isCollapsed  := true,
+                 past         := p :: ps},
+       color := 0,
+       deps  := [X.formula]}]
+    -- incoming a-edges
+    ∧ N.ain = [
+      {orig  := {id           := k,
+                 level        := l,     -- by (*), F is (c::cs).length + 1
+                 formula      := F,     --   levels below X
+                 isHypothesis := false,
+                 isCollapsed  := false,
+                 past         := []},
+       dest  := X,
+       colors := 0 :: c:: cs}]
+    -- incoming a-edges up
+    ∧ N.ainUp = []
 
 /- Neighborhood: Check Incoming Edges (Type 1 & 3) -/
 def type_incoming (N : Neighborhood) : Prop := ∀{INC : DEdge}, ( INC ∈ N.din ) → ( check INC N.center N.ainUp )
