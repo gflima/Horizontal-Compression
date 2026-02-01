@@ -126,7 +126,7 @@ def DLDS.neighborhood (G : DLDS) (x : Node) : Neighborhood :=
 -- Notation for "sets" (no-dups lists).
 namespace List
   prefix:max "#" => List.eraseDups
-  notation:66 l₁:40 " ∪ " l₂:40 => List.eraseDups (List.append l₁ l₂)
+  notation:66 l₁:40 " ∪ " l₂:40 => List.eraseDups (l₁ ++ l₂)
   notation:66 l₁:40 " − " l₂:40 => List.eraseDups (List.removeAll l₁ l₂)
 end List
 
@@ -241,23 +241,56 @@ def check_nonempty_and_nonzero (ns : List Nat) : Prop :=
 def type2_elimination (N : Neighborhood) : Prop :=
   let X := N.center
   X.isNonRoot ∧ X.isHypothesis = false ∧ X.isCollapsed = false ∧ X.past = []
-  ∧ ∃(inc_nbr out_nbr anc_nbr anc_lvl : Nat)
-    (antecedent out_fml anc_fml : Formula)
-    (major_hpt minor_hpt out_hpt : Bool)
-    (major_dep minor_dep : List Formula)
-    (past color : Nat)(pasts colors : List Nat),
-    inc_nbr > 0 ∧ out_nbr > 0 ∧ anc_nbr > 0
-    ∧ anc_lvl + List.length (0::color::colors) = X.level
-    ∧ color ∈ (out_nbr::past::pasts)
+  ∧ ∃ (i j k l : Nat) (A C F : Formula)
+      (AX_isH A_isH C_isH : Bool) (AX_deps A_deps : List Formula)
+      (past color : Nat) (pasts colors : List Nat),
+    i > 0 ∧ j > 0 ∧ k > 0
+    ∧ l + List.length (0 :: color :: colors) = X.level
+    ∧ color ∈ (j :: past :: pasts)
     ∧ check_nonempty_and_nonzero (past::pasts)
     ∧ check_nonempty_and_nonzero (color::colors)
+    -- incoming d-edges
     ∧ N.din = [
-      DEdge.mk (Node.mk (inc_nbr+1) (X.level+1) (antecedent⊃X.formula) major_hpt false []) X 0 (List.eraseDups major_dep),
-      DEdge.mk (Node.mk inc_nbr (X.level+1) antecedent minor_hpt false []) X 0 (List.eraseDups minor_dep)]
+      {orig  := {id           := i + 1, -- major premise (A⊃X)
+                 level        := X.level + 1,
+                 formula      := A ⊃ X.formula,
+                 isHypothesis := AX_isH,
+                 isCollapsed  := false,
+                 past         := []},
+       dest  := X,
+       color := 0,
+       deps  := #AX_deps},
+      {orig  := {id           := i,     -- minor premise (A)
+                 level        := X.level + 1,
+                 formula      := A,
+                 isHypothesis := A_isH,
+                 isCollapsed  := false,
+                 past         := []},
+       dest  := X,                      -- conclusion (X)
+       color := 0,
+       deps  := #A_deps}]
+    -- outgoing d-edges
     ∧ N.dout = [
-      DEdge.mk X (Node.mk out_nbr (X.level-1) out_fml out_hpt true (past::pasts)) 0 (List.eraseDups (minor_dep ++ major_dep))]
+      {orig  := X,
+       dest  := {id           := j,
+                 level        := X.level - 1,
+                 formula      := C,
+                 isHypothesis := C_isH,
+                 isCollapsed  := true,
+                 past         := past :: pasts},
+       color := 0,
+       deps  := A_deps ∪ AX_deps}]
+    -- incoming a-edges
     ∧ N.ain = [
-      AEdge.mk (Node.mk anc_nbr anc_lvl anc_fml false false []) X (0::color::colors)]
+      {orig  := {id           := k,
+                 level        := l,
+                 formula      := F,
+                 isHypothesis := false,
+                 isCollapsed  := false,
+                 past         := []},
+       dest  := X,
+       colors := 0 :: color :: colors}]
+    -- incoming a-edges up
     ∧ N.ainUp = []
 
 
