@@ -65,7 +65,7 @@ theorem DEdge.mk.injEq' {d₁ d₂ : DEdge} :
 structure AEdge where
   orig   : Node                 -- origin
   dest   : Node                 -- destination
-  colors : List Nat             -- color sequence
+  colors : List Nat             -- color path
   deriving DecidableEq, Repr
 
 abbrev AEdge.decEq := instDecidableEqAEdge.decEq
@@ -120,6 +120,7 @@ structure Neighborhood where
 
 abbrev Neighborhood.decEq := instDecidableEqNeighborhood.decEq
 
+-- Gets the neighborhood of node `x` in `G`.
 def DLDS.neighborhood (G : DLDS) (x : Node) : Neighborhood :=
   .mk x (G.din x) (G.dout x) (G.ain x) (G.ainUp x)
 
@@ -282,7 +283,7 @@ def type2_elimination (N : Neighborhood) : Prop :=
     -- incoming a-edges
     ∧ N.ain = [
       {orig  := {id           := k,
-                 level        := l,     -- by (*), F is (c::cs).length+1
+                 level        := l,     -- by (*), F is (c::cs).length + 1
                  formula      := F,     --   levels below X
                  isHypothesis := false,
                  isCollapsed  := false,
@@ -329,7 +330,7 @@ def type2_introduction (N : Neighborhood) : Prop :=
     -- incoming a-edges
     ∧ N.ain = [
       {orig  := {id           := k,
-                 level        := l,     -- by (*), F is (c::cs).length+1
+                 level        := l,     -- by (*), F is (c::cs).length + 1
                  formula      := F,     --   levels below X
                  isHypothesis := false,
                  isCollapsed  := false,
