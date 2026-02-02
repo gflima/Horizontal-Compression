@@ -55,9 +55,11 @@ example (a : Formula) : Derivation [] (a⊃a) := by
   apply hypo                         -- a ⊢ a
 
 example : Derivation [] ((0⊃1)⊃(1⊃2)⊃(0⊃2)) := by
-  apply impI (G := [0⊃1]) <;> try simp
-  apply impI (G := [0⊃1, 1⊃2]) <;> try simp +decide
-  apply impI (G := [0⊃1, 1⊃2, 0]) <;> try simp +decide
+  apply impI (G := [0⊃1]) (b :=(1⊃2)⊃(0⊃2))
+    <;> try simp
+  apply impI (G := [0⊃1, 1⊃2]) (a := (1⊃2)) (b := (0⊃2))
+    <;> try simp +decide
+  -- apply impI (G := [0⊃1, 1⊃2, 0]) <;> try simp +decide
 
   -- have h : ((0⊃1) == (1⊃2)) = false := by simp; trivial
   -- rw [h]
