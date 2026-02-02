@@ -1,8 +1,8 @@
--- Formula --
+-- Formula -----------------------------------------------------------------
 
 inductive Formula where
 | atom (n : Nat)
-| imp (a b : Formula)
+| imp (A B : Formula)
 deriving BEq, ReflBEq, LawfulBEq, DecidableEq, Inhabited
 
 instance : OfNat Formula n where
@@ -10,7 +10,7 @@ instance : OfNat Formula n where
 
 def Formula.toString : Formula → String
 | .atom n => n.repr
-| .imp a b => "(" ++ a.toString ++ "⊃" ++ b.toString ++ ")"
+| .imp A B => "(" ++ A.toString ++ "⊃" ++ B.toString ++ ")"
 
 instance : ToString Formula where
   toString := Formula.toString
@@ -26,40 +26,78 @@ infixr:66 "⊃" => Formula.imp
 #eval (0⊃1⊃2 : Formula)         -- (0⊃(1⊃2))
 #eval ((0⊃1)⊃2 : Formula)       -- ((0⊃1)⊃2)
 
-#check List.filter
+-- Context -----------------------------------------------------------------
 
-@[simp, grind =] def List.delete [BEq α] (a : α) : (l : List α) → List α
+abbrev Context := List Formula
+
+namespace List
+
+@[simp, grind =] def delete [BEq α] [ReflBEq α] (A : α) :
+    (l : List α) → List α
   | [] => []
-  | x :: xs => match x == a with
-    | true => List.delete a xs
-    | false => x :: List.delete a xs
+  | x :: xs => match x == A with
+    | true => List.delete A xs
+    | false => x :: List.delete A xs
 
-theorem List.delete_nil [BEq α] (a : α) : List.delete a [] = [] := rfl
+abbrev delete' [BEq α] [ReflBEq α] (l : List α) (A : α) := delete A l
 
--- Derivation
+infixl:68 " / " => List.delete'
 
-inductive Derivation : List Formula → Formula → Prop where
+theorem delete_nil [BEq α] [ReflBEq α] (A : α) : []/A = [] := rfl
 
-| hypo (a : Formula) : Derivation [a] a
+theorem delete_head [BEq α] [ReflBEq α] (A : α) (l : List α) :
+    (A :: l)/A = l/A := by simp
 
-| impI (d : Derivation G b) (a : Formula) {_ : a ∈ G} {_ : G' == G.delete a}
-                     : Derivation G' (a⊃b)
+end List
 
-| impE (d₁ : Derivation G₁ a) (d₂ : Derivation G₂ (a⊃b)) {_ : G' == G₁ ++ G₂}
-                     : Derivation G' b
+-- Derivation --------------------------------------------------------------
+
+inductive Derivation : Context → Formula → Prop where
+
+| hypo (A : Formula) :
+    Derivation [A] A
+
+| impI (d : Derivation G B) :
+    A ∈ G → H = G/A → Derivation H (A⊃B)
+
+| impE (d₁ : Derivation G₁ A) (d₂ : Derivation G₂ (A⊃B)) :
+    H = G₁ ++ G₂ → Derivation H B
 
 export Derivation (hypo impI impE)
 
-example (a : Formula) : Derivation [] (a⊃a) := by
-  apply impI (G := [a]) <;> try simp -- ⊢ a⊃a
-  apply hypo                         -- a ⊢ a
+infix:20 " ⊢ " => Derivation
 
-example : Derivation [] ((0⊃1)⊃(1⊃2)⊃(0⊃2)) := by
-  apply impI (G := [0⊃1]) (b :=(1⊃2)⊃(0⊃2))
-    <;> try simp
-  apply impI (G := [0⊃1, 1⊃2]) (a := (1⊃2)) (b := (0⊃2))
-    <;> try simp +decide
-  -- apply impI (G := [0⊃1, 1⊃2, 0]) <;> try simp +decide
+macro "app " e:term : tactic =>
+  `(tactic| apply ($e : _) <;> try simp +decide)
 
-  -- have h : ((0⊃1) == (1⊃2)) = false := by simp; trivial
-  -- rw [h]
+example (A : Formula) : [] ⊢ A⊃A := by
+  app impI (hypo A)
+
+example : [] ⊢ (0⊃1)⊃(1⊃2)⊃(0⊃2) := by
+  app impI (_ : [0⊃1] ⊢ (1⊃2)⊃(0⊃2))
+  app impI (_ : [0⊃1, 1⊃2] ⊢ (0⊃2))
+  app impI (_ : [0, 0⊃1, 1⊃2] ⊢ 2)
+  app impE (_ : [0, 0⊃1] ⊢ 1) (_ : [1⊃2] ⊢ 1⊃2)
+  · app impE (hypo 0) (hypo (0⊃1))
+  · app hypo
+
+-- Basic theorems
+
+theorem MP (d₁ : G₁ ⊢ A) (d₂ : G₂ ⊢ A⊃B) : G₁ ++ G₂ ⊢ B := by
+  app impE d₁ d₂
+
+theorem imp_trans (d₁ : G₁ ⊢ A⊃B) (d₂ : G₂ ⊢ B⊃C) : (G₁ ++ G₂)/A ⊢ A⊃C := by
+  app impI (MP (MP (hypo A) d₁) d₂)
+
+theorem deduct (d : G ⊢ B) : A ∈ G → (G/A ⊢ A⊃B) := by
+  intro _; app impI d; trivial
+
+theorem deduct_head (d : A :: G ⊢ B) : G/A ⊢ A⊃B := by
+  suffices (A :: G)/A ⊢ A⊃B by rw [←List.delete_head]; trivial
+  app deduct (A := A) d
+
+-- Proofs
+
+def Proof (A : Formula) := Derivation [] A
+
+-- DLDS --------------------------------------------------------------------
