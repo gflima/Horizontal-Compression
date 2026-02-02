@@ -28,7 +28,7 @@ infixr:66 "⊃" => Formula.imp
 
 #check List.filter
 
-@[reducible, simp] def List.delete [BEq α] (a : α) : (l : List α) → List α
+@[simp, grind =] def List.delete [BEq α] (a : α) : (l : List α) → List α
   | [] => []
   | x :: xs => match x == a with
     | true => List.delete a xs
@@ -40,22 +40,24 @@ theorem List.delete_nil [BEq α] (a : α) : List.delete a [] = [] := rfl
 
 inductive Derivation : List Formula → Formula → Prop where
 
-| hypo {a : Formula} : Derivation [a] a
+| hypo (a : Formula) : Derivation [a] a
 
-| impI (π : Derivation Γ b) (a : Formula) {_ : a ∈ Γ}
-                     : Derivation (Γ.delete a) (a⊃b)
+| impI (d : Derivation G b) (a : Formula) {_ : a ∈ G} {_ : G' == G.delete a}
+                     : Derivation G' (a⊃b)
 
-| impE (π₁ : Derivation Γ₁ a) (π₂ : Derivation Γ₂ (a⊃b))
-                     : Derivation (Γ₁ ++ Γ₂) b
+| impE (d₁ : Derivation G₁ a) (d₂ : Derivation G₂ (a⊃b)) {_ : G' == G₁ ++ G₂}
+                     : Derivation G' b
 
 export Derivation (hypo impI impE)
 
 example (a : Formula) : Derivation [] (a⊃a) := by
-  have d₀ : Derivation [a] a := hypo;
-  -- apply (impI d₀ a); trivial
-  have d₁ := (@impI _ _ d₀);
-  simp at d₁; trivial
+  apply impI (G := [a]) <;> try simp -- ⊢ a⊃a
+  apply hypo                         -- a ⊢ a
 
-example : Derivation [] (0⊃0) := by
-  have d₀ : Derivation [0] 0 := hypo;
-  apply (impI d₀ 0); trivial
+example : Derivation [] ((0⊃1)⊃(1⊃2)⊃(0⊃2)) := by
+  apply impI (G := [0⊃1]) <;> try simp
+  apply impI (G := [0⊃1, 1⊃2]) <;> try simp +decide
+  apply impI (G := [0⊃1, 1⊃2, 0]) <;> try simp +decide
+
+  -- have h : ((0⊃1) == (1⊃2)) = false := by simp; trivial
+  -- rw [h]
