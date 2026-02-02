@@ -136,11 +136,11 @@ def Tree.leaves : Tree G A → Context
 | enode t₁ t₂ => t₁.leaves ++ t₂.leaves
 
 -- Gets the derivation (Prop) corresponding to tree.
-def Tree.deriv : Tree G A → Derivation G A
+def Tree.P : Tree G A → Derivation G A
 | hnode a => hypo a
 | @inode g a b t h =>
-    by app impI t.deriv; apply (List.mem_of_elem_eq_true h)
-| @enode g₁ g₂ a b t₁ t₂ => by app impE t₁.deriv t₂.deriv
+    by app impI t.P; apply (List.mem_of_elem_eq_true h)
+| @enode g₁ g₂ a b t₁ t₂ => by app impE t₁.P t₂.P
 
 section
 def t0 : Tree [0] 0 := hnode 0
@@ -167,9 +167,9 @@ example : t2.leaves == [0, 0⊃1]         := by rfl
 example : t3.leaves == [0, 0⊃1, 1⊃2]    := by rfl
 example : t4.leaves == [0, 0⊃1,1⊃2]     := by rfl
 
-#check (t0.deriv : [0] ⊢ 0)
-#check (t1.deriv : [] ⊢ 0⊃0)
-#check (t2.deriv : [0, 0⊃1] ⊢ 1)
+#check (t0.P : [0] ⊢ 0)
+#check (t1.P : [] ⊢ 0⊃0)
+#check (t2.P : [0, 0⊃1] ⊢ 1)
 end
 
 theorem Tree.context_sub_leaves (t : Tree G A) :
@@ -193,7 +193,7 @@ structure DLDS where
   nodes : List Node
   edges : List Edge
   root : Node
-  rootP : root ∈ nodes ∧ forall e, e ∈ edges → e.orig != root
+  rootP : nodes.elem root && edges.all (λ e => e.orig != root)
 
 def x : Node := {id := 0, formula := 0}
 def y : Node := {id := 1, formula := 1}
@@ -202,12 +202,12 @@ def y : Node := {id := 1, formula := 1}
   nodes := [x],
   edges := [],
   root  := x,
-  rootP := by simp
+  rootP := by rfl
 } : DLDS)
 
 #check ({
   nodes := [x, y],
   edges := [{orig := x, dest := y, deps := []}],
   root  := y,
-  rootP := by unfold x y; simp
+  rootP := by rfl
 } : DLDS)
