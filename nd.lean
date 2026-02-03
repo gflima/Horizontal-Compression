@@ -32,21 +32,40 @@ abbrev Context := List Formula
 
 namespace List
 
-@[simp] def delete [BEq α] [ReflBEq α] (A : α) :
+@[simp] def delete [BEq α] [ReflBEq α] (a : α) :
     (l : List α) → List α
   | [] => []
-  | x :: xs => match x == A with
-    | true => List.delete A xs
-    | false => x :: List.delete A xs
+  | x :: xs => match x == a with
+    | true => List.delete a xs
+    | false => x :: List.delete a xs
 
-abbrev delete' [BEq α] [ReflBEq α] (l : List α) (A : α) := delete A l
+abbrev delete' [BEq α] [ReflBEq α] (l : List α) (a : α) := delete a l
 
 infixl:68 " / " => List.delete'
 
-theorem delete_nil [BEq α] [ReflBEq α] (A : α) : []/A = [] := rfl
+#check beq_false_of_ne
 
-theorem delete_head [BEq α] [ReflBEq α] (A : α) (l : List α) :
-    (A :: l)/A = l/A := by simp
+theorem delete_filter [BEq α] [LawfulBEq α] (a : α) (l : List α) :
+    l.delete a = l.filter (λ b ↦ !(b == a)) := by
+  induction l with
+  | nil => rfl
+  | cons b _ => simp!; if h : b = a then rw [h]; simp; trivial else
+    rw [beq_false_of_ne h]; simp; trivial
+
+theorem delete_nil [BEq α] [ReflBEq α] (a : α) : []/a = [] := rfl
+
+theorem delete_head [BEq α] [ReflBEq α] (a : α) (l : List α) :
+    (a :: l)/a = l/a := by simp
+
+-- theorem sublist_delete [BEq α] [ReflBEq α] (A : α) (l : List α) :
+--   l/a <+ l := by
+--   induction l with
+--   | nil => simp
+--   | cons a' l' =>
+--     if h : a = a' then
+--       rw [h]; simp; sorry
+--     else
+--       sorry
 
 end List
 
@@ -172,8 +191,8 @@ example : t4.leaves == [0, 0⊃1,1⊃2]     := by rfl
 #check (t2.P : [0, 0⊃1] ⊢ 1)
 end
 
-theorem Tree.context_sub_leaves (t : Tree G A) :
-    t.context.Sublist t.leaves := by
+theorem Tree.context_subset_leaves (t : Tree G A) :
+    t.context ⊆ t.leaves := by
   sorry
 
 -- DLDS --------------------------------------------------------------------
@@ -202,12 +221,12 @@ def y : Node := {id := 1, formula := 1}
   nodes := [x],
   edges := [],
   root  := x,
-  rootP := by rfl
+  rootP := rfl
 } : DLDS)
 
 #check ({
   nodes := [x, y],
   edges := [{orig := x, dest := y, deps := []}],
   root  := y,
-  rootP := by rfl
+  rootP := rfl
 } : DLDS)
