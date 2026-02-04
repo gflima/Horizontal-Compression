@@ -57,16 +57,18 @@ theorem delete_nil [BEq α] [ReflBEq α] (a : α) : []/a = [] := rfl
 theorem delete_head [BEq α] [ReflBEq α] (a : α) (l : List α) :
     (a :: l)/a = l/a := by simp
 
--- theorem sublist_delete [BEq α] [ReflBEq α] (A : α) (l : List α) :
---   l/a <+ l := by
---   induction l with
---   | nil => simp
---   | cons a' l' =>
---     if h : a = a' then
---       rw [h]; simp; sorry
---     else
---       sorry
-
+theorem subset_delete [BEq α] [LawfulBEq α] (a : α) (l : List α) :
+    l/a ⊆ l := by
+  induction l with
+  | nil => simp
+  | cons a' l' ih =>
+    simp;
+    if h : a' = a then
+      rw [h]; simp; apply Subset.trans ih;
+      apply List.subset_cons_of_subset; apply Subset.refl
+    else
+      rw [beq_false_of_ne h]; simp; apply Subset.trans ih;
+      apply List.subset_cons_of_subset; apply Subset.refl
 end List
 
 -- Derivation --------------------------------------------------------------
@@ -84,7 +86,7 @@ inductive Derivation : Context → Formula → Prop where
 
 export Derivation (hypo impI impE)
 
-infix:20 " ⊢ " => Derivation
+infix:21 " ⊢ " => Derivation
 
 macro "app " e:term : tactic =>
   `(tactic| apply ($e : _) <;> try simp +decide)
@@ -161,39 +163,57 @@ def Tree.P : Tree G A → Derivation G A
     by app impI t.P; apply (List.mem_of_elem_eq_true h)
 | @enode g₁ g₂ a b t₁ t₂ => by app impE t₁.P t₂.P
 
+theorem Tree.to_P : Tree G A → Derivation G A := by
+  intro t; apply t.P
+
+theorem Tree.from_P (G : Context) (A : Formula) (d : G ⊢ A) :
+    ∃ t : Tree G A, t.context = G ∧ t.formula = A := by
+  induction d with
+  | hypo a => exists (hnode a)
+  | impI _ AG h hi =>
+    rw [h]; rcases hi with ⟨t₁, _⟩
+    exists (inode _ t₁ (List.elem_eq_true_of_mem AG))
+  | impE d₁ d₂ h hi₁ hi₂ =>
+    rw [h]; rcases hi₁ with ⟨t₁, _⟩; rcases hi₂ with ⟨t₂, _⟩
+    exists (enode t₁ t₂)
+
+theorem Tree.iff_P (G : Context) (A : Formula) :
+    G ⊢ A ↔ ∃ t : Tree G A, t.context = G ∧ t.formula = A := by
+  apply Iff.intro; apply Tree.from_P;
+  intro ⟨t, _⟩; apply Tree.to_P t
+
 section
-def t0 : Tree [0] 0 := hnode 0
-def t1 : Tree [] (0⊃0) := inode 0 t0 rfl
-def t2 : Tree [0, 0⊃1] 1 := enode t0 (Tree.hnode (0⊃1))
-def t3 : Tree [0, 0⊃1, 1⊃2] 2 := enode t2 (hnode (1⊃2))
-def t4 : Tree [0⊃1, 1⊃2] (0⊃2) := inode 0 t3 rfl
-
-example : t0.context == [0]             := by rfl
-example : t1.context == []              := by rfl
-example : t2.context == [0, 0⊃1]        := by rfl
-example : t3.context == [0, 0⊃1, 1⊃2]   := by rfl
-example : t4.context == [0⊃1, 1⊃2]      := by rfl
-
-example : t0.formula == 0               := by rfl
-example : t1.formula == 0⊃0             := by rfl
-example : t2.formula == 1               := by rfl
-example : t3.formula == 2               := by rfl
-example : t4.formula == 0⊃2             := by rfl
-
-example : t0.leaves == [0]              := by rfl
-example : t1.leaves == [0]              := by rfl
-example : t2.leaves == [0, 0⊃1]         := by rfl
-example : t3.leaves == [0, 0⊃1, 1⊃2]    := by rfl
-example : t4.leaves == [0, 0⊃1,1⊃2]     := by rfl
-
+def t0 : Tree [0] 0                   := hnode 0
+def t1 : Tree [] (0⊃0)                := inode 0 t0 rfl
+def t2 : Tree [0, 0⊃1] 1              := enode t0 (Tree.hnode (0⊃1))
+def t3 : Tree [0, 0⊃1, 1⊃2] 2         := enode t2 (hnode (1⊃2))
+def t4 : Tree [0⊃1, 1⊃2] (0⊃2)        := inode 0 t3 rfl
+example : t0.context == [0]           := by rfl
+example : t1.context == []            := by rfl
+example : t2.context == [0, 0⊃1]      := by rfl
+example : t3.context == [0, 0⊃1, 1⊃2] := by rfl
+example : t4.context == [0⊃1, 1⊃2]    := by rfl
+example : t0.formula == 0             := by rfl
+example : t1.formula == 0⊃0           := by rfl
+example : t2.formula == 1             := by rfl
+example : t3.formula == 2             := by rfl
+example : t4.formula == 0⊃2           := by rfl
+example : t0.leaves == [0]            := by rfl
+example : t1.leaves == [0]            := by rfl
+example : t2.leaves == [0, 0⊃1]       := by rfl
+example : t3.leaves == [0, 0⊃1, 1⊃2]  := by rfl
+example : t4.leaves == [0, 0⊃1,1⊃2]   := by rfl
 #check (t0.P : [0] ⊢ 0)
 #check (t1.P : [] ⊢ 0⊃0)
 #check (t2.P : [0, 0⊃1] ⊢ 1)
 end
 
-theorem Tree.context_subset_leaves (t : Tree G A) :
-    t.context ⊆ t.leaves := by
-  sorry
+-- theorem Tree.context_subset_leaves (t : Tree G A) :
+--     t.context ⊆ t.leaves := by
+--   induction t with
+--   | hnode a => simp!
+--   | inode _ => simp!
+--   | enode _ => sorry
 
 -- DLDS --------------------------------------------------------------------
 
