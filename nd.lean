@@ -5,10 +5,12 @@ inductive Formula where
 | imp (A B : Formula)
 deriving BEq, ReflBEq, LawfulBEq, DecidableEq
 
+namespace Formula
+
 instance : OfNat Formula n where
   ofNat := Formula.atom n
 
-def Formula.toString : Formula → String
+def toString : Formula → String
 | .atom n => n.repr
 | .imp A B => "(" ++ A.toString ++ "⊃" ++ B.toString ++ ")"
 
@@ -20,6 +22,8 @@ instance : Repr Formula where
 
 prefix:max "#" => Formula.atom
 infixr:66 "⊃" => Formula.imp
+
+end Formula
 
 #check (#0 : Formula)           -- (atom 0)
 #check (0⊃1 : Formula)          -- (imp (atom 0) (atom 1))
@@ -69,16 +73,16 @@ theorem subset_delete [BEq α] [LawfulBEq α] (a : α) (l : List α) :
     else
       rw [beq_false_of_ne h]; simp; apply Subset.trans ih;
       apply List.subset_cons_of_subset; apply Subset.refl
+
 end List
 
 -- Derivation --------------------------------------------------------------
 
 inductive Derivation : Context → Formula → Prop where
 
-| hypo (A : Formula) :
-    Derivation [A] A
+| hypo (A : Formula) : Derivation [A] A
 
-| impI {A : Formula} (d : Derivation G B) :
+| impI (d : Derivation G B) :
     A ∈ G → H = G/A → Derivation H (A⊃B)
 
 | impE (d₁ : Derivation G₁ A) (d₂ : Derivation G₂ (A⊃B)) :
@@ -91,7 +95,9 @@ infix:21 " ⊢ " => Derivation
 macro "app " e:term : tactic =>
   `(tactic| apply ($e : _) <;> try simp +decide)
 
-example (A : Formula) : [] ⊢ A⊃A := by
+namespace Derivation
+
+example : [] ⊢ A⊃A := by
   app impI (hypo A)
 
 example : [] ⊢ (0⊃1)⊃(1⊃2)⊃(0⊃2) := by
@@ -115,6 +121,8 @@ theorem deduct_head (d : A :: G ⊢ B) : G/A ⊢ A⊃B := by
   suffices (A :: G)/A ⊢ A⊃B by rw [←List.delete_head]; trivial
   app deduct (A := A) d
 
+end Derivation
+
 -- Tree --------------------------------------------------------------------
 
 inductive Tree : Context → Formula → Type where
@@ -132,55 +140,73 @@ deriving Repr
 
 export Tree (hnode inode enode)
 
+namespace Tree
+
 -- Gets the root context of the tree.
-def Tree.context : Tree G A → Context
+@[simp] def context : Tree G A → Context
 | hnode a => [a]
 | @inode G a _ _ _ => G/a
 | @enode G₁ G₂ _ _ _ _ => G₁ ++ G₂
 
 -- Gets the root formula of tree.
-def Tree.formula : Tree G A → Formula
+@[simp] def formula : Tree G A → Formula
 | hnode a => a
 | @inode _ a b _ _ => a ⊃ b
 | @enode _ _ _ b t₁ t₂ => b
 
-theorem Tree.context_ok (t : Tree G A) : t.context = G := by
+theorem context_eq (t : Tree G A) : t.context = G := by
   cases t <;> rfl
 
-theorem Tree.formula_ok (t : Tree G A) : t.formula = A := by
+theorem formula_eq (t : Tree G A) : t.formula = A := by
   cases t <;> rfl
 
 -- Gets the leaf formulas of tree.
-def Tree.leaves : Tree G A → Context
+@[simp] def leaves : Tree G A → Context
 | hnode a => [a]
 | inode _ t _ => t.leaves
 | enode t₁ t₂ => t₁.leaves ++ t₂.leaves
 
 -- Gets the derivation (Prop) corresponding to tree.
-def Tree.P : Tree G A → Derivation G A
+def P : Tree G A → Derivation G A
 | hnode a => hypo a
 | @inode g a b t h =>
     by app impI t.P; apply (List.mem_of_elem_eq_true h)
 | @enode g₁ g₂ a b t₁ t₂ => by app impE t₁.P t₂.P
 
-theorem Tree.to_P : Tree G A → Derivation G A := by
+theorem to_P : Tree G A → Derivation G A := by
   intro t; apply t.P
 
-theorem Tree.from_P (G : Context) (A : Formula) (d : G ⊢ A) :
+theorem from_P (G : Context) (A : Formula) (d : G ⊢ A) :
     ∃ t : Tree G A, t.context = G ∧ t.formula = A := by
   induction d with
   | hypo a => exists (hnode a)
-  | impI _ AG h hi =>
+  | impI _ hAG h hi =>
     rw [h]; rcases hi with ⟨t₁, _⟩
-    exists (inode _ t₁ (List.elem_eq_true_of_mem AG))
-  | impE d₁ d₂ h hi₁ hi₂ =>
+    exists (inode _ t₁ (List.elem_eq_true_of_mem hAG))
+  | impE _ _ h hi₁ hi₂ =>
     rw [h]; rcases hi₁ with ⟨t₁, _⟩; rcases hi₂ with ⟨t₂, _⟩
     exists (enode t₁ t₂)
 
-theorem Tree.iff_P (G : Context) (A : Formula) :
+theorem iff_P (G : Context) (A : Formula) :
     G ⊢ A ↔ ∃ t : Tree G A, t.context = G ∧ t.formula = A := by
   apply Iff.intro; apply Tree.from_P;
   intro ⟨t, _⟩; apply Tree.to_P t
+
+theorem context_subset_leaves (G : Context) (A : Formula) (t : Tree G A) :
+    t.context ⊆ t.leaves := by
+  induction t with
+  | hnode _ => simp
+  | inode _ t _ ih =>
+    simp; rewrite [Tree.context_eq t] at ih
+    exact (List.Subset.trans (List.subset_delete _ _) ih)
+  | enode t₁ t₂ ih₁ ih₂ =>
+    simp; and_intros
+    · rewrite [Tree.context_eq t₁] at ih₁
+      apply (List.subset_append_of_subset_left _ ih₁)
+    · rewrite [Tree.context_eq t₂] at ih₂
+      apply (List.subset_append_of_subset_right _ ih₂)
+
+end Tree
 
 section
 def t0 : Tree [0] 0                   := hnode 0
@@ -208,14 +234,9 @@ example : t4.leaves == [0, 0⊃1,1⊃2]   := by rfl
 #check (t2.P : [0, 0⊃1] ⊢ 1)
 end
 
--- theorem Tree.context_subset_leaves (t : Tree G A) :
---     t.context ⊆ t.leaves := by
---   induction t with
---   | hnode a => simp!
---   | inode _ => simp!
---   | enode _ => sorry
-
 -- DLDS --------------------------------------------------------------------
+
+namespace DLDS
 
 structure Node where
   id      : Nat
@@ -250,3 +271,5 @@ def y : Node := {id := 1, formula := 1}
   root  := y,
   rootP := rfl
 } : DLDS)
+
+end DLDS
