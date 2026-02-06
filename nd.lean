@@ -166,6 +166,20 @@ theorem formula_eq (t : Tree G A) : t.formula = A := by
 | inode _ t _ => t.leaves
 | enode t₁ t₂ => t₁.leaves ++ t₂.leaves
 
+theorem context_subset_leaves (G : Context) (A : Formula) (t : Tree G A) :
+    t.context ⊆ t.leaves := by
+  induction t with
+  | hnode _ => simp
+  | inode _ t _ ih =>
+    simp; rewrite [Tree.context_eq t] at ih
+    exact (List.Subset.trans (List.subset_delete _ _) ih)
+  | enode t₁ t₂ ih₁ ih₂ =>
+    simp; and_intros
+    · rewrite [Tree.context_eq t₁] at ih₁
+      apply (List.subset_append_of_subset_left _ ih₁)
+    · rewrite [Tree.context_eq t₂] at ih₂
+      apply (List.subset_append_of_subset_right _ ih₂)
+
 -- Gets the derivation (Prop) corresponding to tree.
 def P : Tree G A → Derivation G A
 | hnode a => hypo a
@@ -191,20 +205,6 @@ theorem iff_P (G : Context) (A : Formula) :
     G ⊢ A ↔ ∃ t : Tree G A, t.context = G ∧ t.formula = A := by
   apply Iff.intro; apply Tree.from_P;
   intro ⟨t, _⟩; apply Tree.to_P t
-
-theorem context_subset_leaves (G : Context) (A : Formula) (t : Tree G A) :
-    t.context ⊆ t.leaves := by
-  induction t with
-  | hnode _ => simp
-  | inode _ t _ ih =>
-    simp; rewrite [Tree.context_eq t] at ih
-    exact (List.Subset.trans (List.subset_delete _ _) ih)
-  | enode t₁ t₂ ih₁ ih₂ =>
-    simp; and_intros
-    · rewrite [Tree.context_eq t₁] at ih₁
-      apply (List.subset_append_of_subset_left _ ih₁)
-    · rewrite [Tree.context_eq t₂] at ih₂
-      apply (List.subset_append_of_subset_right _ ih₂)
 
 end Tree
 
@@ -234,6 +234,10 @@ example : t4.leaves == [0, 0⊃1,1⊃2]   := by rfl
 #check (t2.P : [0, 0⊃1] ⊢ 1)
 end
 
+-- Graph -------------------------------------------------------------------
+
+#check List
+
 -- DLDS --------------------------------------------------------------------
 
 namespace DLDS
@@ -246,6 +250,7 @@ structure Node where
 structure Edge where
   orig    : Node
   dest    : Node
+  color   : Nat
   deps    : Context
   deriving BEq, ReflBEq, LawfulBEq, DecidableEq
 
@@ -255,6 +260,7 @@ structure DLDS where
   root : Node
   rootP : nodes.elem root && edges.all (λ e => e.orig != root)
 
+section
 def x : Node := {id := 0, formula := 0}
 def y : Node := {id := 1, formula := 1}
 
@@ -267,9 +273,10 @@ def y : Node := {id := 1, formula := 1}
 
 #check ({
   nodes := [x, y],
-  edges := [{orig := x, dest := y, deps := []}],
+  edges := [{orig := x, dest := y, color := 0, deps := []}],
   root  := y,
   rootP := rfl
 } : DLDS)
+end
 
 end DLDS

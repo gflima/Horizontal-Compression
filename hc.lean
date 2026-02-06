@@ -378,8 +378,9 @@ def type2_hypothesis (N : Neighborhood) : Prop :=
     -- incoming a-edges up
     ∧ N.ainUp = []
 
-/- Neighborhood: Check Incoming Edges (Type 1 & 3) -/
-
+-- every d-edge d arriving at X
+-- comes from a non-collapsed parent node Y
+-- Y is target of some a-edge
 def type_incoming (N : Neighborhood) : Prop :=
   ∀ {d : DEdge}, d ∈ N.din → check d N.center N.ainUp
   where check (d : DEdge) (X : Node) (ainUp : List AEdge) : Prop :=
@@ -389,34 +390,39 @@ def type_incoming (N : Neighborhood) : Prop :=
     ∧ d.orig.past = [])
     ∧ d.dest = X
     ∧ d.color = 0
-    ∧ ∃ (c : Nat) (cs : List Nat) (anc : Node),
-        {orig := anc, dest := d.orig, colors := 0 :: c :: cs} ∈ ainUp
+    ∧ ∃ (c : Nat) (cs : List Nat) (Y : Node),
+        {orig := Y, dest := d.orig, colors := 0 :: c :: cs} ∈ ainUp
 
-/- Neighborhood: Check Outgoing Edges (Type 1) -/
-def type_outgoing₁ (N : Neighborhood) : Prop := ∀{OUT : DEdge}, ( OUT ∈ N.dout ) → ( type_outgoing₁.check_h₁ OUT N.center
-                                                                                                 ∨ type_outgoing₁.check_ie₁ OUT N.center N.ainUp )
-  where check_h₁ (OUT : DEdge) (center : Node) : Prop :=
-        /- Type 1 Hypothesis -/
-        ( center.isHypothesis = true )
-        /- Orig Node: -/
-      ∧ ( OUT.orig = center )
-        /- Dest Node: -/
-      ∧ ( ( OUT.dest.id > 0 ) ∧ ( OUT.dest.level = center.level - 1 )
-        ∧ ( OUT.dest.isCollapsed = false ) ∧ ( OUT.dest.past = [] ) )
-        /- Colors: -/
-      ∧ ( OUT.color = 0 )
-        check_ie₁ (OUT : DEdge) (center : Node) (INDIRECT : List AEdge) : Prop :=
-        /- Type 1 Introduction & Elimination -/
-        ( ( center.isHypothesis = false ) ∨ ( center.isCollapsed = true ) )
-        /- Orig Node: -/
-      ∧ ( OUT.orig = center )
-        /- Dest Node: -/
-      ∧ ( ( OUT.dest.id > 0 ) ∧ ( OUT.dest.level = center.level - 1 )
-        ∧ ( OUT.dest.isCollapsed = false ) ∧ ( OUT.dest.past = [] ) )
-        /- Colors: -/
-      ∧ ( OUT.color ∈ (center.id::center.past) )
-        /- DEdge-AEdge Duo: -/
-      ∧ ( ∃(inc : Node), ( AEdge.mk OUT.dest inc [0, OUT.color] ∈ INDIRECT ) )                                                      /- => Indirect Path => -/
+-- every d-edge d leaving X
+-- (1) goes from X a hypothesis to a non-collapsed child node; or
+-- (2) goes from X a non-hypothesis, collapsed node to
+--     a non-collapsed child node Y such that that is an a-edge
+--     from Z to
+def type_outgoing₁ (N : Neighborhood) : Prop :=
+  ∀ {d : DEdge}, d ∈ N.dout →
+    type_outgoing₁.check_h₁ d N.center
+    ∨ type_outgoing₁.check_ie₁ d N.center N.ainUp
+  where
+    check_h₁ (d : DEdge) (X : Node) : Prop :=
+      X.isHypothesis = true
+      ∧ d.orig = X
+      ∧ (d.dest.id > 0
+      ∧ d.dest.level = X.level - 1
+      ∧ d.dest.isCollapsed = false
+      ∧ d.dest.past = [])
+      ∧ d.color = 0
+
+    check_ie₁ (d : DEdge) (X : Node) (ainUp : List AEdge) : Prop :=
+      (X.isHypothesis = false ∨ X.isCollapsed = true)
+      ∧ d.orig = X
+      ∧ (d.dest.id > 0
+      ∧ d.dest.level = X.level - 1
+      ∧ d.dest.isCollapsed = false
+      ∧ d.dest.past = [])
+      ∧ d.color ∈ X.id :: X.past
+      ∧ ∃ (Z : Node),
+        {orig := d.dest, dest := Z, colors := [0, d.color]} ∈ ainUp
+
 /- Neighborhood: Check Outgoing Edges (Type 3) -/
 def type_outgoing₃ (N : Neighborhood) : Prop := ∀{OUT : DEdge}, ( OUT ∈ N.dout ) → ( ( type_outgoing₁.check_h₁ OUT N.center
                                                                                                    ∨ type_outgoing₁.check_ie₁ OUT N.center N.ainUp )
