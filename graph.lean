@@ -63,25 +63,32 @@ def isValid (t : Adj) : Bool :=
 abbrev valid (t : Adj) : Prop :=
   forall e, e ∈ t.edges → e.1 ∈ t.nodes ∧ e.2 ∈ t.nodes
 
-theorem isValid_subset (t : Adj) : t.isValid ↔
+theorem isValid_subset {t : Adj} : t.isValid ↔
     t.edges.unzip.fst ⊆ t.nodes ∧ t.edges.unzip.snd ⊆ t.nodes := by
   unfold isValid
   rw [Function.uncurry_apply_pair and, Bool.and_eq_true,
       Prod.map_fst, List.isSuperset, List.isSubset_iff_Subset,
       Prod.map_snd, List.isSuperset, List.isSubset_iff_Subset]
 
-theorem valid_of_isValid (t : Adj) : t.isValid → t.valid := by
+theorem valid_of_isValid {t : Adj} : t.isValid → t.valid := by
   rw [isValid_subset]
   intro ⟨h₁, h₂⟩ e _; and_intros
   · apply h₁; simp; exists e.snd
   · apply h₂; simp; exists e.fst
 
-theorem isValid_of_valid (t : Adj) : t.valid → t.isValid := by
-  rw [isValid_subset]; unfold valid
-  intro h
-  rw [List.unzip_eq_map]; simp;
+theorem isValid_of_valid {t : Adj} : t.valid → t.isValid := by
+  rw [isValid_subset, imp_and, List.unzip_eq_map,
+      List.subset_def, List.subset_def]; simp
   apply And.intro
-  sorry
+  · intro h a x ax; have ⟨_, _⟩ := h a x ax; trivial
+  · intro h a x xa; have ⟨_, _⟩ := h x a xa; trivial
+
+@[simp, grind =] theorem isValid_iff_valid {t : Adj} :
+    t.isValid ↔ t.valid := by
+  apply Iff.intro valid_of_isValid isValid_of_valid
+
+instance (t : Adj) : Decidable t.valid :=
+  decidable_of_iff t.isValid isValid_iff_valid
 
 end Adj
 
