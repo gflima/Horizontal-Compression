@@ -92,8 +92,6 @@ instance (t : Adj) : Decidable t.valid :=
 
 end Adj
 
-#exit
-
 structure Graph where
   adj : Adj
   adj_isValid : adj.isValid
@@ -106,16 +104,7 @@ def edges (g : Graph) : List Edge := g.adj.edges
 
 def g := Graph.mk #[[0,1],[1,0],[0]] rfl
 #eval g
--- #eval g.nodes
--- #eval g.edges
-
--- -- #check List.Subset
--- -- #eval (List.range g.adj.size)
--- #eval (g.nodes.map (g.adj.getD · [])).flatten ⊆ (List.range g.adj.size)
-
--- #check List.removeAll
--- #check List.Subset
--- #check (· ⊆ g.nodes)
--- #eval g.edges.unzip.map g.nodes.removeAll g.nodes.removeAll == ([], [])
+#eval g.nodes
+#eval g.edges
 
 end Graph
