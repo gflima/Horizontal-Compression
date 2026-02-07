@@ -7,7 +7,7 @@ namespace List
   | _, [] => false
   | a :: l₁, l₂ => l₂.elem a && l₁.isSubset l₂
 
-def isSuperset [BEq α] (l₁ l₂ : List α) : Bool := l₂.isSubset l₁
+@[simp] def isSuperset [BEq α] (l₁ l₂ : List α) : Bool := l₂.isSubset l₁
 
 theorem isSubset_of_cons_isSubset [BEq α] {a : α} {l₁ l₂ : List α} :
     (a :: l₁).isSubset l₂ → l₂.elem a ∧ l₁.isSubset l₂ := by
@@ -25,7 +25,7 @@ theorem Subset_of_isSubset [BEq α] [LawfulBEq α] {l₁ l₂ : List α} :
     · apply ih h_l₁'l₂
 
 theorem isSubset_of_Subset [BEq α] [LawfulBEq α] {l₁ l₂ : List α} :
-    l₁ ⊆ l₂ →  l₁.isSubset l₂ := by
+    l₁ ⊆ l₂ → l₁.isSubset l₂ := by
   induction l₁ generalizing l₂ with
   | nil => simp
   | cons a l₁' ih =>
@@ -36,6 +36,9 @@ theorem isSubset_of_Subset [BEq α] [LawfulBEq α] {l₁ l₂ : List α} :
 @[simp, grind =] theorem isSubset_iff_Subset [BEq α] [LawfulBEq α]
     {l₁ l₂ : List α} : l₁.isSubset l₂ ↔ l₁ ⊆ l₂ := by
   apply Iff.intro Subset_of_isSubset isSubset_of_Subset
+
+instance [DecidableEq α] (l₁ l₂ : List α) : Decidable (l₁ ⊆ l₂) :=
+  decidable_of_iff (l₁.isSubset l₂) isSubset_iff_Subset
 
 end List
 
@@ -54,31 +57,38 @@ def nodes (t : Adj) : List Node := List.range t.size
 def edges (t : Adj) : List Edge :=
   (t.nodes.map (λ x ↦ (t.index x).map (λ y ↦ (x, y)))).flatten
 
-@[simp] def constr (t : Adj) : Bool :=
+def isValid (t : Adj) : Bool :=
   and.uncurry (t.edges.unzip.map t.nodes.isSuperset t.nodes.isSuperset)
 
-abbrev constrP (t : Adj) :=
+abbrev valid (t : Adj) : Prop :=
   forall e, e ∈ t.edges → e.1 ∈ t.nodes ∧ e.2 ∈ t.nodes
 
-theorem constrP_of_constr (t : Adj) : t.constr → t.constrP := by
-  unfold constr constrP
+theorem isValid_subset (t : Adj) : t.isValid ↔
+    t.edges.unzip.fst ⊆ t.nodes ∧ t.edges.unzip.snd ⊆ t.nodes := by
+  unfold isValid
   rw [Function.uncurry_apply_pair and, Bool.and_eq_true,
       Prod.map_fst, List.isSuperset, List.isSubset_iff_Subset,
-      List.unzip_fst, List.subset_def,
-      Prod.map_snd, List.isSuperset, List.isSubset_iff_Subset,
-      List.unzip_snd, List.subset_def]
-  intro ⟨h₁, h₂⟩ e _; and_intros
-  · apply h₁; rw [List.mem_map]; exists e
-  · apply h₂; rw [List.mem_map]; exists e
+      Prod.map_snd, List.isSuperset, List.isSubset_iff_Subset]
 
--- theorem constr_of_constrP (t : Adj) : t.constrP → t.constr := by
---   sorry
+theorem valid_of_isValid (t : Adj) : t.isValid → t.valid := by
+  rw [isValid_subset]
+  intro ⟨h₁, h₂⟩ e _; and_intros
+  · apply h₁; simp; exists e.snd
+  · apply h₂; simp; exists e.fst
+
+theorem isValid_of_valid (t : Adj) : t.valid → t.isValid := by
+  rw [isValid_subset]; unfold valid
+  intro h
+  apply And.intro
+  sorry
 
 end Adj
 
+#exit
+
 structure Graph where
   adj : Adj
-  adj_constr : adj.constr
+  adj_isValid : adj.isValid
   deriving Repr, DecidableEq
 
 namespace Graph
