@@ -60,24 +60,14 @@ def edges (t : Adj) : List Edge :=
 abbrev constrP (t : Adj) :=
   forall e, e ∈ t.edges → e.1 ∈ t.nodes ∧ e.2 ∈ t.nodes
 
-def A := #[[0,1],[1,0],[8]]
-#check Function.uncurry_apply_pair and
-#check Prod.map
-
-#check List.unzip_fst
-#check List.subset_append_left
-#check List.mem_map
-
 theorem constrP_of_constr (t : Adj) : t.constr → t.constrP := by
   unfold constr constrP
-  rw [Function.uncurry_apply_pair and, Bool.and_eq_true]
-  rw [Prod.map_fst]
-  rw [Prod.map_snd]
-  rw [List.isSuperset, List.isSuperset]
-  rw [List.isSubset_iff_Subset, List.isSubset_iff_Subset]
-  rw [List.unzip_fst, List.unzip_snd]
-  rw [List.subset_def, List.subset_def]
-  intro ⟨h₁, h₂⟩ e he; and_intros
+  rw [Function.uncurry_apply_pair and, Bool.and_eq_true,
+      Prod.map_fst, List.isSuperset, List.isSubset_iff_Subset,
+      List.unzip_fst, List.subset_def,
+      Prod.map_snd, List.isSuperset, List.isSubset_iff_Subset,
+      List.unzip_snd, List.subset_def]
+  intro ⟨h₁, h₂⟩ e _; and_intros
   · apply h₁; rw [List.mem_map]; exists e
   · apply h₂; rw [List.mem_map]; exists e
 
