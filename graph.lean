@@ -79,6 +79,7 @@ theorem valid_of_isValid (t : Adj) : t.isValid → t.valid := by
 theorem isValid_of_valid (t : Adj) : t.valid → t.isValid := by
   rw [isValid_subset]; unfold valid
   intro h
+  rw [List.unzip_eq_map]; simp;
   apply And.intro
   sorry
 
