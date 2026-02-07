@@ -7,21 +7,35 @@ namespace List
   | _, [] => false
   | a :: l₁, l₂ => l₂.elem a && l₁.isSubset l₂
 
+def isSuperset [BEq α] (l₁ l₂ : List α) : Bool := l₂.isSubset l₁
+
 theorem isSubset_of_cons_isSubset [BEq α] {a : α} {l₁ l₂ : List α} :
     (a :: l₁).isSubset l₂ → l₂.elem a ∧ l₁.isSubset l₂ := by
-  induction l₁ generalizing a l₂ <;>
-  if h : l₂ = [] then rewrite [h]; simp else simp
+  if h : l₂ = [] then rw [h]; simp else simp
 
-theorem Subset_of_isSubset [BEq α] [LawfulBEq α] (l₁ l₂ : List α) :
+theorem Subset_of_isSubset [BEq α] [LawfulBEq α] {l₁ l₂ : List α} :
     l₁.isSubset l₂ → l₁ ⊆ l₂ := by
   induction l₁ generalizing l₂ with
   | nil => simp
   | cons a l₁' ih =>
     intro h_al₁l₂
     have ⟨h_al₂, h_l₁'l₂⟩ := isSubset_of_cons_isSubset h_al₁l₂
-    rewrite [List.cons_subset]; and_intros;
+    rw [List.cons_subset]; and_intros;
     · apply l₂.mem_of_elem_eq_true h_al₂
-    · apply ih _ h_l₁'l₂
+    · apply ih h_l₁'l₂
+
+theorem isSubset_of_Subset [BEq α] [LawfulBEq α] {l₁ l₂ : List α} :
+    l₁ ⊆ l₂ →  l₁.isSubset l₂ := by
+  induction l₁ generalizing l₂ with
+  | nil => simp
+  | cons a l₁' ih =>
+    if h : l₂ = [] then rw [h]; simp else
+      rw [List.cons_subset]; intro ⟨h_al₂, h_l₁'l₂⟩; simp
+      and_intros; trivial; apply ih h_l₁'l₂
+
+@[simp, grind =] theorem isSubset_iff_Subset [BEq α] [LawfulBEq α]
+    {l₁ l₂ : List α} : l₁.isSubset l₂ ↔ l₁ ⊆ l₂ := by
+  apply Iff.intro Subset_of_isSubset isSubset_of_Subset
 
 end List
 
@@ -41,19 +55,34 @@ def edges (t : Adj) : List Edge :=
   (t.nodes.map (λ x ↦ (t.index x).map (λ y ↦ (x, y)))).flatten
 
 @[simp] def constr (t : Adj) : Bool :=
-  let sub := λ l ↦ l.isSubset t.nodes
-  and.uncurry (t.edges.unzip.map sub sub)
+  and.uncurry (t.edges.unzip.map t.nodes.isSuperset t.nodes.isSuperset)
 
 abbrev constrP (t : Adj) :=
   forall e, e ∈ t.edges → e.1 ∈ t.nodes ∧ e.2 ∈ t.nodes
 
+def A := #[[0,1],[1,0],[8]]
+#check Function.uncurry_apply_pair and
+#check Prod.map
+
+#check List.unzip_fst
+#check List.subset_append_left
+#check List.mem_map
+
 theorem constrP_of_constr (t : Adj) : t.constr → t.constrP := by
-  sorry
+  unfold constr constrP
+  rw [Function.uncurry_apply_pair and, Bool.and_eq_true]
+  rw [Prod.map_fst]
+  rw [Prod.map_snd]
+  rw [List.isSuperset, List.isSuperset]
+  rw [List.isSubset_iff_Subset, List.isSubset_iff_Subset]
+  rw [List.unzip_fst, List.unzip_snd]
+  rw [List.subset_def, List.subset_def]
+  intro ⟨h₁, h₂⟩ e he; and_intros
+  · apply h₁; rw [List.mem_map]; exists e
+  · apply h₂; rw [List.mem_map]; exists e
 
-#exit
-
-theorem constr_of_constrP (t : Adj) : t.constrP → t.constr := by
-  sorry
+-- theorem constr_of_constrP (t : Adj) : t.constrP → t.constr := by
+--   sorry
 
 end Adj
 
