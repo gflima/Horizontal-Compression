@@ -90,11 +90,28 @@ theorem isValid_of_valid {t : Adj} : t.valid → t.isValid := by
 instance (t : Adj) : Decidable t.valid :=
   decidable_of_iff t.isValid isValid_iff_valid
 
+def delete_node (t : Adj) (x : Node)
+    (h : x < t.size := by get_elem_tactic) : Adj :=
+  let rec loop (i : Nat) (t : Adj) :=
+    if h : i < t.size then
+      loop (i + 1) (t.set i ((index t i).filter (x != ·)) h)
+    else
+      t
+  loop 0 (t.eraseIdx x h)
+
+def a := #[[0,1],[1,0],[0]]
+#eval nodes a
+#eval edges a
+-- #eval nodes (delete_node a 0)
+#eval edges (delete_node a 0)
+
 end Adj
+
+#exit
 
 structure Graph where
   adj : Adj
-  adj_isValid : adj.isValid
+  adj_isValid : adj.isValid := by get_elem_tactic
   deriving Repr, DecidableEq
 
 namespace Graph
@@ -102,9 +119,10 @@ namespace Graph
 def nodes (g : Graph) : List Node := g.adj.nodes
 def edges (g : Graph) : List Edge := g.adj.edges
 
-def g := Graph.mk #[[0,1],[1,0],[0]] rfl
+def g := Graph.mk #[[0,1],[1,0],[0]]
 #eval g
 #eval g.nodes
 #eval g.edges
+#eval (g.adj.eraseIdx 0)
 
 end Graph
